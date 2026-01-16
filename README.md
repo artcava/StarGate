@@ -4,19 +4,19 @@
 
 ## TABLE OF CONTENTS
 
-1. [The Problem](#section-1%3A-the-problem)
-2. [The Solution (StarGate)](#section-2%3A-the-solution-(stargate))
-3. [Architecture - Synchronous Pull Model](#section-3%3A-architecture---synchronous-pull-model)
-4. [Architecture - System Components](#section-4%3A-architecture---system-components)
-5. [Extensibility](#section-5%3A-extensibility)
-6. [Security & Compliance](#section-6%3A-security-%26-compliance)
-7. [Implementation Approach](#section-7%3A-implementation-approach)
-8. [Key Benefits](#section-8%3A-key-benefits)
-9. [Assumptions & Constraints](#section-9%3A-assumptions-%26-constraints)
-10. [Success Metrics](#section-10%3A-success-metrics)
-11. [API Specifications](#section-11%3A-api-specifications)
-12. [Error Handling & Resilience](#section-12%3A-error-handling-%26-resilience)
-13. [Monitoring & Observability](#section-13%3A-monitoring-%26-observability)
+1. [The Problem](#section-1-the-problem)
+2. [The Solution (StarGate)](#section-2-the-solution-stargate)
+3. [Architecture - Synchronous Pull Model](#section-3-architecture---synchronous-pull-model)
+4. [Architecture - System Components](#section-4-architecture---system-components)
+5. [Extensibility](#section-5-extensibility)
+6. [Security & Compliance](#section-6-security--compliance)
+7. [Implementation Approach](#section-7-implementation-approach)
+8. [Key Benefits](#section-8-key-benefits)
+9. [Assumptions & Constraints](#section-9-assumptions--constraints)
+10. [Success Metrics](#section-10-success-metrics)
+11. [API Specifications](#section-11-api-specifications)
+12. [Error Handling & Resilience](#section-12-error-handling--resilience)
+13. [Monitoring & Observability](#section-13-monitoring--observability)
 
 ---
 
