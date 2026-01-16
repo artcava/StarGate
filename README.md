@@ -77,7 +77,7 @@ This 3-6 month cycle repeats **per customer/supplier** for **each new process ty
 
 **StarGate is a secure hybrid bridge** built directly into Customer/Supplier **Client** as a standard component. It enables the local instance to initiate and monitor processes with the central system while maintaining complete isolation of **Server**.
 
-::: mermaid
+``` mermaid
 graph TD 
 SERVER["🔒 SERVER<br/>- Remains completely<br/>isolated and secure"] 
 STARGATE["⚡ STARGATE<br/>AZURE PUBLIC<br/>━━━━━━━━━━━━━━<br/>✓ Authentication<br/>✓ Authorization<br/>✓ Request/Response<br/>✓ State Management"] 
@@ -95,7 +95,7 @@ style STARGATE fill:#4dabf7,stroke:#1971c2,color:#fff
 style CLIENT1 fill:#51cf66,stroke:#2b8a3e,color:#fff 
 style CLIENT2 fill:#51cf66,stroke:#2b8a3e,color:#fff 
 style CLIENT3 fill:#51cf66,stroke:#2b8a3e,color:#fff 
-:::
+```
 
 ### The 4 Pillars of StarGate
 
@@ -132,7 +132,7 @@ style CLIENT3 fill:#51cf66,stroke:#2b8a3e,color:#fff
 
 All communication is **initiated by Horizon-Customer (via built-in StarGate client)**:
 
-::: mermaid
+``` mermaid
 sequenceDiagram
     participant Customer as CLIENT<br/>(Customer/Supplier)
     participant StarGate as STARGATE<br/>GATEWAY
@@ -162,7 +162,7 @@ sequenceDiagram
     end
     
     deactivate Horizon
-:::
+```
 
 ###Polling Strategy (Intelligent Adaptive)
 The **StarGate Client** implements an intelligent polling strategy designed to balance responsiveness with resource efficiency:
