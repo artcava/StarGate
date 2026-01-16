@@ -285,22 +285,6 @@ stateDiagram-v2
     Failed --> Processing: Auto-Retry<br/>(if enabled)
     Failed --> [*]: Intervention<br/>Required
 ```
-
-```
-Request Submitted (by local process)
-       │
-       ▼
-    Accepted (202 returned to Client)
-       │
-       ├─→ Processing (StarGate auto-polls)
-       │
-       ├─→ Completed (result available to local system)
-       │   └─→ Local system consumes result automatically
-       │
-       └─→ Failed (error details available)
-           └─→ Auto-retry or manual intervention
-```
-
 ---
 
 ## SECTION 4: ARCHITECTURE - SYSTEM COMPONENTS
