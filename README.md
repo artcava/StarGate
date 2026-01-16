@@ -164,7 +164,7 @@ sequenceDiagram
     deactivate Horizon
 ```
 
-###Polling Strategy (Intelligent Adaptive)
+### Polling Strategy (Intelligent Adaptive)
 The **StarGate Client** implements an intelligent polling strategy designed to balance responsiveness with resource efficiency:
 ```
 POLLING STRATEGY TIMELINE:
