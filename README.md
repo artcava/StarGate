@@ -560,7 +560,7 @@ The architecture supports adding new processes:
 
 #### Submit Process Request
 
-```
+``` json
 POST /api/stargate/processes
 Content-Type: application/json
 Authorization: Bearer {token}
@@ -629,7 +629,7 @@ ERROR RESPONSES:
 
 #### Query Process Status
 
-```
+``` json
 GET /api/stargate/processes/{processId}
 Authorization: Bearer {token}
 
