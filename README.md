@@ -20,7 +20,8 @@
 
 ---
 
-## SECTION 1: THE PROBLEM [🔝 Back to TOC](#table-of-contents)
+## SECTION 1: THE PROBLEM 
+[🔝](#table-of-contents)
 
 ### Current Situation
 
@@ -71,7 +72,8 @@ This 3-6 month cycle repeats **per customer/supplier** for **each new process ty
 
 ---
 
-## SECTION 2: THE SOLUTION (STARGATE) [🔝 Back to TOC](#table-of-contents)
+## SECTION 2: THE SOLUTION (STARGATE)
+[🔝](#table-of-contents)
 
 ### Key Concept
 
@@ -126,7 +128,8 @@ style CLIENT3 fill:#51cf66,stroke:#2b8a3e,color:#fff
 
 ---
 
-## SECTION 3: ARCHITECTURE - SYNCHRONOUS PULL MODEL [🔝 Back to TOC](#table-of-contents)
+## SECTION 3: ARCHITECTURE - SYNCHRONOUS PULL MODEL
+[🔝](#table-of-contents)
 
 ### Interaction Pattern
 
@@ -287,7 +290,8 @@ stateDiagram-v2
 ```
 ---
 
-## SECTION 4: ARCHITECTURE - SYSTEM COMPONENTS [🔝 Back to TOC](#table-of-contents)
+## SECTION 4: ARCHITECTURE - SYSTEM COMPONENTS
+[🔝](#table-of-contents)
 
 ### High-Level Component View
 
@@ -396,7 +400,8 @@ stateDiagram-v2
 
 ---
 
-## SECTION 5: EXTENSIBILITY [🔝 Back to TOC](#table-of-contents)
+## SECTION 5: EXTENSIBILITY
+[🔝](#table-of-contents)
 
 ### Process Types
 
@@ -434,7 +439,8 @@ The architecture supports adding new processes:
 
 ---
 
-## SECTION 6: SECURITY & COMPLIANCE [🔝 Back to TOC](#table-of-contents)
+## SECTION 6: SECURITY & COMPLIANCE
+[🔝](#table-of-contents)
 
 ### Authentication & Authorization
 
@@ -466,7 +472,8 @@ The architecture supports adding new processes:
 
 ---
 
-## SECTION 7: IMPLEMENTATION APPROACH [🔝 Back to TOC](#table-of-contents)
+## SECTION 7: IMPLEMENTATION APPROACH
+[🔝](#table-of-contents)
 
 ### Phased Rollout
 
@@ -504,7 +511,8 @@ The architecture supports adding new processes:
 
 ---
 
-## SECTION 8: KEY BENEFITS [🔝 Back to TOC](#table-of-contents)
+## SECTION 8: KEY BENEFITS
+[🔝](#table-of-contents)
 
 ### Operational
 
@@ -542,7 +550,8 @@ The architecture supports adding new processes:
 
 ---
 
-## SECTION 9: ASSUMPTIONS & CONSTRAINTS [🔝 Back to TOC](#table-of-contents)
+## SECTION 9: ASSUMPTIONS & CONSTRAINTS
+[🔝](#table-of-contents)
 
 ### Assumptions
 
@@ -561,7 +570,8 @@ The architecture supports adding new processes:
 
 ---
 
-## SECTION 10: SUCCESS METRICS [🔝 Back to TOC](#table-of-contents)
+## SECTION 10: SUCCESS METRICS
+[🔝](#table-of-contents)
 
 ### Operational Metrics
 
@@ -581,7 +591,8 @@ The architecture supports adding new processes:
 
 ---
 
-## SECTION 11: API SPECIFICATIONS [🔝 Back to TOC](#table-of-contents)
+## SECTION 11: API SPECIFICATIONS
+[🔝](#table-of-contents)
 
 ### Detailed Endpoint Documentation
 
@@ -722,7 +733,8 @@ Authorization: Bearer {token}
 
 ---
 
-## SECTION 12: ERROR HANDLING & RESILIENCE [🔝 Back to TOC](#table-of-contents)
+## SECTION 12: ERROR HANDLING & RESILIENCE
+[🔝](#table-of-contents)
 
 ### Error Categories
 
@@ -786,7 +798,8 @@ Authorization: Bearer {token}
 
 ---
 
-## SECTION 13: MONITORING & OBSERVABILITY [🔝 Back to TOC](#table-of-contents)
+## SECTION 13: MONITORING & OBSERVABILITY
+[🔝](#table-of-contents)
 
 ### Key Observability Requirements
 
