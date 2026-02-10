@@ -493,3 +493,9 @@ dotnet build /p:TreatWarningsAsErrors=true
 | Coverage < 70% | Insufficient code coverage | Add more tests |
 | Format check fails | Code not formatted | Run `dotnet format` |
 | Analyzer warnings | Analyzer rule violations | Fix violations or suppress if justified |
+
+---
+
+## Additional Resources
+
+For detailed information about the release process, including version management, changelog updates, and release verification, see [RELEASE-PROCESS.md](./RELEASE-PROCESS.md).
