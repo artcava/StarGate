@@ -162,7 +162,7 @@ git push origin v0.2.0
 
 # 6. Workflow automatically creates release
 # GitHub Actions ci.yml triggers
-# Creates installer + publishes release
+# Publishes release
 ```
 
 ---
@@ -361,12 +361,11 @@ jobs:
   release:
     needs: [build, test, quality]
     if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
       - Checkout code
       - Setup .NET SDK
       - Build Release configuration
-      - Create installer (Velopack/MSIX)
       - Publish GitHub Release
       - Upload release artifacts
 ```
@@ -376,7 +375,7 @@ jobs:
 **Trigger:** Push of a tag with format `v*` (e.g., `v0.1.0`, `v1.2.3`).
 
 **Output:**
-- 📦 GitHub Release with installer
+- 📦 GitHub Release with build artifacts
 - 📝 Automatic release notes
 - 🔗 Download links for users
 
@@ -426,8 +425,6 @@ ci.yml triggered by tag push v0.2.0
   ↓
 ✅ Release job starts
   ↓
-📦 Creates Windows installer
-  ↓
 🚀 Publishes GitHub Release
   ↓
 ✅ Release v0.2.0 published!
@@ -436,7 +433,7 @@ ci.yml triggered by tag push v0.2.0
 **Step 4:** Verify on GitHub
 - Go to: `https://github.com/[user]/[repo]/releases`
 - Find release `v0.2.0`
-- Installer download available
+- Release artifacts available for download
 
 ---
 
