@@ -493,13 +493,3 @@ dotnet build /p:TreatWarningsAsErrors=true
 | Coverage < 70% | Insufficient code coverage | Add more tests |
 | Format check fails | Code not formatted | Run `dotnet format` |
 | Analyzer warnings | Analyzer rule violations | Fix violations or suppress if justified |
-
----
-
-### Benefits of Unified Workflow
-
-✅ **Simplicity:** Single file to maintain instead of 3  
-✅ **Consistency:** All jobs share the same configuration  
-✅ **Efficiency:** Artifact reuse between jobs (caching)  
-✅ **Visibility:** Clear and centralized status checks  
-✅ **Maintainability:** Changes in a single place  
