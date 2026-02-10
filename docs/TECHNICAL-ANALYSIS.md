@@ -2,7 +2,7 @@
 
 **Document Version:** 1.3  
 **Last Updated:** 2026-02-10  
-**Status:** Draft - In Progress
+**Status:** Draft
 
 ---
 
@@ -51,8 +51,6 @@ This document outlines the technical analysis and development plan for the StarG
 - Client SDK implementation (see [CLIENT-TECHNICAL-ANALYSIS.md](./CLIENT-TECHNICAL-ANALYSIS.md))
 - Production deployment procedures
 - Infrastructure as Code (Terraform/ARM)
-
-> **Note:** Per l'analisi tecnica del Client SDK, fare riferimento al documento dedicato [CLIENT-TECHNICAL-ANALYSIS.md](./CLIENT-TECHNICAL-ANALYSIS.md).
 
 ---
 
@@ -114,15 +112,15 @@ This document outlines the technical analysis and development plan for the StarG
 ### Architecture Decisions
 
 #### Database: MongoDB
-- **Decision:** Utilizzare MongoDB esistente già disponibile
-- **Rationale:** Istanza MongoDB già presente nell'infrastruttura, riduce complessità e costi
-- **Benefits:** Nessun provisioning aggiuntivo, familiarità del team, costi contenuti
+- **Decision:** Use existing MongoDB instance
+- **Rationale:** MongoDB instance already available in infrastructure, reduces complexity and costs
+- **Benefits:** No additional provisioning required, team familiarity, contained costs
 
-#### Message Broker: RabbitMQ con Astrazione
-- **Decision:** RabbitMQ come implementazione primaria con interfaccia broker-agnostic
-- **Rationale:** Affidabilità, maturità, supporto a pattern complessi; astrazione permette futura sostituzione
-- **Benefits:** Scalabilità, durabilità dei messaggi, facilità di monitoraggio, flessibilità futura
-- **Alternative:** Possibilità di sostituire con Azure Service Bus, Amazon SQS, o altri broker senza modifiche al core
+#### Message Broker: RabbitMQ with Abstraction
+- **Decision:** RabbitMQ as primary implementation with broker-agnostic interface
+- **Rationale:** Reliability, maturity, support for complex patterns; abstraction enables future replacement
+- **Benefits:** Scalability, message durability, easy monitoring, flexibility for future changes
+- **Alternative:** Can be replaced with Azure Service Bus, Amazon SQS, or other brokers without core changes
 
 ---
 
@@ -232,8 +230,6 @@ StarGate/
 ├── Directory.Build.props                # Shared MSBuild properties
 └── docker-compose.yml                   # Local development stack
 ```
-
-> **Note:** Il progetto `StarGate.Client` è documentato separatamente in [CLIENT-TECHNICAL-ANALYSIS.md](./CLIENT-TECHNICAL-ANALYSIS.md).
 
 ### Directory.Build.props
 
@@ -972,7 +968,7 @@ public class RedisStateStore : IStateStore
 
 ### Broker Abstraction
 
-Il design broker-agnostic permette di sostituire l'implementazione RabbitMQ con altri broker senza modificare il codice core.
+The broker-agnostic design allows replacing the RabbitMQ implementation with other brokers without modifying core code.
 
 #### IMessageBroker Interface
 
@@ -980,22 +976,22 @@ Il design broker-agnostic permette di sostituire l'implementazione RabbitMQ con 
 namespace StarGate.Core.Abstractions;
 
 /// <summary>
-/// Astrazione per message broker.
-/// Permette di sostituire l'implementazione (RabbitMQ, Azure Service Bus, etc.) senza modificare il core.
+/// Message broker abstraction.
+/// Allows replacing implementation (RabbitMQ, Azure Service Bus, etc.) without core changes.
 /// </summary>
 public interface IMessageBroker
 {
     /// <summary>
-    /// Pubblica un messaggio in coda per l'elaborazione asincrona.
+    /// Publishes a message to a queue for asynchronous processing.
     /// </summary>
-    /// <typeparam name="T">Tipo del payload del messaggio.</typeparam>
-    /// <param name="queueName">Nome della coda di destinazione.</param>
-    /// <param name="message">Messaggio da pubblicare.</param>
-    /// <param name="ct">Token di cancellazione.</param>
+    /// <typeparam name="T">Type of message payload.</typeparam>
+    /// <param name="queueName">Target queue name.</param>
+    /// <param name="message">Message to publish.</param>
+    /// <param name="ct">Cancellation token.</param>
     Task PublishAsync<T>(string queueName, T message, CancellationToken ct = default) where T : class;
 
     /// <summary>
-    /// Pubblica un messaggio con proprietà personalizzate.
+    /// Publishes a message with custom properties.
     /// </summary>
     Task PublishAsync<T>(
         string queueName, 
@@ -1004,16 +1000,16 @@ public interface IMessageBroker
         CancellationToken ct = default) where T : class;
 
     /// <summary>
-    /// Crea un consumer per una specifica coda.
+    /// Creates a consumer for a specific queue.
     /// </summary>
-    /// <param name="queueName">Nome della coda da consumare.</param>
-    /// <param name="cancellationToken">Token di cancellazione.</param>
-    /// <returns>Consumer configurato.</returns>
+    /// <param name="queueName">Queue name to consume from.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Configured consumer.</returns>
     IMessageConsumer CreateConsumer(string queueName, CancellationToken cancellationToken = default);
 }
 
 /// <summary>
-/// Proprietà aggiuntive per i messaggi.
+/// Additional message properties.
 /// </summary>
 public record MessageProperties
 {
@@ -1031,28 +1027,28 @@ public record MessageProperties
 namespace StarGate.Core.Abstractions;
 
 /// <summary>
-/// Astrazione per consumer di messaggi.
+/// Message consumer abstraction.
 /// </summary>
 public interface IMessageConsumer : IAsyncDisposable
 {
     /// <summary>
-    /// Avvia il consumo dei messaggi.
+    /// Starts consuming messages.
     /// </summary>
-    /// <typeparam name="T">Tipo del payload atteso.</typeparam>
-    /// <param name="messageHandler">Handler per processare i messaggi.</param>
-    /// <param name="ct">Token di cancellazione.</param>
+    /// <typeparam name="T">Expected payload type.</typeparam>
+    /// <param name="messageHandler">Handler to process messages.</param>
+    /// <param name="ct">Cancellation token.</param>
     Task StartConsumingAsync<T>(
         Func<T, MessageContext, Task> messageHandler,
         CancellationToken ct = default) where T : class;
 
     /// <summary>
-    /// Ferma il consumo dei messaggi.
+    /// Stops consuming messages.
     /// </summary>
     Task StopConsumingAsync();
 }
 
 /// <summary>
-/// Contesto del messaggio ricevuto.
+/// Context of received message.
 /// </summary>
 public record MessageContext
 {
@@ -1107,7 +1103,6 @@ public class RabbitMqBroker : IMessageBroker
     {
         using var channel = await _connection.CreateChannelAsync(ct);
 
-        // Dichiara la coda (idempotente)
         await channel.QueueDeclareAsync(
             queue: queueName,
             durable: true,
@@ -1116,10 +1111,8 @@ public class RabbitMqBroker : IMessageBroker
             arguments: null,
             cancellationToken: ct);
 
-        // Serializza il messaggio
         var body = MessageSerializers.Serialize(message);
 
-        // Configura proprietà RabbitMQ
         var basicProperties = new BasicProperties
         {
             Persistent = true,
@@ -1137,7 +1130,6 @@ public class RabbitMqBroker : IMessageBroker
             basicProperties.Expiration = ((int)properties.TimeToLive.Value.TotalMilliseconds).ToString();
         }
 
-        // Pubblica il messaggio
         await channel.BasicPublishAsync(
             exchange: string.Empty,
             routingKey: queueName,
@@ -1192,14 +1184,12 @@ public class RabbitMqConsumer : IMessageConsumer
     {
         _channel = await _connection.CreateChannelAsync(ct);
 
-        // Configura prefetch per fair dispatching
         await _channel.BasicQosAsync(
             prefetchSize: 0,
             prefetchCount: 1,
             global: false,
             cancellationToken: ct);
 
-        // Dichiara la coda
         await _channel.QueueDeclareAsync(
             queue: _queueName,
             durable: true,
@@ -1213,10 +1203,8 @@ public class RabbitMqConsumer : IMessageConsumer
         {
             try
             {
-                // Deserializza il messaggio
                 var message = MessageSerializers.Deserialize<T>(ea.Body.ToArray());
 
-                // Crea contesto
                 var context = new MessageContext
                 {
                     MessageId = ea.BasicProperties.MessageId ?? "unknown",
@@ -1233,14 +1221,11 @@ public class RabbitMqConsumer : IMessageConsumer
                     }
                 };
 
-                // Invoca handler
                 await messageHandler(message, context);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error processing message from queue {QueueName}", _queueName);
-
-                // Reject e requeue in caso di errore
                 await _channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: true);
             }
         };
@@ -1316,7 +1301,7 @@ public class RabbitMqOptions
     public int NetworkRecoveryInterval { get; init; } = 10;
 }
 
-// In Program.cs - configurazione DI
+// In Program.cs
 services.AddSingleton<IConnection>(sp =>
 {
     var options = sp.GetRequiredService<RabbitMqOptions>();
@@ -1342,7 +1327,7 @@ services.AddSingleton<IMessageBroker, RabbitMqBroker>();
 
 ## Business Logic
 
-### Process Service (Updated for Message Broker)
+### Process Service
 
 ```csharp
 namespace StarGate.Core.Services;
@@ -1383,7 +1368,6 @@ public class ProcessService : IProcessService
             clientId,
             request.ProcessType);
 
-        // Check for duplicate using client process ID
         var existing = await _repository.GetByClientProcessIdAsync(
             clientId,
             request.ClientProcessId,
@@ -1397,10 +1381,8 @@ public class ProcessService : IProcessService
             return existing;
         }
 
-        // Generate GUID for process ID
         var processId = Guid.NewGuid();
 
-        // Create process entity
         var process = new Process
         {
             ProcessId = processId,
@@ -1420,13 +1402,9 @@ public class ProcessService : IProcessService
             Retryable = true
         };
 
-        // Persist to database
         await _repository.CreateAsync(process, ct);
-
-        // Cache for fast queries
         await _cache.SetProcessAsync(process);
 
-        // Publish to message broker for background processing
         await _messageBroker.PublishAsync(
             ProcessQueueName,
             process,
@@ -1448,7 +1426,6 @@ public class ProcessService : IProcessService
         Guid processId,
         CancellationToken ct = default)
     {
-        // Try cache first (sub-millisecond)
         var cached = await _cache.GetProcessAsync(processId);
         if (cached is not null)
         {
@@ -1456,12 +1433,10 @@ public class ProcessService : IProcessService
             return cached;
         }
 
-        // Fallback to database
         var process = await _repository.GetByIdAsync(processId, ct);
 
         if (process is not null)
         {
-            // Populate cache for next time
             await _cache.SetProcessAsync(process);
             _logger.LogDebug("Process {ProcessId} retrieved from database", processId);
         }
@@ -1568,7 +1543,7 @@ public class ProcessHandlerFactory : IProcessHandlerFactory
 }
 ```
 
-### Process Worker (Updated for Message Broker)
+### Process Worker
 
 ```csharp
 namespace StarGate.Server.Workers;
@@ -1604,7 +1579,6 @@ public class ProcessWorker : BackgroundService
 
         await consumer.StartConsumingAsync<Process>(ProcessMessageAsync, stoppingToken);
 
-        // Keep alive until cancellation
         await Task.Delay(Timeout.Infinite, stoppingToken);
     }
 
@@ -1617,20 +1591,15 @@ public class ProcessWorker : BackgroundService
 
         try
         {
-            // Update status to Processing
             await _processService.UpdateProcessStatusAsync(
                 process.ProcessId,
                 ProcessStatus.Processing,
                 progress: 0,
                 currentStep: "initializing");
 
-            // Get appropriate handler
             var handler = _handlerFactory.GetHandler(process.ProcessType);
-
-            // Execute handler
             var result = await handler.ExecuteAsync(process, CancellationToken.None);
 
-            // Update status to Completed
             await _processService.UpdateProcessStatusAsync(
                 process.ProcessId,
                 ProcessStatus.Completed,
@@ -1638,7 +1607,6 @@ public class ProcessWorker : BackgroundService
                 currentStep: null,
                 result: result);
 
-            // Acknowledge message
             await context.AcknowledgeAsync();
 
             _logger.LogInformation(
@@ -1652,7 +1620,6 @@ public class ProcessWorker : BackgroundService
                 "Process {ProcessId} failed with error",
                 process.ProcessId);
 
-            // Update status to Failed
             await _processService.UpdateProcessStatusAsync(
                 process.ProcessId,
                 ProcessStatus.Failed,
@@ -1661,7 +1628,6 @@ public class ProcessWorker : BackgroundService
                     ex.Message,
                     ex.StackTrace));
 
-            // Acknowledge message (non requeue per evitare loop infiniti)
             await context.AcknowledgeAsync();
         }
     }
@@ -1692,7 +1658,6 @@ public class OrderProcessHandler : IProcessHandler
             "Starting order processing for {ProcessId}",
             process.ProcessId);
 
-        // Deserialize order data
         var orderData = JsonSerializer.Deserialize<OrderData>(
             process.Data!.ToString()!);
 
@@ -1701,19 +1666,11 @@ public class OrderProcessHandler : IProcessHandler
             throw new InvalidOperationException("Invalid order data");
         }
 
-        // Step 1: Validate order
         await ValidateOrderAsync(orderData, ct);
-
-        // Step 2: Check inventory
         await CheckInventoryAsync(orderData, ct);
-
-        // Step 3: Reserve items
         await ReserveItemsAsync(orderData, ct);
-
-        // Step 4: Process payment (simulated)
         await Task.Delay(TimeSpan.FromSeconds(2), ct);
 
-        // Step 5: Create shipping label
         var trackingNumber = GenerateTrackingNumber();
 
         var result = new OrderResult
@@ -1733,7 +1690,6 @@ public class OrderProcessHandler : IProcessHandler
 
     private async Task ValidateOrderAsync(OrderData order, CancellationToken ct)
     {
-        // Business logic for validation
         await Task.Delay(TimeSpan.FromMilliseconds(500), ct);
 
         if (order.Items.Count == 0)
@@ -1744,12 +1700,10 @@ public class OrderProcessHandler : IProcessHandler
 
     private async Task CheckInventoryAsync(OrderData order, CancellationToken ct)
     {
-        // Business logic for inventory check
         await Task.Delay(TimeSpan.FromSeconds(1), ct);
 
         foreach (var item in order.Items)
         {
-            // Simulate inventory check
             if (item.Quantity > 1000)
             {
                 throw new InvalidOperationException(
@@ -1760,7 +1714,6 @@ public class OrderProcessHandler : IProcessHandler
 
     private async Task ReserveItemsAsync(OrderData order, CancellationToken ct)
     {
-        // Business logic for item reservation
         await Task.Delay(TimeSpan.FromMilliseconds(800), ct);
     }
 
@@ -1800,7 +1753,6 @@ public class OrderResult
 ```csharp
 namespace StarGate.Api;
 
-// In Program.cs
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -1828,7 +1780,6 @@ builder.Services.AddAuthorization(options =>
 ```csharp
 namespace StarGate.Api;
 
-// In Program.cs
 builder.Services.AddRateLimiter(options =>
 {
     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
@@ -1963,7 +1914,6 @@ public class ProcessServiceTests
     [Fact]
     public async Task SubmitProcessAsync_ShouldCreateNewProcess_WhenNotDuplicate()
     {
-        // Arrange
         var clientId = "test-client";
         var request = new SubmitProcessRequest(
             "client-process-123",
@@ -1978,10 +1928,8 @@ public class ProcessServiceTests
                 default))
             .ReturnsAsync((Process?)null);
 
-        // Act
         var result = await _sut.SubmitProcessAsync(clientId, request);
 
-        // Assert
         result.Should().NotBeNull();
         result.ProcessId.Should().NotBe(Guid.Empty);
         result.ClientProcessId.Should().Be(request.ClientProcessId);
@@ -2008,7 +1956,6 @@ public class ProcessServiceTests
     [Fact]
     public async Task SubmitProcessAsync_ShouldReturnExisting_WhenIdempotentRequest()
     {
-        // Arrange
         var clientId = "test-client";
         var existing = new Process
         {
@@ -2037,10 +1984,8 @@ public class ProcessServiceTests
                 default))
             .ReturnsAsync(existing);
 
-        // Act
         var result = await _sut.SubmitProcessAsync(clientId, request);
 
-        // Assert
         result.Should().Be(existing);
 
         _repositoryMock.Verify(
@@ -2051,7 +1996,6 @@ public class ProcessServiceTests
     [Fact]
     public async Task GetProcessByIdAsync_ShouldReturnFromCache_WhenCached()
     {
-        // Arrange
         var processId = Guid.NewGuid();
         var cachedProcess = new Process
         {
@@ -2071,10 +2015,8 @@ public class ProcessServiceTests
             .Setup(c => c.GetProcessAsync(processId))
             .ReturnsAsync(cachedProcess);
 
-        // Act
         var result = await _sut.GetProcessByIdAsync(processId);
 
-        // Assert
         result.Should().Be(cachedProcess);
 
         _repositoryMock.Verify(
@@ -2237,77 +2179,47 @@ public class ProcessServiceTests
    - **Question:** Should handlers be auto-discovered or explicitly registered?
    - **Current:** Manual registration via DI
    - **Alternative:** Assembly scanning for IProcessHandler implementations
-   - **Decision:** TBD - Requires team discussion on flexibility vs explicitness
    - **Impact:** Affects handler development workflow and testability
 
 2. **Telemetry Implementation**
    - **Question:** Use OpenTelemetry, Application Insights, or custom metrics?
    - **Current:** Planning for OpenTelemetry (vendor-neutral)
    - **Alternative:** Application Insights (Azure-specific, rich features)
-   - **Decision:** TBD - Depends on monitoring strategy and cloud provider lock-in tolerance
    - **Impact:** Affects observability, debugging capabilities, and operational costs
 
 ### Business Logic Questions
 
 1. **Process Timeout Policy**
    - **Question:** What happens when a process exceeds 10-minute timeout?
-   - **Options:** 
-     - Auto-fail with timeout error
-     - Continue with warning
-     - Configurable per process type
-   - **Decision:** TBD
+   - **Options:** Auto-fail with timeout error, continue with warning, configurable per process type
    - **Impact:** Affects resource management and user expectations
 
 2. **Retry Strategy for Failed Processes**
    - **Question:** Should failed processes auto-retry? How many attempts?
    - **Current:** Manual retry via API
    - **Alternative:** Automatic retry with exponential backoff (3-5 attempts)
-   - **Decision:** TBD
    - **Impact:** Affects failure handling, message broker configuration, and user experience
 
 3. **Process Result Retention**
    - **Question:** How long should completed process results be retained?
-   - **Options:** 
-     - 24 hours (minimal)
-     - 7 days (recommended)
-     - 30 days (extended)
-     - Indefinitely (with archival strategy)
-   - **Decision:** TBD - impacts storage costs and compliance requirements
+   - **Options:** 24 hours (minimal), 7 days (recommended), 30 days (extended), indefinitely (with archival)
    - **Impact:** Database sizing, cleanup jobs, and audit capabilities
 
 4. **Concurrent Process Limit**
    - **Question:** Should there be a limit on concurrent processes per client?
-   - **Options:**
-     - No limit (trust rate limiting)
-     - Per-client queue limit (e.g., 100 pending)
-     - Per-client active processing limit (e.g., 10 concurrent)
-   - **Decision:** TBD - impacts queue design and resource allocation
+   - **Options:** No limit (trust rate limiting), per-client queue limit (e.g., 100 pending), per-client active processing limit (e.g., 10 concurrent)
    - **Impact:** Fair resource distribution and system stability
-
----
-
-## Next Steps
-
-1. **Resolve remaining open questions** (Handler Registration and Telemetry)
-2. **Review and approve** this updated architecture
-3. **Refine sprint estimates** based on team capacity
-4. **Setup development environment** with MongoDB and RabbitMQ
-5. **Create detailed task breakdown** for Phase 1
-6. **Begin Phase 1: Foundation** development
-7. **Schedule weekly sprint reviews** and retrospectives
 
 ---
 
 ## Related Documents
 
-- **[Client SDK Technical Analysis](./CLIENT-TECHNICAL-ANALYSIS.md)** - Detailed analysis of the client SDK implementation
-- **[Coding Conventions](./CODING-CONVENTIONS.md)** - C# coding standards and best practices
-- **[Git Flow](./GIT-FLOW.md)** - Branching strategy and workflow
-- **[Pull Request Process](./PULL-REQUEST-PROCESS.md)** - PR guidelines and review process
-- **[Release Process](./RELEASE-PROCESS.md)** - Versioning and release procedures
+- [Client SDK Technical Analysis](./CLIENT-TECHNICAL-ANALYSIS.md)
+- [Coding Conventions](./CODING-CONVENTIONS.md)
+- [Git Flow](./GIT-FLOW.md)
+- [Pull Request Process](./PULL-REQUEST-PROCESS.md)
+- [Release Process](./RELEASE-PROCESS.md)
 
 ---
 
-**Document Status:** Draft - Updated with Broker Architecture  
-**Next Review:** After Open Questions Resolution  
-**Owner:** Development Team
+**Document Owner:** Development Team
