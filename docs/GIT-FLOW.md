@@ -1,12 +1,12 @@
-# Git Flow - PTRP Development Model
+# Git Flow - StarGate Development Model
 
 ## Overview
 
-PTRP uses **Git Flow** branching model for version control and release management.
+StarGate uses **Git Flow** branching model for version control and release management.
 
 ```
 ┌──────────────────────────────────────────┐
-│          PTRP Git Flow Model             │
+│        StarGate Git Flow Model          │
 ├──────────────────────────────────────────┤
 │                                          │
 │  main (production)  ──────────────────── │
@@ -75,9 +75,9 @@ PTRP uses **Git Flow** branching model for version control and release managemen
 - **Branch from:** `develop`
 - **Merge back to:** `develop` (via Pull Request)
 - **Naming examples:**
-  - `feature/patient-list-ui`
+  - `feature/user-authentication`
   - `feature/database-integration`
-  - `feature/ISSUE-45-project-validation`
+  - `feature/ISSUE-45-api-validation`
 
 **Workflow:**
 ```bash
@@ -116,10 +116,10 @@ git push origin --delete feature/my-feature
 **Example:**
 ```bash
 git checkout develop
-git checkout -b bugfix/patient-search-crash
+git checkout -b bugfix/api-timeout-issue
 # Fix bug
-git commit -m "fix: prevent crash in patient search"
-git push -u origin bugfix/patient-search-crash
+git commit -m "fix: resolve API timeout issue"
+git push -u origin bugfix/api-timeout-issue
 # Create PR to develop
 ```
 
@@ -139,7 +139,7 @@ git checkout develop
 git checkout -b release/0.2.0
 
 # 2. Update version in CSPROJ
-# Edit src/PTRP.App/PTRP.App.csproj
+# Edit src/StarGate.App/StarGate.App.csproj
 # Set <Version>0.2.0</Version>
 
 git commit -m "chore: bump version to 0.2.0"
@@ -220,11 +220,11 @@ Follow **Conventional Commits** format:
 
 ### Examples
 ```bash
-git commit -m "feat: add patient search by name"
-git commit -m "fix: prevent crash when deleting patient"
+git commit -m "feat: add user authentication module"
+git commit -m "fix: resolve database connection timeout"
 git commit -m "docs: add installation guide"
 git commit -m "chore: bump version to 0.2.0"
-git commit -m "test: add unit tests for PatientService"
+git commit -m "test: add unit tests for AuthService"
 ```
 
 ---
@@ -242,7 +242,7 @@ Versions follow **Semantic Versioning (SemVer)**: `MAJOR.MINOR.PATCH`
 
 ```bash
 # Create tag
-git tag -a v0.1.0 -m "Initial MVVM WPF release"
+git tag -a v0.1.0 -m "Initial release"
 
 # Push tag
 git push origin v0.1.0
