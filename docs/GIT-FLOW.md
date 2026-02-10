@@ -5,24 +5,24 @@
 PTRP uses **Git Flow** branching model for version control and release management.
 
 ```
-┌─────────────────────────────────────────────┐
-│          PTRP Git Flow Model                │
-├─────────────────────────────────────────────┤
-│                                             │
-│  main (production)  ─────────────────────   │
-│       ↑                                     │
-│       │ (tag v0.1.0, v0.2.0, ...)          │
-│       │ (PR + status checks required)      │
-│       │                                    │
-│  develop (integration)  ──────────────────  │
-│       ↑                                     │
-│       │ (PR + status checks required)      │
-│    ┌──┴──┐                                 │
-│    │     │                                 │
-│  feature/*  bugfix/*  docs/*  release/*    │
-│  (feature development)                     │
-│                                             │
-└─────────────────────────────────────────────┘
+┌──────────────────────────────────────────┐
+│          PTRP Git Flow Model             │
+├──────────────────────────────────────────┤
+│                                          │
+│  main (production)  ──────────────────── │
+│       ↑                                  │
+│       │ (tag v0.1.0, v0.2.0, ...)        │
+│       │ (PR + status checks required)    │
+│       │                                  │
+│  develop (integration)  ──────────────── │
+│       ↑                                  │
+│       │ (PR + status checks required)    │
+│    ┌──┴──┐                               │
+│    │     │                               │
+│  feature/*  bugfix/*  docs/*  release/*  │
+│  (feature development)                   │
+│                                          │
+└──────────────────────────────────────────┘
 ```
 
 ---
