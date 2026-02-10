@@ -354,6 +354,3 @@ git log main..HEAD --oneline
 ```
 
 ---
-
-For more info, see:
-- [RELEASE-PROCESS.md](./RELEASE-PROCESS.md)
