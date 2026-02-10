@@ -1,6 +1,6 @@
 # Technical Analysis - StarGate Software Development
 
-**Document Version:** 1.1  
+**Document Version:** 1.2  
 **Last Updated:** 2026-02-10  
 **Status:** Draft - In Progress
 
@@ -16,12 +16,11 @@
 6. [Data Layer](#data-layer)
 7. [Business Logic](#business-logic)
 8. [Process Handlers](#process-handlers)
-9. [Client SDK](#client-sdk)
-10. [Security Implementation](#security-implementation)
-11. [Resilience Patterns](#resilience-patterns)
-12. [Testing Strategy](#testing-strategy)
-13. [Development Roadmap](#development-roadmap)
-14. [Open Questions](#open-questions)
+9. [Security Implementation](#security-implementation)
+10. [Resilience Patterns](#resilience-patterns)
+11. [Testing Strategy](#testing-strategy)
+12. [Development Roadmap](#development-roadmap)
+13. [Open Questions](#open-questions)
 
 ---
 
@@ -37,7 +36,6 @@ This document outlines the technical analysis and development plan for the StarG
 - API endpoints (Minimal APIs)
 - Data access layer (MongoDB, Redis)
 - Process orchestration engine
-- Client SDK library
 - Authentication/Authorization logic
 - Resilience patterns (retry, circuit breaker)
 - Unit and integration testing
@@ -47,9 +45,12 @@ This document outlines the technical analysis and development plan for the StarG
 **OUT OF SCOPE:**
 - Azure resource provisioning (VMs, VNets, etc.)
 - Azure AD/Identity Provider configuration
-- Client application integration
+- Client application integration (see [CLIENT-TECHNICAL-ANALYSIS.md](./CLIENT-TECHNICAL-ANALYSIS.md))
+- Client SDK implementation (see [CLIENT-TECHNICAL-ANALYSIS.md](./CLIENT-TECHNICAL-ANALYSIS.md))
 - Production deployment procedures
 - Infrastructure as Code (Terraform/ARM)
+
+> **Note:** Per l'analisi tecnica del Client SDK, fare riferimento al documento dedicato [CLIENT-TECHNICAL-ANALYSIS.md](./CLIENT-TECHNICAL-ANALYSIS.md).
 
 ---
 
@@ -83,12 +84,11 @@ This document outlines the technical analysis and development plan for the StarG
 │              │  - Queue (In-Memory) │                       │
 │              └─────────────────────┘                        │
 │                                                             │
-│  ┌────────────────────┐      ┌────────────────────┐        │
-│  │ StarGate.Contracts │      │  StarGate.Client   │        │
-│  │  - DTOs            │      │  - SDK Library     │        │
-│  │  - Public APIs     │      │  - Polling Logic   │        │
-│  └────────────────────┘      │  - Offline Queue   │        │
-│                              └────────────────────┘        │
+│  ┌────────────────────┐                                     │
+│  │ StarGate.Contracts │                                     │
+│  │  - DTOs            │                                     │
+│  │  - Public APIs     │                                     │
+│  └────────────────────┘                                     │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -173,27 +173,15 @@ StarGate/
 │   │   ├── appsettings.json
 │   │   └── Dockerfile
 │   │
-│   ├── StarGate.Contracts/              # Shared contracts
-│   │   ├── Requests/                    # Request DTOs
-│   │   │   └── SubmitProcessRequest.cs
-│   │   ├── Responses/                   # Response DTOs
-│   │   │   ├── SubmitProcessResponse.cs
-│   │   │   ├── ProcessStatusResponse.cs
-│   │   │   └── ErrorResponse.cs
-│   │   └── Models/                      # Shared models
-│   │       └── ProcessData.cs
-│   │
-│   └── StarGate.Client/                 # Client SDK
-│       ├── StarGateClient.cs            # Main client class
-│       ├── StarGateClientOptions.cs     # Configuration
-│       ├── Auth/                        # Authentication
-│       │   ├── ITokenProvider.cs
-│       │   └── OAuth2TokenProvider.cs
-│       ├── Polling/                     # Polling strategy
-│       │   └── ProcessPoller.cs
-│       └── Queue/                       # Offline queue
-│           ├── IOfflineQueue.cs
-│           └── FileBasedOfflineQueue.cs
+│   └── StarGate.Contracts/              # Shared contracts
+│       ├── Requests/                    # Request DTOs
+│       │   └── SubmitProcessRequest.cs
+│       ├── Responses/                   # Response DTOs
+│       │   ├── SubmitProcessResponse.cs
+│       │   ├── ProcessStatusResponse.cs
+│       │   └── ErrorResponse.cs
+│       └── Models/                      # Shared models
+│           └── ProcessData.cs
 │
 ├── tests/
 │   ├── StarGate.Api.Tests/             # API unit tests
@@ -208,9 +196,6 @@ StarGate/
 │   ├── StarGate.Server.Tests/          # Server unit tests
 │   │   ├── Workers/
 │   │   └── Handlers/
-│   ├── StarGate.Client.Tests/          # Client SDK tests
-│   │   ├── Polling/
-│   │   └── Queue/
 │   └── StarGate.Integration.Tests/     # Integration tests
 │       ├── ApiIntegrationTests.cs
 │       └── EndToEndTests.cs
@@ -221,6 +206,8 @@ StarGate/
 ├── Directory.Build.props                # Shared MSBuild properties
 └── docker-compose.yml                   # Local development stack
 ```
+
+> **Note:** Il progetto `StarGate.Client` è documentato separatamente in [CLIENT-TECHNICAL-ANALYSIS.md](./CLIENT-TECHNICAL-ANALYSIS.md).
 
 ### Directory.Build.props
 
@@ -1299,253 +1286,6 @@ public class OrderResult
 
 ---
 
-## Client SDK
-
-### StarGate Client
-
-```csharp
-namespace StarGate.Client;
-
-public interface IStarGateClient
-{
-    Task<ProcessSubmissionResult> SubmitProcessAsync<TData>(
-        string clientProcessId,
-        string processType,
-        TData data,
-        CancellationToken ct = default);
-
-    Task<Process?> GetProcessStatusAsync(
-        Guid processId,
-        CancellationToken ct = default);
-
-    Task<Process> WaitForCompletionAsync(
-        Guid processId,
-        CancellationToken ct = default);
-}
-
-public class StarGateClient : IStarGateClient
-{
-    private readonly HttpClient _httpClient;
-    private readonly ITokenProvider _tokenProvider;
-    private readonly IOfflineQueue _offlineQueue;
-    private readonly ProcessPoller _poller;
-    private readonly ILogger<StarGateClient> _logger;
-
-    public StarGateClient(
-        HttpClient httpClient,
-        ITokenProvider tokenProvider,
-        IOfflineQueue offlineQueue,
-        ILogger<StarGateClient> logger)
-    {
-        _httpClient = httpClient;
-        _tokenProvider = tokenProvider;
-        _offlineQueue = offlineQueue;
-        _poller = new ProcessPoller(this, logger);
-        _logger = logger;
-    }
-
-    public async Task<ProcessSubmissionResult> SubmitProcessAsync<TData>(
-        string clientProcessId,
-        string processType,
-        TData data,
-        CancellationToken ct = default)
-    {
-        var request = new SubmitProcessRequest(
-            clientProcessId,
-            processType,
-            data,
-            Guid.NewGuid().ToString()); // Generate idempotency key
-
-        try
-        {
-            // Get OAuth token for this process type
-            var token = await _tokenProvider.GetTokenAsync(processType, ct);
-
-            _httpClient.DefaultRequestHeaders.Authorization =
-                new AuthenticationHeaderValue("Bearer", token);
-
-            // Submit request
-            var response = await _httpClient.PostAsJsonAsync(
-                "/api/stargate/processes",
-                request,
-                ct);
-
-            if (response.StatusCode == HttpStatusCode.TooManyRequests)
-            {
-                _logger.LogWarning(
-                    "Rate limit exceeded for process submission");
-                throw new InvalidOperationException("Rate limit exceeded");
-            }
-
-            response.EnsureSuccessStatusCode();
-
-            var result = await response.Content
-                .ReadFromJsonAsync<SubmitProcessResponse>(ct);
-
-            _logger.LogInformation(
-                "Process {ProcessId} submitted successfully",
-                result!.ProcessId);
-
-            return new ProcessSubmissionResult(
-                result.ProcessId,
-                result.ClientProcessId,
-                result.Status);
-        }
-        catch (HttpRequestException ex)
-        {
-            _logger.LogWarning(
-                ex,
-                "Failed to submit process, enqueueing offline");
-
-            // Enqueue for later retry
-            await _offlineQueue.EnqueueAsync(request, ct);
-
-            return new ProcessSubmissionResult(
-                null,
-                clientProcessId,
-                "queued_offline");
-        }
-    }
-
-    public async Task<Process?> GetProcessStatusAsync(
-        Guid processId,
-        CancellationToken ct = default)
-    {
-        try
-        {
-            var token = await _tokenProvider.GetTokenAsync(ct: ct);
-            _httpClient.DefaultRequestHeaders.Authorization =
-                new AuthenticationHeaderValue("Bearer", token);
-
-            var response = await _httpClient.GetAsync(
-                $"/api/stargate/processes/{processId}",
-                ct);
-
-            if (response.StatusCode == HttpStatusCode.NotFound)
-            {
-                return null;
-            }
-
-            response.EnsureSuccessStatusCode();
-
-            return await response.Content.ReadFromJsonAsync<Process>(ct);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(
-                ex,
-                "Error retrieving process status for {ProcessId}",
-                processId);
-            return null;
-        }
-    }
-
-    public async Task<Process> WaitForCompletionAsync(
-        Guid processId,
-        CancellationToken ct = default)
-    {
-        return await _poller.WaitForCompletionAsync(processId, ct);
-    }
-}
-```
-
-### Adaptive Polling Strategy
-
-```csharp
-namespace StarGate.Client.Polling;
-
-public class ProcessPoller
-{
-    private readonly IStarGateClient _client;
-    private readonly ILogger _logger;
-    private const int Phase1DurationMinutes = 2;
-    private const int Phase1IntervalSeconds = 30;
-    private const int Phase2IntervalSeconds = 60;
-    private const int TimeoutMinutes = 10;
-
-    public ProcessPoller(IStarGateClient client, ILogger logger)
-    {
-        _client = client;
-        _logger = logger;
-    }
-
-    public async Task<Process> WaitForCompletionAsync(
-        Guid processId,
-        CancellationToken ct = default)
-    {
-        var startTime = DateTime.UtcNow;
-
-        _logger.LogInformation(
-            "Starting adaptive polling for process {ProcessId}",
-            processId);
-
-        while (!ct.IsCancellationRequested)
-        {
-            // Poll for current status
-            var process = await _client.GetProcessStatusAsync(processId, ct);
-
-            if (process is null)
-            {
-                throw new InvalidOperationException(
-                    $"Process {processId} not found");
-            }
-
-            // Check if completed
-            if (process.Status is ProcessStatus.Completed or ProcessStatus.Failed)
-            {
-                var duration = DateTime.UtcNow - startTime;
-                _logger.LogInformation(
-                    "Process {ProcessId} completed with status {Status} after {Duration}",
-                    processId,
-                    process.Status,
-                    duration);
-
-                return process;
-            }
-
-            // Calculate elapsed time
-            var elapsed = DateTime.UtcNow - startTime;
-            var elapsedMinutes = elapsed.TotalMinutes;
-
-            // Adaptive delay
-            TimeSpan delay;
-            if (elapsedMinutes < Phase1DurationMinutes)
-            {
-                // Phase 1: Aggressive polling (30s)
-                delay = TimeSpan.FromSeconds(Phase1IntervalSeconds);
-            }
-            else
-            {
-                // Phase 2: Conservative polling (60s)
-                delay = TimeSpan.FromSeconds(Phase2IntervalSeconds);
-            }
-
-            _logger.LogDebug(
-                "Process {ProcessId} at {Progress}% ({Status}), waiting {Delay}s",
-                processId,
-                process.Progress,
-                process.Status,
-                delay.TotalSeconds);
-
-            await Task.Delay(delay, ct);
-
-            // Timeout warning
-            if (elapsedMinutes > TimeoutMinutes)
-            {
-                _logger.LogWarning(
-                    "Process {ProcessId} exceeded timeout ({Timeout} minutes)",
-                    processId,
-                    TimeoutMinutes);
-            }
-        }
-
-        throw new OperationCanceledException();
-    }
-}
-```
-
----
-
 ## Security Implementation
 
 ### JWT Token Validation
@@ -1914,66 +1654,52 @@ public class ProcessServiceTests
 - [ ] Add handler registration mechanism
 - [ ] Write unit tests for each handler
 
-### Phase 6: Client SDK (Week 9)
+### Phase 6: Resilience (Week 9)
 
-#### Sprint 6.1: Core Client
-- [ ] Implement StarGateClient
-- [ ] Add token provider interface
-- [ ] Implement OAuth2TokenProvider
-- [ ] Write unit tests
-
-#### Sprint 6.2: Polling & Offline Queue
-- [ ] Implement ProcessPoller with adaptive strategy
-- [ ] Implement FileBasedOfflineQueue
-- [ ] Add offline queue flush mechanism
-- [ ] Write unit tests
-
-### Phase 7: Resilience (Week 10)
-
-#### Sprint 7.1: Polly Integration
+#### Sprint 6.1: Polly Integration
 - [ ] Implement retry policies
 - [ ] Implement circuit breaker
 - [ ] Add timeout policies
 - [ ] Configure policies in DI container
 - [ ] Write resilience tests
 
-### Phase 8: Testing & Quality (Week 11-12)
+### Phase 7: Testing & Quality (Week 10-11)
 
-#### Sprint 8.1: Integration Tests
+#### Sprint 7.1: Integration Tests
 - [ ] Write API integration tests
 - [ ] Write end-to-end workflow tests
 - [ ] Add test coverage reporting
 - [ ] Achieve >80% coverage target
 
-#### Sprint 8.2: Load Testing
+#### Sprint 7.2: Load Testing
 - [ ] Create k6 load test scripts
 - [ ] Run performance baseline tests
 - [ ] Identify and fix bottlenecks
 - [ ] Document performance characteristics
 
-### Phase 9: Containerization (Week 13)
+### Phase 8: Containerization (Week 12)
 
-#### Sprint 9.1: Docker
+#### Sprint 8.1: Docker
 - [ ] Create Dockerfile for API
 - [ ] Create Dockerfile for Server
 - [ ] Optimize image sizes
 - [ ] Configure health checks in containers
 
-#### Sprint 9.2: Orchestration
+#### Sprint 8.2: Orchestration
 - [ ] Complete docker-compose.yml
 - [ ] Add environment configuration
 - [ ] Test local deployment
 - [ ] Document deployment procedures
 
-### Phase 10: Documentation & Handoff (Week 14)
+### Phase 9: Documentation & Handoff (Week 13)
 
-#### Sprint 10.1: Documentation
+#### Sprint 9.1: Documentation
 - [ ] Complete API documentation (OpenAPI/Swagger)
 - [ ] Write developer guide
 - [ ] Create troubleshooting guide
 - [ ] Document architecture decisions
 
-#### Sprint 10.2: Final Review
+#### Sprint 9.2: Final Review
 - [ ] Code review and refactoring
 - [ ] Security audit
 - [ ] Performance review
@@ -1997,18 +1723,13 @@ public class ProcessServiceTests
    - **Alternative:** CosmosDB (managed, auto-scaling)
    - **Decision:** TBD based on operational requirements
 
-3. **Token Storage in Client SDK**
-   - **Question:** Where should OAuth tokens be stored in client?
-   - **Options:** In-memory, encrypted file, secure credential store
-   - **Decision:** TBD - depends on client deployment environment
-
-4. **Process Handler Registration**
+3. **Process Handler Registration**
    - **Question:** Should handlers be auto-discovered or explicitly registered?
    - **Current:** Manual registration via DI
    - **Alternative:** Assembly scanning for IProcessHandler implementations
    - **Decision:** TBD
 
-5. **Telemetry Implementation**
+4. **Telemetry Implementation**
    - **Question:** Use OpenTelemetry, Application Insights, or custom metrics?
    - **Current:** Planning for OpenTelemetry (vendor-neutral)
    - **Decision:** TBD
@@ -2048,6 +1769,16 @@ public class ProcessServiceTests
 
 ---
 
-**Document Status:** Draft - Awaiting Review  
+## Related Documents
+
+- **[Client SDK Technical Analysis](./CLIENT-TECHNICAL-ANALYSIS.md)** - Detailed analysis of the client SDK implementation
+- **[Coding Conventions](./CODING-CONVENTIONS.md)** - C# coding standards and best practices
+- **[Git Flow](./GIT-FLOW.md)** - Branching strategy and workflow
+- **[Pull Request Process](./PULL-REQUEST-PROCESS.md)** - PR guidelines and review process
+- **[Release Process](./RELEASE-PROCESS.md)** - Versioning and release procedures
+
+---
+
+**Document Status:** Draft - In Progress  
 **Next Review:** TBD  
 **Owner:** Development Team
