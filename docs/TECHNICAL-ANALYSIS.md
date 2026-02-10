@@ -1,6 +1,6 @@
 # Technical Analysis - StarGate Software Development
 
-**Document Version:** 1.4  
+**Document Version:** 1.5  
 **Last Updated:** 2026-02-10  
 **Status:** Draft
 
@@ -2534,40 +2534,6 @@ public class PolicyProvider : IPolicyProvider
    - **Alternative:** Application Insights (Azure-specific, rich features)
    - **Impact:** Affects observability, debugging capabilities, and operational costs
    - **Priority:** High
-
-### Business Logic Questions - RESOLVED
-
-1. **Process Timeout Policy** ✅
-   - **Decision:** Configurable per process type with per-client overrides
-   - **Implementation:** Hierarchical configuration model
-     - Default timeout defined in ProcessTypePolicy
-     - Optional client-specific timeout in ClientPolicyOverride
-     - Policy applied immediately to all clients, with selective overrides as needed
-   - **Rationale:** Provides operational flexibility while maintaining simplicity
-
-2. **Retry Strategy for Failed Processes** ✅
-   - **Decision:** Configurable per process type with per-client overrides
-   - **Implementation:** Hierarchical retry policy configuration
-     - Default retry strategy in ProcessTypePolicy
-     - Optional client-specific retry strategy in ClientPolicyOverride
-     - Supports both enabled/disabled and configurable attempts/backoff
-   - **Rationale:** Allows different failure handling strategies per process type and special handling for specific clients
-
-3. **Process Result Retention** ✅
-   - **Decision:** Configurable per process type with per-client overrides
-   - **Implementation:** Hierarchical retention period configuration
-     - Default retention period in ProcessTypePolicy
-     - Optional client-specific retention in ClientPolicyOverride
-     - Enforced via scheduled cleanup jobs
-   - **Rationale:** Balances storage costs with audit requirements, allows premium retention for specific clients
-
-4. **Concurrent Process Limit** ✅
-   - **Decision:** Configurable per process type with per-client overrides
-   - **Implementation:** Hierarchical concurrency limit configuration
-     - Default limit in ProcessTypePolicy (can be null for unlimited)
-     - Optional client-specific limit in ClientPolicyOverride
-     - Enforced at submission time via ProcessService
-   - **Rationale:** Ensures fair resource distribution, prevents client overload, allows premium throughput for specific clients
 
 ---
 
