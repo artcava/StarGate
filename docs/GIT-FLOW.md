@@ -267,26 +267,26 @@ git push origin v0.1.0
 
 ## CI/CD Pipeline
 
-Il progetto utilizza un **unico workflow GitHub Actions** (`ci.yml`) che gestisce tutti gli aspetti del CI/CD: build, test e release.
+The project uses a **unified GitHub Actions workflow** (`ci.yml`) that handles all CI/CD aspects: build, test, and release.
 
-### Workflow Unificato: `ci.yml`
+### Unified Workflow: `ci.yml`
 
-**Posizione:** `.github/workflows/ci.yml`
+**Location:** `.github/workflows/ci.yml`
 
-**Funzionalità:**
-- **Build & Test**: Compilazione e testing automatico su ogni push/PR
-- **Code Quality**: Verifica formattazione e analyzer
-- **Release**: Creazione automatica di release su push di tag
+**Features:**
+- **Build & Test**: Automatic compilation and testing on every push/PR
+- **Code Quality**: Formatting and analyzer verification
+- **Release**: Automatic release creation on tag push
 
 ### Trigger Events
 
-| Event | Branches | Jobs Eseguiti |
+| Event | Branches | Jobs Executed |
 |-------|----------|---------------|
 | **Push** | `main`, `develop` | Build → Test → Quality |
 | **Pull Request** | `main`, `develop` | Build → Test → Quality |
-| **Push Tag** | `v*` (es. `v0.1.0`) | Build → Test → Release |
+| **Push Tag** | `v*` (e.g., `v0.1.0`) | Build → Test → Release |
 
-### Jobs del Workflow
+### Workflow Jobs
 
 #### 1. **Build Job**
 ```yaml
@@ -294,16 +294,16 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - Checkout del codice
+      - Checkout code
       - Setup .NET SDK
-      - Restore delle dipendenze
-      - Build del progetto
-      - Upload degli artifacts
+      - Restore dependencies
+      - Build project
+      - Upload artifacts
 ```
 
-**Obiettivo:** Verificare che il codice compili correttamente.
+**Goal:** Verify that code compiles correctly.
 
-**Output:** Artifacts pronti per testing e release.
+**Output:** Artifacts ready for testing and release.
 
 ---
 
@@ -313,21 +313,21 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - Checkout del codice
+      - Checkout code
       - Setup .NET SDK
-      - Restore delle dipendenze
-      - Esecuzione unit tests
-      - Generazione code coverage report
-      - Verifica soglia minima (70%)
+      - Restore dependencies
+      - Run unit tests
+      - Generate code coverage report
+      - Verify minimum threshold (70%)
 ```
 
-**Obiettivo:** Eseguire tutti gli unit test e verificare la code coverage.
+**Goal:** Execute all unit tests and verify code coverage.
 
-**Requisiti:**
-- ✅ Tutti i test devono passare
+**Requirements:**
+- ✅ All tests must pass
 - ✅ Code coverage ≥ 70%
 
-**Failure:** PR bloccata se i test falliscono o coverage < 70%.
+**Failure:** PR blocked if tests fail or coverage < 70%.
 
 ---
 
@@ -337,60 +337,60 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - Checkout del codice
+      - Checkout code
       - Setup .NET SDK
-      - Restore delle dipendenze
-      - Verifica formattazione (dotnet format)
-      - Esecuzione analyzers
-      - Controllo warnings
+      - Restore dependencies
+      - Verify formatting (dotnet format)
+      - Run analyzers
+      - Check warnings
 ```
 
-**Obiettivo:** Garantire qualità e consistenza del codice.
+**Goal:** Ensure code quality and consistency.
 
-**Verifica:**
-- ✅ Codice formattato correttamente (`.editorconfig`)
-- ✅ Nessuna violazione degli analyzer
-- ✅ Nessun warning critico
+**Checks:**
+- ✅ Code properly formatted (`.editorconfig`)
+- ✅ No analyzer violations
+- ✅ No critical warnings
 
-**Failure:** PR bloccata se ci sono violazioni di formattazione o analyzer.
+**Failure:** PR blocked if there are formatting or analyzer violations.
 
 ---
 
-#### 4. **Release Job** (Solo su Tag)
+#### 4. **Release Job** (Tag Only)
 ```yaml
   release:
     needs: [build, test, quality]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: windows-latest
     steps:
-      - Checkout del codice
+      - Checkout code
       - Setup .NET SDK
       - Build Release configuration
-      - Creazione installer (Velopack/MSIX)
-      - Pubblicazione GitHub Release
-      - Upload artifacts della release
+      - Create installer (Velopack/MSIX)
+      - Publish GitHub Release
+      - Upload release artifacts
 ```
 
-**Obiettivo:** Creare e pubblicare automaticamente una nuova release.
+**Goal:** Automatically create and publish a new release.
 
-**Trigger:** Push di un tag con formato `v*` (es. `v0.1.0`, `v1.2.3`).
+**Trigger:** Push of a tag with format `v*` (e.g., `v0.1.0`, `v1.2.3`).
 
 **Output:**
-- 📦 GitHub Release con installer
-- 📝 Release notes automatiche
-- 🔗 Download links per gli utenti
+- 📦 GitHub Release with installer
+- 📝 Automatic release notes
+- 🔗 Download links for users
 
 ---
 
-### Status Checks per Pull Request
+### Status Checks for Pull Requests
 
-Prima di poter mergeare una PR verso `main` o `develop`, devono passare:
+Before merging a PR to `main` or `develop`, the following must pass:
 
-✅ **Build Job** - Compilazione senza errori  
-✅ **Test Job** - Tutti i test passano + coverage ≥ 70%  
-✅ **Quality Job** - Codice formattato + nessuna violazione analyzer
+✅ **Build Job** - Compilation without errors  
+✅ **Test Job** - All tests pass + coverage ≥ 70%  
+✅ **Quality Job** - Code formatted + no analyzer violations
 
-**Esempio di stato PR:**
+**Example PR status:**
 ```
 ✅ ci / build (pull_request)           — Passed in 2m 34s
 ✅ ci / test (pull_request)            — Passed in 1m 45s
@@ -399,22 +399,22 @@ Prima di poter mergeare una PR verso `main` o `develop`, devono passare:
 
 ---
 
-### Workflow di Release Completo
+### Complete Release Workflow
 
-**Step 1:** Merge di `release/X.X.X` in `main`
+**Step 1:** Merge `release/X.X.X` into `main`
 ```bash
-# Dopo aver completato la PR e merge
+# After completing PR and merge
 git checkout main
 git pull origin main
 ```
 
-**Step 2:** Creazione e push del tag
+**Step 2:** Create and push tag
 ```bash
 git tag -a v0.2.0 -m "Release v0.2.0: Feature X, Fix Y"
 git push origin v0.2.0
 ```
 
-**Step 3:** Workflow automatico
+**Step 3:** Automatic workflow
 ```
 ci.yml triggered by tag push v0.2.0
   ↓
@@ -433,16 +433,16 @@ ci.yml triggered by tag push v0.2.0
 ✅ Release v0.2.0 published!
 ```
 
-**Step 4:** Verifica su GitHub
-- Vai a: `https://github.com/[user]/[repo]/releases`
-- Trova la release `v0.2.0`
-- Download dell'installer disponibile
+**Step 4:** Verify on GitHub
+- Go to: `https://github.com/[user]/[repo]/releases`
+- Find release `v0.2.0`
+- Installer download available
 
 ---
 
-### Configurazione Branch Protection
+### Branch Protection Configuration
 
-Per abilitare i controlli automatici, configura su GitHub:
+To enable automatic checks, configure on GitHub:
 
 **Settings → Branches → Branch protection rules → `main` / `develop`**
 
@@ -456,59 +456,53 @@ Per abilitare i controlli automatici, configura su GitHub:
     ☑️ ci / quality
 
 ☑️ Require pull request reviews before merging
-  • Required approvals: 1 (per main)
-  • Required approvals: 0 (per develop)
+  • Required approvals: 1 (for main)
+  • Required approvals: 0 (for develop)
 
 ☑️ Do not allow bypassing the above settings
 ```
 
 ---
 
-### Debugging del Workflow
+### Workflow Debugging
 
-Se il workflow fallisce:
+If the workflow fails:
 
-**1. Verifica logs su GitHub Actions:**
+**1. Check logs on GitHub Actions:**
 ```
-Repository → Actions → ci → Click sul run fallito → Espandi il job
+Repository → Actions → ci → Click on failed run → Expand job
 ```
 
-**2. Test in locale:**
+**2. Test locally:**
 ```bash
-# Simula il build job
+# Simulate build job
 dotnet restore
 dotnet build --configuration Release
 
-# Simula il test job
+# Simulate test job
 dotnet test --no-build --verbosity normal --collect:"XPlat Code Coverage"
 
-# Simula il quality job
+# Simulate quality job
 dotnet format --verify-no-changes
 dotnet build /p:TreatWarningsAsErrors=true
 ```
 
-**3. Errori comuni:**
+**3. Common errors:**
 
-| Errore | Causa | Soluzione |
+| Error | Cause | Solution |
 |--------|-------|----------|
-| Build fails | Errori di compilazione | Fissa gli errori nel codice |
-| Test fails | Test unitari falliti | Correggi i test o il codice |
-| Coverage < 70% | Code coverage insufficiente | Aggiungi più test |
-| Format check fails | Codice non formattato | Esegui `dotnet format` |
-| Analyzer warnings | Violazioni regole analyzer | Correggi le violazioni o sopprimi se giustificato |
+| Build fails | Compilation errors | Fix code errors |
+| Test fails | Unit tests failed | Fix tests or code |
+| Coverage < 70% | Insufficient code coverage | Add more tests |
+| Format check fails | Code not formatted | Run `dotnet format` |
+| Analyzer warnings | Analyzer rule violations | Fix violations or suppress if justified |
 
 ---
 
-### Vantaggi del Workflow Unificato
+### Benefits of Unified Workflow
 
-✅ **Semplicità:** Un solo file da mantenere invece di 3  
-✅ **Consistenza:** Tutti i job condividono la stessa configurazione  
-✅ **Efficienza:** Riuso di artifacts tra job (caching)  
-✅ **Visibilità:** Status checks chiari e centralizzati  
-✅ **Manutenibilità:** Modifiche in un unico punto  
-
----
-
-For more info, see:
-- [RELEASE-PROCESS.md](./RELEASE-PROCESS.md)
-- [CONTRIBUTING.md](./CONTRIBUTING.md)
+✅ **Simplicity:** Single file to maintain instead of 3  
+✅ **Consistency:** All jobs share the same configuration  
+✅ **Efficiency:** Artifact reuse between jobs (caching)  
+✅ **Visibility:** Clear and centralized status checks  
+✅ **Maintainability:** Changes in a single place  
