@@ -1,6 +1,6 @@
 # Technical Analysis - StarGate Software Development
 
-**Document Version:** 1.3  
+**Document Version:** 1.4  
 **Last Updated:** 2026-02-10  
 **Status:** Draft
 
@@ -20,8 +20,9 @@
 10. [Security Implementation](#security-implementation)
 11. [Resilience Patterns](#resilience-patterns)
 12. [Testing Strategy](#testing-strategy)
-13. [Development Roadmap](#development-roadmap)
-14. [Open Questions](#open-questions)
+13. [Configuration Management](#configuration-management)
+14. [Development Roadmap](#development-roadmap)
+15. [Open Questions](#open-questions)
 
 ---
 
@@ -43,6 +44,7 @@ This document outlines the technical analysis and development plan for the StarG
 - Unit and integration testing
 - Docker containerization
 - CI/CD pipeline configuration
+- Configurable process policies (timeout, retry, retention, concurrency)
 
 **OUT OF SCOPE:**
 - Azure resource provisioning (VMs, VNets, etc.)
@@ -122,6 +124,12 @@ This document outlines the technical analysis and development plan for the StarG
 - **Benefits:** Scalability, message durability, easy monitoring, flexibility for future changes
 - **Alternative:** Can be replaced with Azure Service Bus, Amazon SQS, or other brokers without core changes
 
+#### Configuration Model: Hierarchical Process Policies
+- **Decision:** Two-tier configuration system (process type defaults + per-client overrides)
+- **Rationale:** Balance between operational simplicity and client-specific customization needs
+- **Benefits:** Easy global policy updates, flexibility for special client requirements, clear precedence rules
+- **Scope:** Applies to timeout, retry strategy, result retention, and concurrency limits
+
 ---
 
 ## Solution Structure
@@ -148,16 +156,21 @@ StarGate/
 │   │   ├── Domain/                      # Domain entities
 │   │   │   ├── Process.cs
 │   │   │   ├── ProcessStatus.cs
-│   │   │   └── ProcessError.cs
+│   │   │   ├── ProcessError.cs
+│   │   │   └── Configuration/           # Configuration entities
+│   │   │       ├── ProcessTypePolicy.cs
+│   │   │       └── ClientPolicyOverride.cs
 │   │   ├── Abstractions/                # Interfaces
 │   │   │   ├── IProcessRepository.cs
 │   │   │   ├── IStateStore.cs
 │   │   │   ├── IProcessService.cs
 │   │   │   ├── IProcessHandler.cs
+│   │   │   ├── IPolicyProvider.cs       # Policy resolution
 │   │   │   ├── IMessageBroker.cs        # Broker abstraction
 │   │   │   └── IMessageConsumer.cs      # Consumer abstraction
 │   │   ├── Services/                    # Business services
-│   │   │   └── ProcessService.cs
+│   │   │   ├── ProcessService.cs
+│   │   │   └── PolicyProvider.cs        # Configuration resolver
 │   │   ├── Exceptions/                  # Custom exceptions
 │   │   │   ├── ProcessNotFoundException.cs
 │   │   │   └── DuplicateProcessException.cs
@@ -167,6 +180,7 @@ StarGate/
 │   ├── StarGate.Infrastructure/         # Infrastructure concerns
 │   │   ├── Persistence/                 # Database implementations
 │   │   │   ├── MongoProcessRepository.cs
+│   │   │   ├── MongoPolicyRepository.cs # Policy storage
 │   │   │   ├── ProcessDocument.cs
 │   │   │   └── MongoDbContext.cs
 │   │   ├── Caching/                     # Cache implementations
@@ -2028,6 +2042,316 @@ public class ProcessServiceTests
 
 ---
 
+## Configuration Management
+
+### Process Policy Model
+
+All process-related policies (timeout, retry, retention, concurrency) follow a hierarchical configuration model:
+
+1. **Process Type Defaults** - Applied globally to all clients for a specific process type
+2. **Client Overrides** - Optional per-client customizations that override process type defaults
+
+#### Process Type Policy Entity
+
+```csharp
+namespace StarGate.Core.Domain.Configuration;
+
+/// <summary>
+/// Defines default policies for a specific process type.
+/// Applied to all clients unless overridden by client-specific policies.
+/// </summary>
+public record ProcessTypePolicy
+{
+    /// <summary>
+    /// Process type identifier (e.g., "order", "shipping").
+    /// </summary>
+    public required string ProcessType { get; init; }
+
+    /// <summary>
+    /// Maximum execution time before process is automatically failed.
+    /// </summary>
+    public required TimeSpan Timeout { get; init; }
+
+    /// <summary>
+    /// Retry configuration for failed processes.
+    /// </summary>
+    public required RetryPolicy RetryPolicy { get; init; }
+
+    /// <summary>
+    /// How long to retain completed process results.
+    /// </summary>
+    public required TimeSpan ResultRetention { get; init; }
+
+    /// <summary>
+    /// Maximum number of concurrent processes per client.
+    /// Null means no limit (subject to global rate limiting).
+    /// </summary>
+    public int? MaxConcurrentProcesses { get; init; }
+
+    /// <summary>
+    /// Timestamp when policy was last updated.
+    /// </summary>
+    public required DateTime UpdatedAt { get; init; }
+}
+
+/// <summary>
+/// Retry strategy configuration.
+/// </summary>
+public record RetryPolicy
+{
+    /// <summary>
+    /// Whether automatic retries are enabled.
+    /// </summary>
+    public required bool Enabled { get; init; }
+
+    /// <summary>
+    /// Maximum number of retry attempts.
+    /// </summary>
+    public required int MaxAttempts { get; init; }
+
+    /// <summary>
+    /// Initial delay before first retry.
+    /// </summary>
+    public required TimeSpan InitialDelay { get; init; }
+
+    /// <summary>
+    /// Backoff strategy (Linear, Exponential).
+    /// </summary>
+    public required BackoffStrategy BackoffStrategy { get; init; }
+
+    /// <summary>
+    /// Maximum delay between retries (prevents exponential explosion).
+    /// </summary>
+    public required TimeSpan MaxDelay { get; init; }
+}
+
+public enum BackoffStrategy
+{
+    Linear,
+    Exponential
+}
+```
+
+#### Client Policy Override Entity
+
+```csharp
+namespace StarGate.Core.Domain.Configuration;
+
+/// <summary>
+/// Client-specific policy overrides for a process type.
+/// When present, these values override the process type defaults.
+/// </summary>
+public record ClientPolicyOverride
+{
+    /// <summary>
+    /// Client identifier.
+    /// </summary>
+    public required string ClientId { get; init; }
+
+    /// <summary>
+    /// Process type this override applies to.
+    /// </summary>
+    public required string ProcessType { get; init; }
+
+    /// <summary>
+    /// Custom timeout (overrides ProcessTypePolicy.Timeout).
+    /// </summary>
+    public TimeSpan? Timeout { get; init; }
+
+    /// <summary>
+    /// Custom retry policy (overrides ProcessTypePolicy.RetryPolicy).
+    /// </summary>
+    public RetryPolicy? RetryPolicy { get; init; }
+
+    /// <summary>
+    /// Custom result retention (overrides ProcessTypePolicy.ResultRetention).
+    /// </summary>
+    public TimeSpan? ResultRetention { get; init; }
+
+    /// <summary>
+    /// Custom concurrency limit (overrides ProcessTypePolicy.MaxConcurrentProcesses).
+    /// </summary>
+    public int? MaxConcurrentProcesses { get; init; }
+
+    /// <summary>
+    /// Timestamp when override was last updated.
+    /// </summary>
+    public required DateTime UpdatedAt { get; init; }
+}
+```
+
+### Policy Provider Interface
+
+```csharp
+namespace StarGate.Core.Abstractions;
+
+/// <summary>
+/// Resolves effective policies by merging process type defaults with client overrides.
+/// </summary>
+public interface IPolicyProvider
+{
+    /// <summary>
+    /// Gets the effective timeout for a client and process type.
+    /// </summary>
+    Task<TimeSpan> GetTimeoutAsync(string clientId, string processType, CancellationToken ct = default);
+
+    /// <summary>
+    /// Gets the effective retry policy for a client and process type.
+    /// </summary>
+    Task<RetryPolicy> GetRetryPolicyAsync(string clientId, string processType, CancellationToken ct = default);
+
+    /// <summary>
+    /// Gets the effective result retention period for a client and process type.
+    /// </summary>
+    Task<TimeSpan> GetResultRetentionAsync(string clientId, string processType, CancellationToken ct = default);
+
+    /// <summary>
+    /// Gets the effective concurrency limit for a client and process type.
+    /// </summary>
+    Task<int?> GetConcurrencyLimitAsync(string clientId, string processType, CancellationToken ct = default);
+}
+```
+
+### Policy Resolution Logic
+
+```csharp
+namespace StarGate.Core.Services;
+
+public class PolicyProvider : IPolicyProvider
+{
+    private readonly IPolicyRepository _repository;
+    private readonly ILogger<PolicyProvider> _logger;
+
+    public PolicyProvider(
+        IPolicyRepository repository,
+        ILogger<PolicyProvider> logger)
+    {
+        _repository = repository;
+        _logger = logger;
+    }
+
+    public async Task<TimeSpan> GetTimeoutAsync(
+        string clientId, 
+        string processType, 
+        CancellationToken ct = default)
+    {
+        var processTypePolicy = await _repository.GetProcessTypePolicyAsync(processType, ct);
+        var clientOverride = await _repository.GetClientOverrideAsync(clientId, processType, ct);
+
+        var effectiveTimeout = clientOverride?.Timeout ?? processTypePolicy.Timeout;
+
+        _logger.LogDebug(
+            "Resolved timeout for client {ClientId}, process {ProcessType}: {Timeout}",
+            clientId,
+            processType,
+            effectiveTimeout);
+
+        return effectiveTimeout;
+    }
+
+    public async Task<RetryPolicy> GetRetryPolicyAsync(
+        string clientId, 
+        string processType, 
+        CancellationToken ct = default)
+    {
+        var processTypePolicy = await _repository.GetProcessTypePolicyAsync(processType, ct);
+        var clientOverride = await _repository.GetClientOverrideAsync(clientId, processType, ct);
+
+        var effectiveRetryPolicy = clientOverride?.RetryPolicy ?? processTypePolicy.RetryPolicy;
+
+        _logger.LogDebug(
+            "Resolved retry policy for client {ClientId}, process {ProcessType}: Enabled={Enabled}, MaxAttempts={MaxAttempts}",
+            clientId,
+            processType,
+            effectiveRetryPolicy.Enabled,
+            effectiveRetryPolicy.MaxAttempts);
+
+        return effectiveRetryPolicy;
+    }
+
+    public async Task<TimeSpan> GetResultRetentionAsync(
+        string clientId, 
+        string processType, 
+        CancellationToken ct = default)
+    {
+        var processTypePolicy = await _repository.GetProcessTypePolicyAsync(processType, ct);
+        var clientOverride = await _repository.GetClientOverrideAsync(clientId, processType, ct);
+
+        var effectiveRetention = clientOverride?.ResultRetention ?? processTypePolicy.ResultRetention;
+
+        _logger.LogDebug(
+            "Resolved result retention for client {ClientId}, process {ProcessType}: {Retention}",
+            clientId,
+            processType,
+            effectiveRetention);
+
+        return effectiveRetention;
+    }
+
+    public async Task<int?> GetConcurrencyLimitAsync(
+        string clientId, 
+        string processType, 
+        CancellationToken ct = default)
+    {
+        var processTypePolicy = await _repository.GetProcessTypePolicyAsync(processType, ct);
+        var clientOverride = await _repository.GetClientOverrideAsync(clientId, processType, ct);
+
+        var effectiveLimit = clientOverride?.MaxConcurrentProcesses ?? processTypePolicy.MaxConcurrentProcesses;
+
+        _logger.LogDebug(
+            "Resolved concurrency limit for client {ClientId}, process {ProcessType}: {Limit}",
+            clientId,
+            processType,
+            effectiveLimit?.ToString() ?? "unlimited");
+
+        return effectiveLimit;
+    }
+}
+```
+
+### Configuration Examples
+
+#### Process Type Policy (Default)
+
+```json
+{
+  "processType": "order",
+  "timeout": "00:10:00",
+  "retryPolicy": {
+    "enabled": true,
+    "maxAttempts": 3,
+    "initialDelay": "00:00:10",
+    "backoffStrategy": "Exponential",
+    "maxDelay": "00:05:00"
+  },
+  "resultRetention": "7.00:00:00",
+  "maxConcurrentProcesses": 100,
+  "updatedAt": "2026-02-10T18:00:00Z"
+}
+```
+
+#### Client Policy Override (Custom)
+
+```json
+{
+  "clientId": "premium-client-001",
+  "processType": "order",
+  "timeout": "00:30:00",
+  "retryPolicy": {
+    "enabled": true,
+    "maxAttempts": 5,
+    "initialDelay": "00:00:05",
+    "backoffStrategy": "Exponential",
+    "maxDelay": "00:10:00"
+  },
+  "resultRetention": "30.00:00:00",
+  "maxConcurrentProcesses": 500,
+  "updatedAt": "2026-02-10T18:30:00Z"
+}
+```
+
+---
+
 ## Development Roadmap
 
 ### Phase 1: Foundation (Week 1-2)
@@ -2041,18 +2365,20 @@ public class ProcessServiceTests
 
 #### Sprint 1.2: Domain Model
 - [ ] Implement core domain entities (Process, ProcessStatus, ProcessError)
-- [ ] Define repository interfaces (IProcessRepository, IStateStore)
+- [ ] Implement configuration entities (ProcessTypePolicy, ClientPolicyOverride)
+- [ ] Define repository interfaces (IProcessRepository, IStateStore, IPolicyRepository)
 - [ ] Define broker interfaces (IMessageBroker, IMessageConsumer)
-- [ ] Define service interfaces (IProcessService, IProcessHandler)
+- [ ] Define service interfaces (IProcessService, IProcessHandler, IPolicyProvider)
 - [ ] Write unit tests for domain model
 
 ### Phase 2: Data Layer (Week 3)
 
 #### Sprint 2.1: MongoDB Implementation
 - [ ] Implement MongoProcessRepository
+- [ ] Implement MongoPolicyRepository
 - [ ] Create ProcessDocument and mapping logic
 - [ ] Configure MongoDB indexes
-- [ ] Write unit tests for repository
+- [ ] Write unit tests for repositories
 - [ ] Integration tests with MongoDB container
 
 #### Sprint 2.2: Redis Cache
@@ -2077,93 +2403,113 @@ public class ProcessServiceTests
 - [ ] Test error handling and requeue logic
 - [ ] Document broker configuration
 
-### Phase 4: API Gateway (Week 5-6)
+### Phase 4: Configuration Management (Week 5)
 
-#### Sprint 4.1: API Endpoints
+#### Sprint 4.1: Policy Implementation
+- [ ] Implement PolicyProvider service
+- [ ] Add policy resolution logic (type defaults + client overrides)
+- [ ] Implement configuration caching strategy
+- [ ] Write unit tests for policy resolution
+
+#### Sprint 4.2: Policy Integration
+- [ ] Integrate policies into ProcessService
+- [ ] Integrate policies into ProcessWorker
+- [ ] Add policy validation and constraints
+- [ ] Integration tests for policy enforcement
+
+### Phase 5: API Gateway (Week 6-7)
+
+#### Sprint 5.1: API Endpoints
 - [ ] Implement ProcessEndpoints (POST, GET)
 - [ ] Add request validation
 - [ ] Implement global exception handler
 - [ ] Add health check endpoints
 - [ ] Write unit tests for endpoints
 
-#### Sprint 4.2: Security
+#### Sprint 5.2: Security
 - [ ] Configure JWT authentication
 - [ ] Implement authorization policies
 - [ ] Add rate limiting
 - [ ] Configure CORS
 - [ ] Security testing
 
-### Phase 5: Business Logic (Week 7)
+### Phase 6: Business Logic (Week 8)
 
-#### Sprint 5.1: Process Service
+#### Sprint 6.1: Process Service
 - [ ] Implement ProcessService with GUID generation
 - [ ] Add idempotency handling
 - [ ] Integrate message broker publishing
+- [ ] Integrate policy enforcement
 - [ ] Implement process state transitions
 - [ ] Write comprehensive unit tests
 
-### Phase 6: Process Engine (Week 8-9)
+### Phase 7: Process Engine (Week 9-10)
 
-#### Sprint 6.1: Background Worker
+#### Sprint 7.1: Background Worker
 - [ ] Implement ProcessWorker with message consumption
 - [ ] Add graceful shutdown handling
+- [ ] Integrate timeout enforcement
+- [ ] Integrate retry logic
 - [ ] Implement error handling and acknowledgment
 - [ ] Add telemetry and logging
 - [ ] Write unit tests
 
-#### Sprint 6.2: Process Handlers
+#### Sprint 7.2: Process Handlers
 - [ ] Implement ProcessHandlerFactory
 - [ ] Create OrderProcessHandler (example)
 - [ ] Create ShippingProcessHandler (example)
 - [ ] Add handler registration mechanism
 - [ ] Write unit tests for each handler
 
-### Phase 7: Resilience (Week 10)
+### Phase 8: Resilience (Week 11)
 
-#### Sprint 7.1: Polly Integration
+#### Sprint 8.1: Polly Integration
 - [ ] Implement retry policies
 - [ ] Implement circuit breaker
 - [ ] Add timeout policies
 - [ ] Configure policies in DI container
 - [ ] Write resilience tests
 
-### Phase 8: Testing & Quality (Week 11-12)
+### Phase 9: Testing & Quality (Week 12-13)
 
-#### Sprint 8.1: Integration Tests
+#### Sprint 9.1: Integration Tests
 - [ ] Write API integration tests
 - [ ] Write end-to-end workflow tests
+- [ ] Test policy enforcement scenarios
 - [ ] Add test coverage reporting
 - [ ] Achieve >80% coverage target
 
-#### Sprint 8.2: Load Testing
+#### Sprint 9.2: Load Testing
 - [ ] Create k6 load test scripts
+- [ ] Test with various policy configurations
 - [ ] Run performance baseline tests
 - [ ] Identify and fix bottlenecks
 - [ ] Document performance characteristics
 
-### Phase 9: Containerization (Week 13)
+### Phase 10: Containerization (Week 14)
 
-#### Sprint 9.1: Docker
+#### Sprint 10.1: Docker
 - [ ] Create Dockerfile for API
 - [ ] Create Dockerfile for Server
 - [ ] Optimize image sizes
 - [ ] Configure health checks in containers
 
-#### Sprint 9.2: Orchestration
+#### Sprint 10.2: Orchestration
 - [ ] Complete docker-compose.yml
 - [ ] Add environment configuration
 - [ ] Test local deployment
 - [ ] Document deployment procedures
 
-### Phase 10: Documentation & Handoff (Week 14)
+### Phase 11: Documentation & Handoff (Week 15)
 
-#### Sprint 10.1: Documentation
+#### Sprint 11.1: Documentation
 - [ ] Complete API documentation (OpenAPI/Swagger)
+- [ ] Document configuration management
 - [ ] Write developer guide
 - [ ] Create troubleshooting guide
 - [ ] Document architecture decisions
 
-#### Sprint 10.2: Final Review
+#### Sprint 11.2: Final Review
 - [ ] Code review and refactoring
 - [ ] Security audit
 - [ ] Performance review
@@ -2180,35 +2526,48 @@ public class ProcessServiceTests
    - **Current:** Manual registration via DI
    - **Alternative:** Assembly scanning for IProcessHandler implementations
    - **Impact:** Affects handler development workflow and testability
+   - **Priority:** Medium
 
 2. **Telemetry Implementation**
    - **Question:** Use OpenTelemetry, Application Insights, or custom metrics?
    - **Current:** Planning for OpenTelemetry (vendor-neutral)
    - **Alternative:** Application Insights (Azure-specific, rich features)
    - **Impact:** Affects observability, debugging capabilities, and operational costs
+   - **Priority:** High
 
-### Business Logic Questions
+### Business Logic Questions - RESOLVED
 
-1. **Process Timeout Policy**
-   - **Question:** What happens when a process exceeds 10-minute timeout?
-   - **Options:** Auto-fail with timeout error, continue with warning, configurable per process type
-   - **Impact:** Affects resource management and user expectations
+1. **Process Timeout Policy** ✅
+   - **Decision:** Configurable per process type with per-client overrides
+   - **Implementation:** Hierarchical configuration model
+     - Default timeout defined in ProcessTypePolicy
+     - Optional client-specific timeout in ClientPolicyOverride
+     - Policy applied immediately to all clients, with selective overrides as needed
+   - **Rationale:** Provides operational flexibility while maintaining simplicity
 
-2. **Retry Strategy for Failed Processes**
-   - **Question:** Should failed processes auto-retry? How many attempts?
-   - **Current:** Manual retry via API
-   - **Alternative:** Automatic retry with exponential backoff (3-5 attempts)
-   - **Impact:** Affects failure handling, message broker configuration, and user experience
+2. **Retry Strategy for Failed Processes** ✅
+   - **Decision:** Configurable per process type with per-client overrides
+   - **Implementation:** Hierarchical retry policy configuration
+     - Default retry strategy in ProcessTypePolicy
+     - Optional client-specific retry strategy in ClientPolicyOverride
+     - Supports both enabled/disabled and configurable attempts/backoff
+   - **Rationale:** Allows different failure handling strategies per process type and special handling for specific clients
 
-3. **Process Result Retention**
-   - **Question:** How long should completed process results be retained?
-   - **Options:** 24 hours (minimal), 7 days (recommended), 30 days (extended), indefinitely (with archival)
-   - **Impact:** Database sizing, cleanup jobs, and audit capabilities
+3. **Process Result Retention** ✅
+   - **Decision:** Configurable per process type with per-client overrides
+   - **Implementation:** Hierarchical retention period configuration
+     - Default retention period in ProcessTypePolicy
+     - Optional client-specific retention in ClientPolicyOverride
+     - Enforced via scheduled cleanup jobs
+   - **Rationale:** Balances storage costs with audit requirements, allows premium retention for specific clients
 
-4. **Concurrent Process Limit**
-   - **Question:** Should there be a limit on concurrent processes per client?
-   - **Options:** No limit (trust rate limiting), per-client queue limit (e.g., 100 pending), per-client active processing limit (e.g., 10 concurrent)
-   - **Impact:** Fair resource distribution and system stability
+4. **Concurrent Process Limit** ✅
+   - **Decision:** Configurable per process type with per-client overrides
+   - **Implementation:** Hierarchical concurrency limit configuration
+     - Default limit in ProcessTypePolicy (can be null for unlimited)
+     - Optional client-specific limit in ClientPolicyOverride
+     - Enforced at submission time via ProcessService
+   - **Rationale:** Ensures fair resource distribution, prevents client overload, allows premium throughput for specific clients
 
 ---
 
