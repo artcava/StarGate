@@ -161,7 +161,7 @@ git tag -a v0.2.0 -m "Release v0.2.0"
 git push origin v0.2.0
 
 # 6. Workflow automatically creates release
-# GitHub Actions release.yml triggers
+# GitHub Actions ci.yml triggers
 # Creates installer + publishes release
 ```
 
@@ -267,90 +267,248 @@ git push origin v0.1.0
 
 ## CI/CD Pipeline
 
-### Triggers
+Il progetto utilizza un **unico workflow GitHub Actions** (`ci.yml`) che gestisce tutti gli aspetti del CI/CD: build, test e release.
 
-**Build Workflow** (`build.yml`):
-- Triggers on: push to `main`/`develop`, PR to `main`/`develop`
-- Action: Compile project, run basic checks
-- Status: Must pass before merge
+### Workflow Unificato: `ci.yml`
 
-**Test Workflow** (`test.yml`):
-- Triggers on: push to `main`/`develop`, PR to `main`/`develop`
-- Action: Run unit tests, measure code coverage (70% minimum)
-- Status: Must pass before merge
+**Posizione:** `.github/workflows/ci.yml`
 
-**Release Workflow** (`release.yml`):
-- Triggers on: push of tag `v*` to `main`
-- Action: Build release, create Windows installer (Velopack), publish to GitHub Releases
-- Status: Automatic, no manual intervention
+**Funzionalità:**
+- **Build & Test**: Compilazione e testing automatico su ogni push/PR
+- **Code Quality**: Verifica formattazione e analyzer
+- **Release**: Creazione automatica di release su push di tag
+
+### Trigger Events
+
+| Event | Branches | Jobs Eseguiti |
+|-------|----------|---------------|
+| **Push** | `main`, `develop` | Build → Test → Quality |
+| **Pull Request** | `main`, `develop` | Build → Test → Quality |
+| **Push Tag** | `v*` (es. `v0.1.0`) | Build → Test → Release |
+
+### Jobs del Workflow
+
+#### 1. **Build Job**
+```yaml
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - Checkout del codice
+      - Setup .NET SDK
+      - Restore delle dipendenze
+      - Build del progetto
+      - Upload degli artifacts
+```
+
+**Obiettivo:** Verificare che il codice compili correttamente.
+
+**Output:** Artifacts pronti per testing e release.
 
 ---
 
-## Quick Reference
+#### 2. **Test Job**
+```yaml
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - Checkout del codice
+      - Setup .NET SDK
+      - Restore delle dipendenze
+      - Esecuzione unit tests
+      - Generazione code coverage report
+      - Verifica soglia minima (70%)
+```
 
-```bash
-# Clone repository
-git clone https://github.com/artcava/PTRP.git
-cd PTRP
+**Obiettivo:** Eseguire tutti gli unit test e verificare la code coverage.
 
-# Check branches
-git branch -a
+**Requisiti:**
+- ✅ Tutti i test devono passare
+- ✅ Code coverage ≥ 70%
 
-# Create feature
-git checkout develop
-git pull origin develop
-git checkout -b feature/my-feature
-# ... make changes ...
-git commit -m "feat: my feature"
-git push -u origin feature/my-feature
-# Create PR on GitHub
+**Failure:** PR bloccata se i test falliscono o coverage < 70%.
 
-# Update develop locally
-git checkout develop
-git pull origin develop
+---
 
-# Delete local branch after merge
-git branch -d feature/my-feature
-git push origin --delete feature/my-feature
+#### 3. **Quality Job**
+```yaml
+  quality:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - Checkout del codice
+      - Setup .NET SDK
+      - Restore delle dipendenze
+      - Verifica formattazione (dotnet format)
+      - Esecuzione analyzers
+      - Controllo warnings
+```
 
-# Create release (maintainer only)
-git checkout develop
-git checkout -b release/0.2.0
-# ... update version ...
-git commit -m "chore: bump to 0.2.0"
-git push -u origin release/0.2.0
-# Create PR to main
-# After merge: git tag -a v0.2.0 && git push origin v0.2.0
+**Obiettivo:** Garantire qualità e consistenza del codice.
+
+**Verifica:**
+- ✅ Codice formattato correttamente (`.editorconfig`)
+- ✅ Nessuna violazione degli analyzer
+- ✅ Nessun warning critico
+
+**Failure:** PR bloccata se ci sono violazioni di formattazione o analyzer.
+
+---
+
+#### 4. **Release Job** (Solo su Tag)
+```yaml
+  release:
+    needs: [build, test, quality]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: windows-latest
+    steps:
+      - Checkout del codice
+      - Setup .NET SDK
+      - Build Release configuration
+      - Creazione installer (Velopack/MSIX)
+      - Pubblicazione GitHub Release
+      - Upload artifacts della release
+```
+
+**Obiettivo:** Creare e pubblicare automaticamente una nuova release.
+
+**Trigger:** Push di un tag con formato `v*` (es. `v0.1.0`, `v1.2.3`).
+
+**Output:**
+- 📦 GitHub Release con installer
+- 📝 Release notes automatiche
+- 🔗 Download links per gli utenti
+
+---
+
+### Status Checks per Pull Request
+
+Prima di poter mergeare una PR verso `main` o `develop`, devono passare:
+
+✅ **Build Job** - Compilazione senza errori  
+✅ **Test Job** - Tutti i test passano + coverage ≥ 70%  
+✅ **Quality Job** - Codice formattato + nessuna violazione analyzer
+
+**Esempio di stato PR:**
+```
+✅ ci / build (pull_request)           — Passed in 2m 34s
+✅ ci / test (pull_request)            — Passed in 1m 45s
+✅ ci / quality (pull_request)         — Passed in 1m 12s
 ```
 
 ---
 
-## Useful Commands
+### Workflow di Release Completo
 
+**Step 1:** Merge di `release/X.X.X` in `main`
 ```bash
-# See all branches
-git branch -a
+# Dopo aver completato la PR e merge
+git checkout main
+git pull origin main
+```
 
-# Delete local branch
-git branch -d branch-name
+**Step 2:** Creazione e push del tag
+```bash
+git tag -a v0.2.0 -m "Release v0.2.0: Feature X, Fix Y"
+git push origin v0.2.0
+```
 
-# Delete remote branch
-git push origin --delete branch-name
+**Step 3:** Workflow automatico
+```
+ci.yml triggered by tag push v0.2.0
+  ↓
+✅ Build job completes
+  ↓
+✅ Test job completes (coverage OK)
+  ↓
+✅ Quality job completes (no violations)
+  ↓
+✅ Release job starts
+  ↓
+📦 Creates Windows installer
+  ↓
+🚀 Publishes GitHub Release
+  ↓
+✅ Release v0.2.0 published!
+```
 
-# Fetch latest from remote
-git fetch origin
+**Step 4:** Verifica su GitHub
+- Vai a: `https://github.com/[user]/[repo]/releases`
+- Trova la release `v0.2.0`
+- Download dell'installer disponibile
 
-# Pull latest develop
-git checkout develop && git pull origin develop
+---
 
-# Check status
-git status
+### Configurazione Branch Protection
 
-# See recent commits
-git log --oneline -10
+Per abilitare i controlli automatici, configura su GitHub:
 
-# See commits on this branch vs main
-git log main..HEAD --oneline
+**Settings → Branches → Branch protection rules → `main` / `develop`**
+
+```
+☑️ Require status checks to pass before merging
+  ☑️ Require branches to be up to date before merging
+  
+  Status checks that are required:
+    ☑️ ci / build
+    ☑️ ci / test
+    ☑️ ci / quality
+
+☑️ Require pull request reviews before merging
+  • Required approvals: 1 (per main)
+  • Required approvals: 0 (per develop)
+
+☑️ Do not allow bypassing the above settings
 ```
 
 ---
+
+### Debugging del Workflow
+
+Se il workflow fallisce:
+
+**1. Verifica logs su GitHub Actions:**
+```
+Repository → Actions → ci → Click sul run fallito → Espandi il job
+```
+
+**2. Test in locale:**
+```bash
+# Simula il build job
+dotnet restore
+dotnet build --configuration Release
+
+# Simula il test job
+dotnet test --no-build --verbosity normal --collect:"XPlat Code Coverage"
+
+# Simula il quality job
+dotnet format --verify-no-changes
+dotnet build /p:TreatWarningsAsErrors=true
+```
+
+**3. Errori comuni:**
+
+| Errore | Causa | Soluzione |
+|--------|-------|----------|
+| Build fails | Errori di compilazione | Fissa gli errori nel codice |
+| Test fails | Test unitari falliti | Correggi i test o il codice |
+| Coverage < 70% | Code coverage insufficiente | Aggiungi più test |
+| Format check fails | Codice non formattato | Esegui `dotnet format` |
+| Analyzer warnings | Violazioni regole analyzer | Correggi le violazioni o sopprimi se giustificato |
+
+---
+
+### Vantaggi del Workflow Unificato
+
+✅ **Semplicità:** Un solo file da mantenere invece di 3  
+✅ **Consistenza:** Tutti i job condividono la stessa configurazione  
+✅ **Efficienza:** Riuso di artifacts tra job (caching)  
+✅ **Visibilità:** Status checks chiari e centralizzati  
+✅ **Manutenibilità:** Modifiche in un unico punto  
+
+---
+
+For more info, see:
+- [RELEASE-PROCESS.md](./RELEASE-PROCESS.md)
+- [CONTRIBUTING.md](./CONTRIBUTING.md)
