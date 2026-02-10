@@ -1,6 +1,6 @@
 # Technical Analysis - StarGate Software Development
 
-**Document Version:** 1.2  
+**Document Version:** 1.3  
 **Last Updated:** 2026-02-10  
 **Status:** Draft - In Progress
 
@@ -14,13 +14,14 @@
 4. [Domain Model](#domain-model)
 5. [API Design](#api-design)
 6. [Data Layer](#data-layer)
-7. [Business Logic](#business-logic)
-8. [Process Handlers](#process-handlers)
-9. [Security Implementation](#security-implementation)
-10. [Resilience Patterns](#resilience-patterns)
-11. [Testing Strategy](#testing-strategy)
-12. [Development Roadmap](#development-roadmap)
-13. [Open Questions](#open-questions)
+7. [Message Broker](#message-broker)
+8. [Business Logic](#business-logic)
+9. [Process Handlers](#process-handlers)
+10. [Security Implementation](#security-implementation)
+11. [Resilience Patterns](#resilience-patterns)
+12. [Testing Strategy](#testing-strategy)
+13. [Development Roadmap](#development-roadmap)
+14. [Open Questions](#open-questions)
 
 ---
 
@@ -35,6 +36,7 @@ This document outlines the technical analysis and development plan for the StarG
 - Domain model and business logic
 - API endpoints (Minimal APIs)
 - Data access layer (MongoDB, Redis)
+- Message broker integration (RabbitMQ)
 - Process orchestration engine
 - Authentication/Authorization logic
 - Resilience patterns (retry, circuit breaker)
@@ -64,7 +66,7 @@ This document outlines the technical analysis and development plan for the StarG
 │                                                             │
 │  ┌────────────────────┐      ┌────────────────────┐        │
 │  │  StarGate.Api      │      │  StarGate.Server   │        │
-│  │  (Public Gateway)  │──────│  (Process Engine)  │        │
+│  │  (Public Gateway)  │      │  (Process Engine)  │        │
 │  │  - Minimal APIs    │      │  - BackgroundService│        │
 │  │  - Auth/AuthZ      │      │  - Process Handlers│        │
 │  │  - Rate Limiting   │      │  - Business Logic  │        │
@@ -81,7 +83,9 @@ This document outlines the technical analysis and development plan for the StarG
 │              │ StarGate.Infrastructure│                     │
 │              │  - MongoDB Repository│                       │
 │              │  - Redis Cache       │                       │
-│              │  - Queue (In-Memory) │                       │
+│              │  - Message Broker    │                       │
+│              │    * RabbitMQ        │                       │
+│              │    * Abstraction     │                       │
 │              └─────────────────────┘                        │
 │                                                             │
 │  ┌────────────────────┐                                     │
@@ -100,11 +104,25 @@ This document outlines the technical analysis and development plan for the StarG
 | API Framework | ASP.NET Core Minimal APIs | 8.0 |
 | Cache | StackExchange.Redis | 2.x |
 | Database | MongoDB.Driver | 2.x |
+| Message Broker | RabbitMQ.Client | 6.x |
 | Authentication | Microsoft.AspNetCore.Authentication.JwtBearer | 8.0 |
 | Resilience | Polly | 8.x |
 | Logging | Serilog | 3.x |
 | Testing | xUnit + FluentAssertions + Moq | Latest |
 | Containerization | Docker | Latest |
+
+### Architecture Decisions
+
+#### Database: MongoDB
+- **Decision:** Utilizzare MongoDB esistente già disponibile
+- **Rationale:** Istanza MongoDB già presente nell'infrastruttura, riduce complessità e costi
+- **Benefits:** Nessun provisioning aggiuntivo, familiarità del team, costi contenuti
+
+#### Message Broker: RabbitMQ con Astrazione
+- **Decision:** RabbitMQ come implementazione primaria con interfaccia broker-agnostic
+- **Rationale:** Affidabilità, maturità, supporto a pattern complessi; astrazione permette futura sostituzione
+- **Benefits:** Scalabilità, durabilità dei messaggi, facilità di monitoraggio, flessibilità futura
+- **Alternative:** Possibilità di sostituire con Azure Service Bus, Amazon SQS, o altri broker senza modifiche al core
 
 ---
 
@@ -138,7 +156,8 @@ StarGate/
 │   │   │   ├── IStateStore.cs
 │   │   │   ├── IProcessService.cs
 │   │   │   ├── IProcessHandler.cs
-│   │   │   └── IProcessQueue.cs
+│   │   │   ├── IMessageBroker.cs        # Broker abstraction
+│   │   │   └── IMessageConsumer.cs      # Consumer abstraction
 │   │   ├── Services/                    # Business services
 │   │   │   └── ProcessService.cs
 │   │   ├── Exceptions/                  # Custom exceptions
@@ -155,9 +174,14 @@ StarGate/
 │   │   ├── Caching/                     # Cache implementations
 │   │   │   ├── RedisStateStore.cs
 │   │   │   └── CacheKeys.cs
-│   │   ├── Queue/                       # Queue implementations
-│   │   │   ├── InMemoryProcessQueue.cs
-│   │   │   └── ProcessQueueItem.cs
+│   │   ├── Messaging/                   # Message broker implementations
+│   │   │   ├── RabbitMQ/                # RabbitMQ specific
+│   │   │   │   ├── RabbitMqBroker.cs
+│   │   │   │   ├── RabbitMqConsumer.cs
+│   │   │   │   ├── RabbitMqConnection.cs
+│   │   │   │   └── RabbitMqOptions.cs
+│   │   │   ├── ProcessMessage.cs        # Message models
+│   │   │   └── MessageSerializers.cs
 │   │   └── Resilience/                  # Polly policies
 │   │       └── ResiliencePolicies.cs
 │   │
@@ -192,12 +216,14 @@ StarGate/
 │   │   └── Domain/
 │   ├── StarGate.Infrastructure.Tests/  # Infrastructure tests
 │   │   ├── Persistence/
-│   │   └── Caching/
+│   │   ├── Caching/
+│   │   └── Messaging/
 │   ├── StarGate.Server.Tests/          # Server unit tests
 │   │   ├── Workers/
 │   │   └── Handlers/
 │   └── StarGate.Integration.Tests/     # Integration tests
 │       ├── ApiIntegrationTests.cs
+│       ├── BrokerIntegrationTests.cs
 │       └── EndToEndTests.cs
 │
 ├── .editorconfig                        # Code style rules
@@ -942,9 +968,381 @@ public class RedisStateStore : IStateStore
 
 ---
 
+## Message Broker
+
+### Broker Abstraction
+
+Il design broker-agnostic permette di sostituire l'implementazione RabbitMQ con altri broker senza modificare il codice core.
+
+#### IMessageBroker Interface
+
+```csharp
+namespace StarGate.Core.Abstractions;
+
+/// <summary>
+/// Astrazione per message broker.
+/// Permette di sostituire l'implementazione (RabbitMQ, Azure Service Bus, etc.) senza modificare il core.
+/// </summary>
+public interface IMessageBroker
+{
+    /// <summary>
+    /// Pubblica un messaggio in coda per l'elaborazione asincrona.
+    /// </summary>
+    /// <typeparam name="T">Tipo del payload del messaggio.</typeparam>
+    /// <param name="queueName">Nome della coda di destinazione.</param>
+    /// <param name="message">Messaggio da pubblicare.</param>
+    /// <param name="ct">Token di cancellazione.</param>
+    Task PublishAsync<T>(string queueName, T message, CancellationToken ct = default) where T : class;
+
+    /// <summary>
+    /// Pubblica un messaggio con proprietà personalizzate.
+    /// </summary>
+    Task PublishAsync<T>(
+        string queueName, 
+        T message, 
+        MessageProperties properties, 
+        CancellationToken ct = default) where T : class;
+
+    /// <summary>
+    /// Crea un consumer per una specifica coda.
+    /// </summary>
+    /// <param name="queueName">Nome della coda da consumare.</param>
+    /// <param name="cancellationToken">Token di cancellazione.</param>
+    /// <returns>Consumer configurato.</returns>
+    IMessageConsumer CreateConsumer(string queueName, CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// Proprietà aggiuntive per i messaggi.
+/// </summary>
+public record MessageProperties
+{
+    public string? CorrelationId { get; init; }
+    public string? MessageId { get; init; }
+    public int Priority { get; init; }
+    public TimeSpan? TimeToLive { get; init; }
+    public Dictionary<string, object>? Headers { get; init; }
+}
+```
+
+#### IMessageConsumer Interface
+
+```csharp
+namespace StarGate.Core.Abstractions;
+
+/// <summary>
+/// Astrazione per consumer di messaggi.
+/// </summary>
+public interface IMessageConsumer : IAsyncDisposable
+{
+    /// <summary>
+    /// Avvia il consumo dei messaggi.
+    /// </summary>
+    /// <typeparam name="T">Tipo del payload atteso.</typeparam>
+    /// <param name="messageHandler">Handler per processare i messaggi.</param>
+    /// <param name="ct">Token di cancellazione.</param>
+    Task StartConsumingAsync<T>(
+        Func<T, MessageContext, Task> messageHandler,
+        CancellationToken ct = default) where T : class;
+
+    /// <summary>
+    /// Ferma il consumo dei messaggi.
+    /// </summary>
+    Task StopConsumingAsync();
+}
+
+/// <summary>
+/// Contesto del messaggio ricevuto.
+/// </summary>
+public record MessageContext
+{
+    public required string MessageId { get; init; }
+    public string? CorrelationId { get; init; }
+    public required DateTime Timestamp { get; init; }
+    public required long DeliveryTag { get; init; }
+    public required Func<Task> AcknowledgeAsync { get; init; }
+    public required Func<bool, Task> RejectAsync { get; init; }
+}
+```
+
+### RabbitMQ Implementation
+
+#### RabbitMqBroker
+
+```csharp
+namespace StarGate.Infrastructure.Messaging.RabbitMQ;
+
+using RabbitMQ.Client;
+using StarGate.Core.Abstractions;
+
+public class RabbitMqBroker : IMessageBroker
+{
+    private readonly IConnection _connection;
+    private readonly ILogger<RabbitMqBroker> _logger;
+    private readonly RabbitMqOptions _options;
+
+    public RabbitMqBroker(
+        IConnection connection,
+        RabbitMqOptions options,
+        ILogger<RabbitMqBroker> logger)
+    {
+        _connection = connection ?? throw new ArgumentNullException(nameof(connection));
+        _options = options ?? throw new ArgumentNullException(nameof(options));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    public async Task PublishAsync<T>(
+        string queueName, 
+        T message, 
+        CancellationToken ct = default) where T : class
+    {
+        await PublishAsync(queueName, message, new MessageProperties(), ct);
+    }
+
+    public async Task PublishAsync<T>(
+        string queueName,
+        T message,
+        MessageProperties properties,
+        CancellationToken ct = default) where T : class
+    {
+        using var channel = await _connection.CreateChannelAsync(ct);
+
+        // Dichiara la coda (idempotente)
+        await channel.QueueDeclareAsync(
+            queue: queueName,
+            durable: true,
+            exclusive: false,
+            autoDelete: false,
+            arguments: null,
+            cancellationToken: ct);
+
+        // Serializza il messaggio
+        var body = MessageSerializers.Serialize(message);
+
+        // Configura proprietà RabbitMQ
+        var basicProperties = new BasicProperties
+        {
+            Persistent = true,
+            MessageId = properties.MessageId ?? Guid.NewGuid().ToString(),
+            CorrelationId = properties.CorrelationId,
+            Priority = (byte)properties.Priority,
+            Timestamp = new AmqpTimestamp(DateTimeOffset.UtcNow.ToUnixTimeSeconds()),
+            Headers = properties.Headers != null 
+                ? new Dictionary<string, object?>(properties.Headers) 
+                : null
+        };
+
+        if (properties.TimeToLive.HasValue)
+        {
+            basicProperties.Expiration = ((int)properties.TimeToLive.Value.TotalMilliseconds).ToString();
+        }
+
+        // Pubblica il messaggio
+        await channel.BasicPublishAsync(
+            exchange: string.Empty,
+            routingKey: queueName,
+            mandatory: false,
+            basicProperties: basicProperties,
+            body: body,
+            cancellationToken: ct);
+
+        _logger.LogDebug(
+            "Published message {MessageId} to queue {QueueName}",
+            basicProperties.MessageId,
+            queueName);
+    }
+
+    public IMessageConsumer CreateConsumer(string queueName, CancellationToken cancellationToken = default)
+    {
+        return new RabbitMqConsumer(_connection, queueName, _logger);
+    }
+}
+```
+
+#### RabbitMqConsumer
+
+```csharp
+namespace StarGate.Infrastructure.Messaging.RabbitMQ;
+
+using RabbitMQ.Client;
+using RabbitMQ.Client.Events;
+using StarGate.Core.Abstractions;
+
+public class RabbitMqConsumer : IMessageConsumer
+{
+    private readonly IConnection _connection;
+    private readonly string _queueName;
+    private readonly ILogger _logger;
+    private IChannel? _channel;
+    private string? _consumerTag;
+
+    public RabbitMqConsumer(
+        IConnection connection,
+        string queueName,
+        ILogger logger)
+    {
+        _connection = connection ?? throw new ArgumentNullException(nameof(connection));
+        _queueName = queueName ?? throw new ArgumentNullException(nameof(queueName));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    public async Task StartConsumingAsync<T>(
+        Func<T, MessageContext, Task> messageHandler,
+        CancellationToken ct = default) where T : class
+    {
+        _channel = await _connection.CreateChannelAsync(ct);
+
+        // Configura prefetch per fair dispatching
+        await _channel.BasicQosAsync(
+            prefetchSize: 0,
+            prefetchCount: 1,
+            global: false,
+            cancellationToken: ct);
+
+        // Dichiara la coda
+        await _channel.QueueDeclareAsync(
+            queue: _queueName,
+            durable: true,
+            exclusive: false,
+            autoDelete: false,
+            arguments: null,
+            cancellationToken: ct);
+
+        var consumer = new AsyncEventingBasicConsumer(_channel);
+        consumer.ReceivedAsync += async (sender, ea) =>
+        {
+            try
+            {
+                // Deserializza il messaggio
+                var message = MessageSerializers.Deserialize<T>(ea.Body.ToArray());
+
+                // Crea contesto
+                var context = new MessageContext
+                {
+                    MessageId = ea.BasicProperties.MessageId ?? "unknown",
+                    CorrelationId = ea.BasicProperties.CorrelationId,
+                    Timestamp = DateTime.UtcNow,
+                    DeliveryTag = ea.DeliveryTag,
+                    AcknowledgeAsync = async () =>
+                    {
+                        await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
+                    },
+                    RejectAsync = async (requeue) =>
+                    {
+                        await _channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: requeue);
+                    }
+                };
+
+                // Invoca handler
+                await messageHandler(message, context);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error processing message from queue {QueueName}", _queueName);
+
+                // Reject e requeue in caso di errore
+                await _channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: true);
+            }
+        };
+
+        _consumerTag = await _channel.BasicConsumeAsync(
+            queue: _queueName,
+            autoAck: false,
+            consumer: consumer,
+            cancellationToken: ct);
+
+        _logger.LogInformation("Started consuming from queue {QueueName}", _queueName);
+    }
+
+    public async Task StopConsumingAsync()
+    {
+        if (_channel != null && _consumerTag != null)
+        {
+            await _channel.BasicCancelAsync(_consumerTag);
+            _logger.LogInformation("Stopped consuming from queue {QueueName}", _queueName);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await StopConsumingAsync();
+
+        if (_channel != null)
+        {
+            await _channel.CloseAsync();
+            await _channel.DisposeAsync();
+        }
+    }
+}
+```
+
+#### Message Serializers
+
+```csharp
+namespace StarGate.Infrastructure.Messaging;
+
+using System.Text;
+
+public static class MessageSerializers
+{
+    public static byte[] Serialize<T>(T message) where T : class
+    {
+        var json = JsonSerializer.Serialize(message);
+        return Encoding.UTF8.GetBytes(json);
+    }
+
+    public static T Deserialize<T>(byte[] data) where T : class
+    {
+        var json = Encoding.UTF8.GetString(data);
+        return JsonSerializer.Deserialize<T>(json) 
+            ?? throw new InvalidOperationException("Failed to deserialize message");
+    }
+}
+```
+
+#### RabbitMQ Configuration
+
+```csharp
+namespace StarGate.Infrastructure.Messaging.RabbitMQ;
+
+public class RabbitMqOptions
+{
+    public required string HostName { get; init; }
+    public int Port { get; init; } = 5672;
+    public required string UserName { get; init; }
+    public required string Password { get; init; }
+    public string? VirtualHost { get; init; }
+    public int RequestedHeartbeat { get; init; } = 60;
+    public int NetworkRecoveryInterval { get; init; } = 10;
+}
+
+// In Program.cs - configurazione DI
+services.AddSingleton<IConnection>(sp =>
+{
+    var options = sp.GetRequiredService<RabbitMqOptions>();
+    var factory = new ConnectionFactory
+    {
+        HostName = options.HostName,
+        Port = options.Port,
+        UserName = options.UserName,
+        Password = options.Password,
+        VirtualHost = options.VirtualHost ?? "/",
+        RequestedHeartbeat = TimeSpan.FromSeconds(options.RequestedHeartbeat),
+        NetworkRecoveryInterval = TimeSpan.FromSeconds(options.NetworkRecoveryInterval),
+        AutomaticRecoveryEnabled = true
+    };
+
+    return factory.CreateConnectionAsync().GetAwaiter().GetResult();
+});
+
+services.AddSingleton<IMessageBroker, RabbitMqBroker>();
+```
+
+---
+
 ## Business Logic
 
-### Process Service
+### Process Service (Updated for Message Broker)
 
 ```csharp
 namespace StarGate.Core.Services;
@@ -956,18 +1354,19 @@ public class ProcessService : IProcessService
 {
     private readonly IProcessRepository _repository;
     private readonly IStateStore _cache;
-    private readonly IProcessQueue _queue;
+    private readonly IMessageBroker _messageBroker;
     private readonly ILogger<ProcessService> _logger;
+    private const string ProcessQueueName = "stargate.processes";
 
     public ProcessService(
         IProcessRepository repository,
         IStateStore cache,
-        IProcessQueue queue,
+        IMessageBroker messageBroker,
         ILogger<ProcessService> logger)
     {
         _repository = repository;
         _cache = cache;
-        _queue = queue;
+        _messageBroker = messageBroker;
         _logger = logger;
     }
 
@@ -1027,8 +1426,16 @@ public class ProcessService : IProcessService
         // Cache for fast queries
         await _cache.SetProcessAsync(process);
 
-        // Enqueue for background processing
-        await _queue.EnqueueAsync(process, ct);
+        // Publish to message broker for background processing
+        await _messageBroker.PublishAsync(
+            ProcessQueueName,
+            process,
+            new MessageProperties
+            {
+                MessageId = processId.ToString(),
+                CorrelationId = request.ClientProcessId
+            },
+            ct);
 
         _logger.LogInformation(
             "Process {ProcessId} submitted successfully",
@@ -1157,6 +1564,106 @@ public class ProcessHandlerFactory : IProcessHandlerFactory
         }
 
         return handler;
+    }
+}
+```
+
+### Process Worker (Updated for Message Broker)
+
+```csharp
+namespace StarGate.Server.Workers;
+
+using StarGate.Core.Abstractions;
+using StarGate.Core.Domain;
+
+public class ProcessWorker : BackgroundService
+{
+    private readonly IMessageBroker _messageBroker;
+    private readonly IProcessHandlerFactory _handlerFactory;
+    private readonly IProcessService _processService;
+    private readonly ILogger<ProcessWorker> _logger;
+    private const string ProcessQueueName = "stargate.processes";
+
+    public ProcessWorker(
+        IMessageBroker messageBroker,
+        IProcessHandlerFactory handlerFactory,
+        IProcessService processService,
+        ILogger<ProcessWorker> logger)
+    {
+        _messageBroker = messageBroker;
+        _handlerFactory = handlerFactory;
+        _processService = processService;
+        _logger = logger;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        _logger.LogInformation("ProcessWorker starting");
+
+        var consumer = _messageBroker.CreateConsumer(ProcessQueueName, stoppingToken);
+
+        await consumer.StartConsumingAsync<Process>(ProcessMessageAsync, stoppingToken);
+
+        // Keep alive until cancellation
+        await Task.Delay(Timeout.Infinite, stoppingToken);
+    }
+
+    private async Task ProcessMessageAsync(Process process, MessageContext context)
+    {
+        _logger.LogInformation(
+            "Processing message {MessageId} for process {ProcessId}",
+            context.MessageId,
+            process.ProcessId);
+
+        try
+        {
+            // Update status to Processing
+            await _processService.UpdateProcessStatusAsync(
+                process.ProcessId,
+                ProcessStatus.Processing,
+                progress: 0,
+                currentStep: "initializing");
+
+            // Get appropriate handler
+            var handler = _handlerFactory.GetHandler(process.ProcessType);
+
+            // Execute handler
+            var result = await handler.ExecuteAsync(process, CancellationToken.None);
+
+            // Update status to Completed
+            await _processService.UpdateProcessStatusAsync(
+                process.ProcessId,
+                ProcessStatus.Completed,
+                progress: 100,
+                currentStep: null,
+                result: result);
+
+            // Acknowledge message
+            await context.AcknowledgeAsync();
+
+            _logger.LogInformation(
+                "Process {ProcessId} completed successfully",
+                process.ProcessId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Process {ProcessId} failed with error",
+                process.ProcessId);
+
+            // Update status to Failed
+            await _processService.UpdateProcessStatusAsync(
+                process.ProcessId,
+                ProcessStatus.Failed,
+                error: new ProcessError(
+                    "EXECUTION_ERROR",
+                    ex.Message,
+                    ex.StackTrace));
+
+            // Acknowledge message (non requeue per evitare loop infiniti)
+            await context.AcknowledgeAsync();
+        }
     }
 }
 ```
@@ -1437,19 +1944,19 @@ public class ProcessServiceTests
 {
     private readonly Mock<IProcessRepository> _repositoryMock;
     private readonly Mock<IStateStore> _cacheMock;
-    private readonly Mock<IProcessQueue> _queueMock;
+    private readonly Mock<IMessageBroker> _brokerMock;
     private readonly ProcessService _sut;
 
     public ProcessServiceTests()
     {
         _repositoryMock = new Mock<IProcessRepository>();
         _cacheMock = new Mock<IStateStore>();
-        _queueMock = new Mock<IProcessQueue>();
+        _brokerMock = new Mock<IMessageBroker>();
 
         _sut = new ProcessService(
             _repositoryMock.Object,
             _cacheMock.Object,
-            _queueMock.Object,
+            _brokerMock.Object,
             Mock.Of<ILogger<ProcessService>>());
     }
 
@@ -1489,8 +1996,12 @@ public class ProcessServiceTests
             c => c.SetProcessAsync(It.IsAny<Process>()),
             Times.Once);
 
-        _queueMock.Verify(
-            q => q.EnqueueAsync(It.IsAny<Process>(), default),
+        _brokerMock.Verify(
+            b => b.PublishAsync(
+                It.IsAny<string>(), 
+                It.IsAny<Process>(), 
+                It.IsAny<MessageProperties>(),
+                default),
             Times.Once);
     }
 
@@ -1588,7 +2099,8 @@ public class ProcessServiceTests
 
 #### Sprint 1.2: Domain Model
 - [ ] Implement core domain entities (Process, ProcessStatus, ProcessError)
-- [ ] Define repository interfaces (IProcessRepository, IStateStore, IProcessQueue)
+- [ ] Define repository interfaces (IProcessRepository, IStateStore)
+- [ ] Define broker interfaces (IMessageBroker, IMessageConsumer)
 - [ ] Define service interfaces (IProcessService, IProcessHandler)
 - [ ] Write unit tests for domain model
 
@@ -1608,98 +2120,108 @@ public class ProcessServiceTests
 - [ ] Write unit tests for cache
 - [ ] Integration tests with Redis container
 
-### Phase 3: API Gateway (Week 4-5)
+### Phase 3: Message Broker (Week 4)
 
-#### Sprint 3.1: API Endpoints
+#### Sprint 3.1: RabbitMQ Implementation
+- [ ] Implement RabbitMqBroker
+- [ ] Implement RabbitMqConsumer
+- [ ] Configure connection management and recovery
+- [ ] Implement message serialization
+- [ ] Write unit tests for broker
+
+#### Sprint 3.2: Broker Integration
+- [ ] Integration tests with RabbitMQ container
+- [ ] Test message publishing and consumption
+- [ ] Test error handling and requeue logic
+- [ ] Document broker configuration
+
+### Phase 4: API Gateway (Week 5-6)
+
+#### Sprint 4.1: API Endpoints
 - [ ] Implement ProcessEndpoints (POST, GET)
 - [ ] Add request validation
 - [ ] Implement global exception handler
 - [ ] Add health check endpoints
 - [ ] Write unit tests for endpoints
 
-#### Sprint 3.2: Security
+#### Sprint 4.2: Security
 - [ ] Configure JWT authentication
 - [ ] Implement authorization policies
 - [ ] Add rate limiting
 - [ ] Configure CORS
 - [ ] Security testing
 
-### Phase 4: Business Logic (Week 6)
+### Phase 5: Business Logic (Week 7)
 
-#### Sprint 4.1: Process Service
+#### Sprint 5.1: Process Service
 - [ ] Implement ProcessService with GUID generation
 - [ ] Add idempotency handling
+- [ ] Integrate message broker publishing
 - [ ] Implement process state transitions
 - [ ] Write comprehensive unit tests
 
-#### Sprint 4.2: Queue Implementation
-- [ ] Implement in-memory queue
-- [ ] Add queue monitoring
-- [ ] Implement backlog handling
-- [ ] Write unit tests
+### Phase 6: Process Engine (Week 8-9)
 
-### Phase 5: Process Engine (Week 7-8)
-
-#### Sprint 5.1: Background Worker
-- [ ] Implement ProcessWorker (BackgroundService)
+#### Sprint 6.1: Background Worker
+- [ ] Implement ProcessWorker with message consumption
 - [ ] Add graceful shutdown handling
-- [ ] Implement error handling and retry logic
+- [ ] Implement error handling and acknowledgment
 - [ ] Add telemetry and logging
 - [ ] Write unit tests
 
-#### Sprint 5.2: Process Handlers
+#### Sprint 6.2: Process Handlers
 - [ ] Implement ProcessHandlerFactory
 - [ ] Create OrderProcessHandler (example)
 - [ ] Create ShippingProcessHandler (example)
 - [ ] Add handler registration mechanism
 - [ ] Write unit tests for each handler
 
-### Phase 6: Resilience (Week 9)
+### Phase 7: Resilience (Week 10)
 
-#### Sprint 6.1: Polly Integration
+#### Sprint 7.1: Polly Integration
 - [ ] Implement retry policies
 - [ ] Implement circuit breaker
 - [ ] Add timeout policies
 - [ ] Configure policies in DI container
 - [ ] Write resilience tests
 
-### Phase 7: Testing & Quality (Week 10-11)
+### Phase 8: Testing & Quality (Week 11-12)
 
-#### Sprint 7.1: Integration Tests
+#### Sprint 8.1: Integration Tests
 - [ ] Write API integration tests
 - [ ] Write end-to-end workflow tests
 - [ ] Add test coverage reporting
 - [ ] Achieve >80% coverage target
 
-#### Sprint 7.2: Load Testing
+#### Sprint 8.2: Load Testing
 - [ ] Create k6 load test scripts
 - [ ] Run performance baseline tests
 - [ ] Identify and fix bottlenecks
 - [ ] Document performance characteristics
 
-### Phase 8: Containerization (Week 12)
+### Phase 9: Containerization (Week 13)
 
-#### Sprint 8.1: Docker
+#### Sprint 9.1: Docker
 - [ ] Create Dockerfile for API
 - [ ] Create Dockerfile for Server
 - [ ] Optimize image sizes
 - [ ] Configure health checks in containers
 
-#### Sprint 8.2: Orchestration
+#### Sprint 9.2: Orchestration
 - [ ] Complete docker-compose.yml
 - [ ] Add environment configuration
 - [ ] Test local deployment
 - [ ] Document deployment procedures
 
-### Phase 9: Documentation & Handoff (Week 13)
+### Phase 10: Documentation & Handoff (Week 14)
 
-#### Sprint 9.1: Documentation
+#### Sprint 10.1: Documentation
 - [ ] Complete API documentation (OpenAPI/Swagger)
 - [ ] Write developer guide
 - [ ] Create troubleshooting guide
 - [ ] Document architecture decisions
 
-#### Sprint 9.2: Final Review
+#### Sprint 10.2: Final Review
 - [ ] Code review and refactoring
 - [ ] Security audit
 - [ ] Performance review
@@ -1709,63 +2231,70 @@ public class ProcessServiceTests
 
 ## Open Questions
 
-### Technical Decisions Needed
+### Technical Decisions Pending
 
-1. **Process Queue Implementation**
-   - **Question:** Should we use in-memory queue or external message broker (RabbitMQ, Azure Service Bus)?
-   - **Current:** In-memory queue (simple, no external dependencies)
-   - **Alternative:** External broker (better scalability, durability)
-   - **Decision:** TBD based on scale requirements
-
-2. **MongoDB vs CosmosDB**
-   - **Question:** Use MongoDB self-hosted or Azure CosmosDB (MongoDB API)?
-   - **Current:** MongoDB (more control, lower cost)
-   - **Alternative:** CosmosDB (managed, auto-scaling)
-   - **Decision:** TBD based on operational requirements
-
-3. **Process Handler Registration**
+1. **Process Handler Registration**
    - **Question:** Should handlers be auto-discovered or explicitly registered?
    - **Current:** Manual registration via DI
    - **Alternative:** Assembly scanning for IProcessHandler implementations
-   - **Decision:** TBD
+   - **Decision:** TBD - Requires team discussion on flexibility vs explicitness
+   - **Impact:** Affects handler development workflow and testability
 
-4. **Telemetry Implementation**
+2. **Telemetry Implementation**
    - **Question:** Use OpenTelemetry, Application Insights, or custom metrics?
    - **Current:** Planning for OpenTelemetry (vendor-neutral)
-   - **Decision:** TBD
+   - **Alternative:** Application Insights (Azure-specific, rich features)
+   - **Decision:** TBD - Depends on monitoring strategy and cloud provider lock-in tolerance
+   - **Impact:** Affects observability, debugging capabilities, and operational costs
 
 ### Business Logic Questions
 
 1. **Process Timeout Policy**
    - **Question:** What happens when a process exceeds 10-minute timeout?
-   - **Options:** Auto-fail, continue with warning, configurable per process type
+   - **Options:** 
+     - Auto-fail with timeout error
+     - Continue with warning
+     - Configurable per process type
    - **Decision:** TBD
+   - **Impact:** Affects resource management and user expectations
 
 2. **Retry Strategy for Failed Processes**
    - **Question:** Should failed processes auto-retry? How many attempts?
    - **Current:** Manual retry via API
-   - **Alternative:** Automatic retry with exponential backoff
+   - **Alternative:** Automatic retry with exponential backoff (3-5 attempts)
    - **Decision:** TBD
+   - **Impact:** Affects failure handling, message broker configuration, and user experience
 
 3. **Process Result Retention**
    - **Question:** How long should completed process results be retained?
-   - **Options:** 24 hours, 7 days, 30 days, indefinitely
-   - **Decision:** TBD - impacts storage costs
+   - **Options:** 
+     - 24 hours (minimal)
+     - 7 days (recommended)
+     - 30 days (extended)
+     - Indefinitely (with archival strategy)
+   - **Decision:** TBD - impacts storage costs and compliance requirements
+   - **Impact:** Database sizing, cleanup jobs, and audit capabilities
 
 4. **Concurrent Process Limit**
    - **Question:** Should there be a limit on concurrent processes per client?
-   - **Decision:** TBD - impacts queue design
+   - **Options:**
+     - No limit (trust rate limiting)
+     - Per-client queue limit (e.g., 100 pending)
+     - Per-client active processing limit (e.g., 10 concurrent)
+   - **Decision:** TBD - impacts queue design and resource allocation
+   - **Impact:** Fair resource distribution and system stability
 
 ---
 
 ## Next Steps
 
-1. **Review this document** with team and stakeholders
-2. **Resolve open questions** and document decisions
-3. **Refine estimates** for each sprint
-4. **Create detailed task breakdown** in project management tool
-5. **Begin Phase 1: Foundation** development
-6. **Schedule weekly review** meetings to track progress
+1. **Resolve remaining open questions** (Handler Registration and Telemetry)
+2. **Review and approve** this updated architecture
+3. **Refine sprint estimates** based on team capacity
+4. **Setup development environment** with MongoDB and RabbitMQ
+5. **Create detailed task breakdown** for Phase 1
+6. **Begin Phase 1: Foundation** development
+7. **Schedule weekly sprint reviews** and retrospectives
 
 ---
 
@@ -1779,6 +2308,6 @@ public class ProcessServiceTests
 
 ---
 
-**Document Status:** Draft - In Progress  
-**Next Review:** TBD  
+**Document Status:** Draft - Updated with Broker Architecture  
+**Next Review:** After Open Questions Resolution  
 **Owner:** Development Team
