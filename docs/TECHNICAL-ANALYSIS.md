@@ -1,6 +1,6 @@
 # Technical Analysis - StarGate Software Development
 
-**Document Version:** 1.0  
+**Document Version:** 1.1  
 **Last Updated:** 2026-02-10  
 **Status:** Draft - In Progress
 
@@ -95,7 +95,7 @@ This document outlines the technical analysis and development plan for the StarG
 ### Technology Stack
 
 | Component | Technology | Version |
-|-----------|-----------|---------|
+|-----------|-----------|------------|
 | Runtime | .NET | 8.0 |
 | API Framework | ASP.NET Core Minimal APIs | 8.0 |
 | Cache | StackExchange.Redis | 2.x |
@@ -140,8 +140,7 @@ StarGate/
 │   │   │   ├── IProcessHandler.cs
 │   │   │   └── IProcessQueue.cs
 │   │   ├── Services/                    # Business services
-│   │   │   ├── ProcessService.cs
-│   │   │   └── ProcessIdGenerator.cs
+│   │   │   └── ProcessService.cs
 │   │   ├── Exceptions/                  # Custom exceptions
 │   │   │   ├── ProcessNotFoundException.cs
 │   │   │   └── DuplicateProcessException.cs
@@ -256,9 +255,9 @@ namespace StarGate.Core.Domain;
 public record Process
 {
     /// <summary>
-    /// Server-generated unique identifier (e.g., PROC-20260210-00001).
+    /// Server-generated unique identifier (GUID).
     /// </summary>
-    public required string ProcessId { get; init; }
+    public required Guid ProcessId { get; init; }
 
     /// <summary>
     /// Client-provided unique identifier for correlation.
@@ -417,11 +416,11 @@ public record ProcessError(
 **Response (202 Accepted):**
 ```json
 {
-  "processId": "PROC-20260210-00001",
+  "processId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
   "clientProcessId": "client-uuid-123",
   "processType": "order",
   "status": "accepted",
-  "statusUrl": "/api/stargate/processes/PROC-20260210-00001",
+  "statusUrl": "/api/stargate/processes/3fa85f64-5717-4562-b3fc-2c963f66afa6",
   "createdAt": "2026-02-10T16:30:00Z",
   "estimatedCompletionTime": "2026-02-10T16:35:00Z"
 }
@@ -446,7 +445,7 @@ public static class ProcessEndpoints
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status429TooManyRequests);
 
-        group.MapGet("{processId}", GetProcessStatus)
+        group.MapGet("{processId:guid}", GetProcessStatus)
             .Produces<ProcessStatusResponse>(StatusCodes.Status200OK)
             .Produces<ErrorResponse>(StatusCodes.Status404NotFound);
     }
@@ -494,7 +493,7 @@ public static class ProcessEndpoints
     }
 
     private static async Task<IResult> GetProcessStatus(
-        string processId,
+        Guid processId,
         IProcessService processService,
         HttpContext context,
         CancellationToken ct)
@@ -558,7 +557,7 @@ public static class ProcessEndpoints
 **Response (200 OK - Processing):**
 ```json
 {
-  "processId": "PROC-20260210-00001",
+  "processId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
   "clientProcessId": "client-uuid-123",
   "processType": "order",
   "status": "processing",
@@ -576,7 +575,7 @@ public static class ProcessEndpoints
 **Response (200 OK - Completed):**
 ```json
 {
-  "processId": "PROC-20260210-00001",
+  "processId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
   "clientProcessId": "client-uuid-123",
   "processType": "order",
   "status": "completed",
@@ -621,12 +620,8 @@ using MongoDB.Bson.Serialization.Attributes;
 public class ProcessDocument
 {
     [BsonId]
-    [BsonRepresentation(BsonType.ObjectId)]
-    public string? Id { get; set; }
-
-    [BsonElement("processId")]
-    [BsonRequired]
-    public required string ProcessId { get; set; }
+    [BsonGuidRepresentation(GuidRepresentation.Standard)]
+    public required Guid ProcessId { get; set; }
 
     [BsonElement("clientProcessId")]
     [BsonRequired]
@@ -765,7 +760,7 @@ public class MongoProcessRepository : IProcessRepository
         }
     }
 
-    public async Task<Process?> GetByIdAsync(string processId, CancellationToken ct = default)
+    public async Task<Process?> GetByIdAsync(Guid processId, CancellationToken ct = default)
     {
         var document = await _collection
             .Find(p => p.ProcessId == processId)
@@ -893,7 +888,7 @@ public class RedisStateStore : IStateStore
         _logger = logger;
     }
 
-    public async Task<Process?> GetProcessAsync(string processId)
+    public async Task<Process?> GetProcessAsync(Guid processId)
     {
         try
         {
@@ -939,7 +934,7 @@ public class RedisStateStore : IStateStore
         }
     }
 
-    public async Task InvalidateAsync(string processId)
+    public async Task InvalidateAsync(Guid processId)
     {
         try
         {
@@ -954,7 +949,7 @@ public class RedisStateStore : IStateStore
         }
     }
 
-    private static string GetKey(string processId) => $"{KeyPrefix}{processId}";
+    private static string GetKey(Guid processId) => $"{KeyPrefix}{processId}";
 }
 ```
 
@@ -975,20 +970,17 @@ public class ProcessService : IProcessService
     private readonly IProcessRepository _repository;
     private readonly IStateStore _cache;
     private readonly IProcessQueue _queue;
-    private readonly IProcessIdGenerator _idGenerator;
     private readonly ILogger<ProcessService> _logger;
 
     public ProcessService(
         IProcessRepository repository,
         IStateStore cache,
         IProcessQueue queue,
-        IProcessIdGenerator idGenerator,
         ILogger<ProcessService> logger)
     {
         _repository = repository;
         _cache = cache;
         _queue = queue;
-        _idGenerator = idGenerator;
         _logger = logger;
     }
 
@@ -1019,8 +1011,8 @@ public class ProcessService : IProcessService
             return existing;
         }
 
-        // Generate server process ID
-        var processId = await _idGenerator.GenerateAsync(ct);
+        // Generate GUID for process ID
+        var processId = Guid.NewGuid();
 
         // Create process entity
         var process = new Process
@@ -1059,11 +1051,9 @@ public class ProcessService : IProcessService
     }
 
     public async Task<Process?> GetProcessByIdAsync(
-        string processId,
+        Guid processId,
         CancellationToken ct = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(processId);
-
         // Try cache first (sub-millisecond)
         var cached = await _cache.GetProcessAsync(processId);
         if (cached is not null)
@@ -1090,7 +1080,7 @@ public class ProcessService : IProcessService
     }
 
     public async Task<Process> UpdateProcessStatusAsync(
-        string processId,
+        Guid processId,
         ProcessStatus status,
         int progress = 0,
         string? currentStep = null,
@@ -1128,40 +1118,6 @@ public class ProcessService : IProcessService
             status);
 
         return updated;
-    }
-}
-```
-
-### Process ID Generator
-
-```csharp
-namespace StarGate.Core.Services;
-
-public interface IProcessIdGenerator
-{
-    Task<string> GenerateAsync(CancellationToken ct = default);
-}
-
-public class ProcessIdGenerator : IProcessIdGenerator
-{
-    private long _counter;
-    private readonly object _lock = new();
-
-    public Task<string> GenerateAsync(CancellationToken ct = default)
-    {
-        long currentCounter;
-
-        lock (_lock)
-        {
-            _counter++;
-            currentCounter = _counter;
-        }
-
-        var timestamp = DateTime.UtcNow.ToString("yyyyMMdd");
-        var paddedCounter = currentCounter.ToString("D5");
-        var processId = $"PROC-{timestamp}-{paddedCounter}";
-
-        return Task.FromResult(processId);
     }
 }
 ```
@@ -1359,11 +1315,11 @@ public interface IStarGateClient
         CancellationToken ct = default);
 
     Task<Process?> GetProcessStatusAsync(
-        string processId,
+        Guid processId,
         CancellationToken ct = default);
 
     Task<Process> WaitForCompletionAsync(
-        string processId,
+        Guid processId,
         CancellationToken ct = default);
 }
 
@@ -1452,7 +1408,7 @@ public class StarGateClient : IStarGateClient
     }
 
     public async Task<Process?> GetProcessStatusAsync(
-        string processId,
+        Guid processId,
         CancellationToken ct = default)
     {
         try
@@ -1485,7 +1441,7 @@ public class StarGateClient : IStarGateClient
     }
 
     public async Task<Process> WaitForCompletionAsync(
-        string processId,
+        Guid processId,
         CancellationToken ct = default)
     {
         return await _poller.WaitForCompletionAsync(processId, ct);
@@ -1514,7 +1470,7 @@ public class ProcessPoller
     }
 
     public async Task<Process> WaitForCompletionAsync(
-        string processId,
+        Guid processId,
         CancellationToken ct = default)
     {
         var startTime = DateTime.UtcNow;
@@ -1742,7 +1698,6 @@ public class ProcessServiceTests
     private readonly Mock<IProcessRepository> _repositoryMock;
     private readonly Mock<IStateStore> _cacheMock;
     private readonly Mock<IProcessQueue> _queueMock;
-    private readonly Mock<IProcessIdGenerator> _idGeneratorMock;
     private readonly ProcessService _sut;
 
     public ProcessServiceTests()
@@ -1750,13 +1705,11 @@ public class ProcessServiceTests
         _repositoryMock = new Mock<IProcessRepository>();
         _cacheMock = new Mock<IStateStore>();
         _queueMock = new Mock<IProcessQueue>();
-        _idGeneratorMock = new Mock<IProcessIdGenerator>();
 
         _sut = new ProcessService(
             _repositoryMock.Object,
             _cacheMock.Object,
             _queueMock.Object,
-            _idGeneratorMock.Object,
             Mock.Of<ILogger<ProcessService>>());
     }
 
@@ -1778,16 +1731,12 @@ public class ProcessServiceTests
                 default))
             .ReturnsAsync((Process?)null);
 
-        _idGeneratorMock
-            .Setup(g => g.GenerateAsync(default))
-            .ReturnsAsync("PROC-20260210-00001");
-
         // Act
         var result = await _sut.SubmitProcessAsync(clientId, request);
 
         // Assert
         result.Should().NotBeNull();
-        result.ProcessId.Should().Be("PROC-20260210-00001");
+        result.ProcessId.Should().NotBe(Guid.Empty);
         result.ClientProcessId.Should().Be(request.ClientProcessId);
         result.Status.Should().Be(ProcessStatus.Accepted);
         result.ClientId.Should().Be(clientId);
@@ -1812,7 +1761,7 @@ public class ProcessServiceTests
         var clientId = "test-client";
         var existing = new Process
         {
-            ProcessId = "PROC-EXISTING",
+            ProcessId = Guid.NewGuid(),
             ClientProcessId = "client-process-123",
             ProcessType = "order",
             ClientId = clientId,
@@ -1846,17 +1795,13 @@ public class ProcessServiceTests
         _repositoryMock.Verify(
             r => r.CreateAsync(It.IsAny<Process>(), default),
             Times.Never);
-
-        _idGeneratorMock.Verify(
-            g => g.GenerateAsync(default),
-            Times.Never);
     }
 
     [Fact]
     public async Task GetProcessByIdAsync_ShouldReturnFromCache_WhenCached()
     {
         // Arrange
-        var processId = "PROC-20260210-00001";
+        var processId = Guid.NewGuid();
         var cachedProcess = new Process
         {
             ProcessId = processId,
@@ -1882,7 +1827,7 @@ public class ProcessServiceTests
         result.Should().Be(cachedProcess);
 
         _repositoryMock.Verify(
-            r => r.GetByIdAsync(It.IsAny<string>(), default),
+            r => r.GetByIdAsync(It.IsAny<Guid>(), default),
             Times.Never);
     }
 }
@@ -1942,8 +1887,7 @@ public class ProcessServiceTests
 ### Phase 4: Business Logic (Week 6)
 
 #### Sprint 4.1: Process Service
-- [ ] Implement ProcessService
-- [ ] Implement ProcessIdGenerator
+- [ ] Implement ProcessService with GUID generation
 - [ ] Add idempotency handling
 - [ ] Implement process state transitions
 - [ ] Write comprehensive unit tests
