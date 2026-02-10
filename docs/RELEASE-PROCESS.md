@@ -70,19 +70,26 @@ git checkout -b release/0.2.0
 ```
 
 ### Step 3: Update Version in Code
-Edit version files in the project (e.g., `pyproject.toml`, `package.json`, or version configuration files):
+Edit the `.csproj` file(s) in your project:
 
-```toml
-# Example for Python project (pyproject.toml)
-[project]
-version = "0.2.0"
+**For StarGate.API project** (`src/StarGate.API/StarGate.API.csproj`):
+```xml
+<PropertyGroup>
+    <Version>0.2.0</Version>
+    <AssemblyVersion>0.2.0.0</AssemblyVersion>
+    <FileVersion>0.2.0.0</FileVersion>
+    <InformationalVersion>0.2.0</InformationalVersion>
+</PropertyGroup>
 ```
 
-```json
-// Example for Node.js project (package.json)
-{
-  "version": "0.2.0"
-}
+**For StarGate.Client library** (`src/StarGate.Client/StarGate.Client.csproj`):
+```xml
+<PropertyGroup>
+    <Version>0.2.0</Version>
+    <AssemblyVersion>0.2.0.0</AssemblyVersion>
+    <FileVersion>0.2.0.0</FileVersion>
+    <PackageVersion>0.2.0</PackageVersion>
+</PropertyGroup>
 ```
 
 ### Step 4: Update CHANGELOG
@@ -104,8 +111,9 @@ Create/update `CHANGELOG.md`:
 - Updated dependencies to latest versions
 
 ### Dependencies
-- Updated core libraries
-- Added new optimization tools
+- Updated to .NET 9.0
+- Updated EF Core to 9.0.1
+- Added new optimization libraries
 ```
 
 ### Step 5: Commit Changes
@@ -113,7 +121,7 @@ Create/update `CHANGELOG.md`:
 git add .
 git commit -m "chore: release v0.2.0
 
-- Update version in configuration files
+- Update version in CSPROJ files
 - Update CHANGELOG.md
 - Ready for release"
 
@@ -202,8 +210,10 @@ When you push the tag `v0.2.0`:
 git clone --branch v0.2.0 https://github.com/artcava/StarGate.git
 
 # Run tests
-# Verify functionality
+dotnet test
+
 # Verify version information
+dotnet --version
 ```
 
 ### 3. Announce Release
@@ -294,7 +304,7 @@ git push
 - [ ] All tests passing locally
 - [ ] Code reviewed and approved
 - [ ] Create `release/X.X.X` branch
-- [ ] Update version in configuration files
+- [ ] Update version in `.csproj` files
 - [ ] Update CHANGELOG.md
 - [ ] Commit and push release branch
 - [ ] Create PR to `main`
@@ -309,4 +319,4 @@ git push
 
 ---
 
-For questions, see [GIT-FLOW.md](./GIT-FLOW.md) or [CONTRIBUTING.md](./CONTRIBUTING.md).
+For questions, see [GIT-FLOW.md](./GIT-FLOW.md).
