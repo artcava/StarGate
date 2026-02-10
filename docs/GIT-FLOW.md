@@ -6,7 +6,7 @@ StarGate uses **Git Flow** branching model for version control and release manag
 
 ```
 ┌──────────────────────────────────────────┐
-│        StarGate Git Flow Model          │
+│        StarGate Git Flow Model           │
 ├──────────────────────────────────────────┤
 │                                          │
 │  main (production)  ──────────────────── │
