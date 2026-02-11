@@ -53,10 +53,10 @@ public record MessageContext
 
     /// <summary>
     /// Rejects message processing.
+    /// Delegate accepts a boolean parameter: true to requeue message for retry, false to move to dead-letter queue.
     /// Message can be requeued for retry or moved to dead-letter queue.
     /// Should be called when handler fails and message needs retry.
     /// </summary>
-    /// <param name="requeue">Whether to requeue message for retry. If false, message goes to dead-letter queue.</param>
     /// <returns>Task representing the asynchronous rejection.</returns>
     public required Func<bool, Task> RejectAsync { get; init; }
 
