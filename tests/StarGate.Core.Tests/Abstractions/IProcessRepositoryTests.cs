@@ -28,12 +28,12 @@ public abstract class IProcessRepositoryTests
     protected virtual async Task CreateAsync_Should_PersistProcess()
     {
         // Arrange
-        var repository = CreateRepository();
-        var process = CreateValidProcess();
+        IProcessRepository repository = CreateRepository();
+        Process process = CreateValidProcess();
 
         // Act
-        var created = await repository.CreateAsync(process);
-        var retrieved = await repository.GetByIdAsync(process.ProcessId);
+        Process created = await repository.CreateAsync(process);
+        Process? retrieved = await repository.GetByIdAsync(process.ProcessId);
 
         // Assert
         created.ProcessId.Should().Be(process.ProcessId);
@@ -48,11 +48,11 @@ public abstract class IProcessRepositoryTests
     protected virtual async Task GetByIdAsync_Should_ReturnNull_WhenNotFound()
     {
         // Arrange
-        var repository = CreateRepository();
-        var nonExistentId = Guid.NewGuid();
+        IProcessRepository repository = CreateRepository();
+        Guid nonExistentId = Guid.NewGuid();
 
         // Act
-        var result = await repository.GetByIdAsync(nonExistentId);
+        Process? result = await repository.GetByIdAsync(nonExistentId);
 
         // Assert
         result.Should().BeNull();
@@ -63,12 +63,12 @@ public abstract class IProcessRepositoryTests
     protected virtual async Task GetByClientProcessIdAsync_Should_EnableIdempotency()
     {
         // Arrange
-        var repository = CreateRepository();
-        var process = CreateValidProcess();
+        IProcessRepository repository = CreateRepository();
+        Process process = CreateValidProcess();
         await repository.CreateAsync(process);
 
         // Act
-        var retrieved = await repository.GetByClientProcessIdAsync(
+        Process? retrieved = await repository.GetByClientProcessIdAsync(
             process.ClientId,
             process.ClientProcessId);
 
@@ -84,10 +84,10 @@ public abstract class IProcessRepositoryTests
     protected virtual async Task GetByClientProcessIdAsync_Should_ReturnNull_WhenNotFound()
     {
         // Arrange
-        var repository = CreateRepository();
+        IProcessRepository repository = CreateRepository();
 
         // Act
-        var result = await repository.GetByClientProcessIdAsync(
+        Process? result = await repository.GetByClientProcessIdAsync(
             "non-existent-client",
             "non-existent-process");
 
@@ -100,12 +100,12 @@ public abstract class IProcessRepositoryTests
     protected virtual async Task UpdateAsync_Should_ModifyExistingProcess()
     {
         // Arrange
-        var repository = CreateRepository();
-        var process = CreateValidProcess();
+        IProcessRepository repository = CreateRepository();
+        Process process = CreateValidProcess();
         await repository.CreateAsync(process);
 
         // Act
-        var updated = process with
+        Process updated = process with
         {
             Status = ProcessStatus.Completed,
             Progress = 100,
@@ -113,7 +113,7 @@ public abstract class IProcessRepositoryTests
             UpdatedAt = DateTime.UtcNow
         };
         await repository.UpdateAsync(updated);
-        var retrieved = await repository.GetByIdAsync(process.ProcessId);
+        Process? retrieved = await repository.GetByIdAsync(process.ProcessId);
 
         // Assert
         retrieved.Should().NotBeNull();
@@ -128,18 +128,18 @@ public abstract class IProcessRepositoryTests
     protected virtual async Task GetByStatusAsync_Should_ReturnProcessesWithMatchingStatus()
     {
         // Arrange
-        var repository = CreateRepository();
-        var acceptedProcess = CreateValidProcess() with { Status = ProcessStatus.Accepted };
-        var processingProcess = CreateValidProcess() with { Status = ProcessStatus.Processing };
-        var completedProcess = CreateValidProcess() with { Status = ProcessStatus.Completed };
+        IProcessRepository repository = CreateRepository();
+        Process acceptedProcess = CreateValidProcess() with { Status = ProcessStatus.Accepted };
+        Process processingProcess = CreateValidProcess() with { Status = ProcessStatus.Processing };
+        Process completedProcess = CreateValidProcess() with { Status = ProcessStatus.Completed };
 
         await repository.CreateAsync(acceptedProcess);
         await repository.CreateAsync(processingProcess);
         await repository.CreateAsync(completedProcess);
 
         // Act
-        var acceptedResults = await repository.GetByStatusAsync(ProcessStatus.Accepted);
-        var processingResults = await repository.GetByStatusAsync(ProcessStatus.Processing);
+        IReadOnlyList<Process> acceptedResults = await repository.GetByStatusAsync(ProcessStatus.Accepted);
+        IReadOnlyList<Process> processingResults = await repository.GetByStatusAsync(ProcessStatus.Processing);
 
         // Assert
         acceptedResults.Should().ContainSingle(p => p.ProcessId == acceptedProcess.ProcessId);
@@ -151,20 +151,20 @@ public abstract class IProcessRepositoryTests
     protected virtual async Task GetByClientIdAsync_Should_ReturnClientProcesses()
     {
         // Arrange
-        var repository = CreateRepository();
-        var clientId = "test-client-123";
-        var otherClientId = "other-client-456";
+        IProcessRepository repository = CreateRepository();
+        string clientId = "test-client-123";
+        string otherClientId = "other-client-456";
 
-        var clientProcess1 = CreateValidProcess() with { ClientId = clientId };
-        var clientProcess2 = CreateValidProcess() with { ClientId = clientId };
-        var otherClientProcess = CreateValidProcess() with { ClientId = otherClientId };
+        Process clientProcess1 = CreateValidProcess() with { ClientId = clientId };
+        Process clientProcess2 = CreateValidProcess() with { ClientId = clientId };
+        Process otherClientProcess = CreateValidProcess() with { ClientId = otherClientId };
 
         await repository.CreateAsync(clientProcess1);
         await repository.CreateAsync(clientProcess2);
         await repository.CreateAsync(otherClientProcess);
 
         // Act
-        var results = await repository.GetByClientIdAsync(clientId);
+        IReadOnlyList<Process> results = await repository.GetByClientIdAsync(clientId);
 
         // Assert
         results.Should().HaveCount(2);
@@ -178,29 +178,29 @@ public abstract class IProcessRepositoryTests
     protected virtual async Task CountActiveProcessesAsync_Should_ReturnCorrectCount()
     {
         // Arrange
-        var repository = CreateRepository();
-        var clientId = "test-client";
-        var processType = "order";
+        IProcessRepository repository = CreateRepository();
+        string clientId = "test-client";
+        string processType = "order";
 
-        var acceptedProcess = CreateValidProcess() with
+        Process acceptedProcess = CreateValidProcess() with
         {
             ClientId = clientId,
             ProcessType = processType,
             Status = ProcessStatus.Accepted
         };
-        var processingProcess = CreateValidProcess() with
+        Process processingProcess = CreateValidProcess() with
         {
             ClientId = clientId,
             ProcessType = processType,
             Status = ProcessStatus.Processing
         };
-        var completedProcess = CreateValidProcess() with
+        Process completedProcess = CreateValidProcess() with
         {
             ClientId = clientId,
             ProcessType = processType,
             Status = ProcessStatus.Completed
         };
-        var failedProcess = CreateValidProcess() with
+        Process failedProcess = CreateValidProcess() with
         {
             ClientId = clientId,
             ProcessType = processType,
@@ -213,7 +213,7 @@ public abstract class IProcessRepositoryTests
         await repository.CreateAsync(failedProcess);
 
         // Act
-        var count = await repository.CountActiveProcessesAsync(clientId, processType);
+        int count = await repository.CountActiveProcessesAsync(clientId, processType);
 
         // Assert
         count.Should().Be(2); // Only Accepted and Processing are active
@@ -224,16 +224,16 @@ public abstract class IProcessRepositoryTests
     protected virtual async Task CountActiveProcessesAsync_Should_FilterByProcessType()
     {
         // Arrange
-        var repository = CreateRepository();
-        var clientId = "test-client";
+        IProcessRepository repository = CreateRepository();
+        string clientId = "test-client";
 
-        var orderProcess = CreateValidProcess() with
+        Process orderProcess = CreateValidProcess() with
         {
             ClientId = clientId,
             ProcessType = "order",
             Status = ProcessStatus.Processing
         };
-        var shippingProcess = CreateValidProcess() with
+        Process shippingProcess = CreateValidProcess() with
         {
             ClientId = clientId,
             ProcessType = "shipping",
@@ -244,8 +244,8 @@ public abstract class IProcessRepositoryTests
         await repository.CreateAsync(shippingProcess);
 
         // Act
-        var orderCount = await repository.CountActiveProcessesAsync(clientId, "order");
-        var shippingCount = await repository.CountActiveProcessesAsync(clientId, "shipping");
+        int orderCount = await repository.CountActiveProcessesAsync(clientId, "order");
+        int shippingCount = await repository.CountActiveProcessesAsync(clientId, "shipping");
 
         // Assert
         orderCount.Should().Be(1);

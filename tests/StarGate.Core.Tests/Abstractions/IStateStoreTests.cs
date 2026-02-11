@@ -28,11 +28,11 @@ public abstract class IStateStoreTests
     protected virtual async Task GetProcessAsync_Should_ReturnNull_WhenNotCached()
     {
         // Arrange
-        var store = CreateStateStore();
-        var processId = Guid.NewGuid();
+        IStateStore store = CreateStateStore();
+        Guid processId = Guid.NewGuid();
 
         // Act
-        var result = await store.GetProcessAsync(processId);
+        Process? result = await store.GetProcessAsync(processId);
 
         // Assert
         result.Should().BeNull();
@@ -43,12 +43,12 @@ public abstract class IStateStoreTests
     protected virtual async Task SetProcessAsync_Should_CacheProcess()
     {
         // Arrange
-        var store = CreateStateStore();
-        var process = CreateValidProcess();
+        IStateStore store = CreateStateStore();
+        Process process = CreateValidProcess();
 
         // Act
         await store.SetProcessAsync(process);
-        var cached = await store.GetProcessAsync(process.ProcessId);
+        Process? cached = await store.GetProcessAsync(process.ProcessId);
 
         // Assert
         cached.Should().NotBeNull();
@@ -62,18 +62,18 @@ public abstract class IStateStoreTests
     protected virtual async Task SetProcessAsync_Should_OverwriteExistingCache()
     {
         // Arrange
-        var store = CreateStateStore();
-        var process = CreateValidProcess();
+        IStateStore store = CreateStateStore();
+        Process process = CreateValidProcess();
         await store.SetProcessAsync(process);
 
         // Act
-        var updated = process with
+        Process updated = process with
         {
             Status = ProcessStatus.Completed,
             Progress = 100
         };
         await store.SetProcessAsync(updated);
-        var cached = await store.GetProcessAsync(process.ProcessId);
+        Process? cached = await store.GetProcessAsync(process.ProcessId);
 
         // Assert
         cached.Should().NotBeNull();
@@ -86,13 +86,13 @@ public abstract class IStateStoreTests
     protected virtual async Task InvalidateAsync_Should_RemoveCachedProcess()
     {
         // Arrange
-        var store = CreateStateStore();
-        var process = CreateValidProcess();
+        IStateStore store = CreateStateStore();
+        Process process = CreateValidProcess();
         await store.SetProcessAsync(process);
 
         // Act
         await store.InvalidateAsync(process.ProcessId);
-        var cached = await store.GetProcessAsync(process.ProcessId);
+        Process? cached = await store.GetProcessAsync(process.ProcessId);
 
         // Assert
         cached.Should().BeNull();
@@ -103,8 +103,8 @@ public abstract class IStateStoreTests
     protected virtual async Task InvalidateAsync_Should_BeIdempotent()
     {
         // Arrange
-        var store = CreateStateStore();
-        var processId = Guid.NewGuid();
+        IStateStore store = CreateStateStore();
+        Guid processId = Guid.NewGuid();
 
         // Act & Assert - should not throw
         await store.InvalidateAsync(processId);
@@ -116,12 +116,12 @@ public abstract class IStateStoreTests
     protected virtual async Task ExistsAsync_Should_ReturnTrue_WhenCached()
     {
         // Arrange
-        var store = CreateStateStore();
-        var process = CreateValidProcess();
+        IStateStore store = CreateStateStore();
+        Process process = CreateValidProcess();
         await store.SetProcessAsync(process);
 
         // Act
-        var exists = await store.ExistsAsync(process.ProcessId);
+        bool exists = await store.ExistsAsync(process.ProcessId);
 
         // Assert
         exists.Should().BeTrue();
@@ -132,11 +132,11 @@ public abstract class IStateStoreTests
     protected virtual async Task ExistsAsync_Should_ReturnFalse_WhenNotCached()
     {
         // Arrange
-        var store = CreateStateStore();
-        var processId = Guid.NewGuid();
+        IStateStore store = CreateStateStore();
+        Guid processId = Guid.NewGuid();
 
         // Act
-        var exists = await store.ExistsAsync(processId);
+        bool exists = await store.ExistsAsync(processId);
 
         // Assert
         exists.Should().BeFalse();
@@ -147,12 +147,12 @@ public abstract class IStateStoreTests
     protected virtual async Task TrySetStatusAsync_Should_ReturnBoolean()
     {
         // Arrange
-        var store = CreateStateStore();
-        var processId = Guid.NewGuid();
-        var expectedVersion = 1L;
+        IStateStore store = CreateStateStore();
+        Guid processId = Guid.NewGuid();
+        long expectedVersion = 1L;
 
         // Act
-        var result = await store.TrySetStatusAsync(
+        bool result = await store.TrySetStatusAsync(
             processId,
             ProcessStatus.Completed,
             expectedVersion);
@@ -170,23 +170,23 @@ public abstract class IStateStoreTests
     protected virtual async Task TrySetStatusAsync_Should_SupportOptimisticConcurrency()
     {
         // Arrange
-        var store = CreateStateStore();
-        var processId = Guid.NewGuid();
-        var version1 = 1L;
-        var version2 = 2L;
+        IStateStore store = CreateStateStore();
+        Guid processId = Guid.NewGuid();
+        long version1 = 1L;
+        long version2 = 2L;
 
         // Act
-        var firstUpdate = await store.TrySetStatusAsync(
+        bool firstUpdate = await store.TrySetStatusAsync(
             processId,
             ProcessStatus.Processing,
             version1);
 
-        var secondUpdateWithOldVersion = await store.TrySetStatusAsync(
+        bool secondUpdateWithOldVersion = await store.TrySetStatusAsync(
             processId,
             ProcessStatus.Completed,
             version1); // Using old version
 
-        var secondUpdateWithNewVersion = await store.TrySetStatusAsync(
+        bool secondUpdateWithNewVersion = await store.TrySetStatusAsync(
             processId,
             ProcessStatus.Completed,
             version2); // Using new version
