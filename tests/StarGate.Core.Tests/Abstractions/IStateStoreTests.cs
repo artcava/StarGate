@@ -166,11 +166,11 @@ public abstract class IStateStoreTests
             expectedVersion);
 
         // Assert
-        // Note: Exact behavior depends on implementation.
-        // Some implementations may return true even if key doesn't exist (create),
-        // others may return false (strict version check).
-        // This test documents that the method returns a boolean.
-        result.Should().Match<bool>(r => r == true || r == false);
+        // Method signature guarantees bool return type.
+        // Exact behavior (true/false) depends on implementation.
+        // Some implementations return true for new keys, others return false.
+        // This is tested in the optimistic concurrency test below.
+        _ = result; // Just verify no exception is thrown
 
         await CleanupAsync();
     }
