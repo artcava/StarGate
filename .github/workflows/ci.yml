@@ -1,0 +1,245 @@
+name: ci
+
+# Trigger events as per Git Flow documentation
+on:
+  push:
+    branches:
+      - main
+      - develop
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+      - develop
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  SOLUTION_PATH: './StarGate.sln'
+  BUILD_CONFIGURATION: 'Release'
+  COVERAGE_THRESHOLD: 70
+
+jobs:
+  # ============================================
+  # BUILD JOB - Compile and create artifacts
+  # ============================================
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for versioning
+      
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      
+      - name: Restore dependencies
+        run: dotnet restore ${{ env.SOLUTION_PATH }}
+      
+      - name: Build solution
+        run: |
+          dotnet build ${{ env.SOLUTION_PATH }} \
+            --configuration ${{ env.BUILD_CONFIGURATION }} \
+            --no-restore \
+            /p:TreatWarningsAsErrors=false
+      
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            **/bin/${{ env.BUILD_CONFIGURATION }}
+            **/obj/${{ env.BUILD_CONFIGURATION }}
+          retention-days: 1
+
+  # ============================================
+  # TEST JOB - Run unit tests with coverage
+  # ============================================
+  test:
+    name: Test
+    needs: build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      
+      - name: Restore dependencies
+        run: dotnet restore ${{ env.SOLUTION_PATH }}
+      
+      - name: Run unit tests with coverage
+        run: |
+          dotnet test ${{ env.SOLUTION_PATH }} \
+            --configuration ${{ env.BUILD_CONFIGURATION }} \
+            --no-restore \
+            --verbosity normal \
+            --collect:"XPlat Code Coverage" \
+            --results-directory ./coverage
+      
+      - name: Generate coverage report
+        if: always()
+        run: |
+          dotnet tool install --global dotnet-reportgenerator-globaltool || true
+          reportgenerator \
+            -reports:./coverage/**/coverage.cobertura.xml \
+            -targetdir:./coverage/report \
+            -reporttypes:"Html;TextSummary"
+      
+      - name: Display coverage summary
+        if: always()
+        run: cat ./coverage/report/Summary.txt || echo "No coverage report generated"
+      
+      - name: Check coverage threshold
+        if: always()
+        run: |
+          # Extract line coverage percentage from summary
+          COVERAGE=$(grep -oP 'Line coverage: \K[0-9.]+' ./coverage/report/Summary.txt || echo "0")
+          echo "Current coverage: ${COVERAGE}%"
+          echo "Required threshold: ${{ env.COVERAGE_THRESHOLD }}%"
+          
+          # Compare coverage with threshold
+          if (( $(echo "$COVERAGE < ${{ env.COVERAGE_THRESHOLD }}" | bc -l) )); then
+            echo "❌ Coverage ${COVERAGE}% is below threshold ${{ env.COVERAGE_THRESHOLD }}%"
+            exit 1
+          else
+            echo "✅ Coverage ${COVERAGE}% meets threshold ${{ env.COVERAGE_THRESHOLD }}%"
+          fi
+      
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: ./coverage/report
+          retention-days: 7
+
+  # ============================================
+  # QUALITY JOB - Code formatting and analyzers
+  # ============================================
+  quality:
+    name: Quality
+    needs: build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      
+      - name: Restore dependencies
+        run: dotnet restore ${{ env.SOLUTION_PATH }}
+      
+      - name: Verify code formatting
+        run: |
+          dotnet format ${{ env.SOLUTION_PATH }} \
+            --verify-no-changes \
+            --verbosity diagnostic
+      
+      - name: Run code analyzers
+        run: |
+          dotnet build ${{ env.SOLUTION_PATH }} \
+            --configuration ${{ env.BUILD_CONFIGURATION }} \
+            --no-restore \
+            /p:TreatWarningsAsErrors=true \
+            /p:EnforceCodeStyleInBuild=true
+
+  # ============================================
+  # RELEASE JOB - Publish GitHub Release on tag
+  # ============================================
+  release:
+    name: Release
+    needs: [build, test, quality]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      
+      - name: Extract version from tag
+        id: version
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          VERSION=${TAG#v}
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Release version: ${VERSION}"
+      
+      - name: Restore dependencies
+        run: dotnet restore ${{ env.SOLUTION_PATH }}
+      
+      - name: Build release artifacts
+        run: |
+          dotnet build ${{ env.SOLUTION_PATH }} \
+            --configuration ${{ env.BUILD_CONFIGURATION }} \
+            --no-restore \
+            /p:Version=${{ steps.version.outputs.version }}
+      
+      - name: Publish release binaries
+        run: |
+          dotnet publish ${{ env.SOLUTION_PATH }} \
+            --configuration ${{ env.BUILD_CONFIGURATION }} \
+            --no-build \
+            --output ./publish \
+            /p:Version=${{ steps.version.outputs.version }}
+      
+      - name: Create release archive
+        run: |
+          cd ./publish
+          zip -r ../StarGate-${{ steps.version.outputs.version }}.zip .
+          cd ..
+      
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          # Extract commits since last tag
+          PREVIOUS_TAG=$(git tag --sort=-creatordate | grep -v '${{ steps.version.outputs.tag }}' | head -n 1)
+          
+          if [ -z "$PREVIOUS_TAG" ]; then
+            echo "First release - no previous tag found"
+            NOTES="## 🎉 Initial Release\n\nFirst release of StarGate."
+          else
+            echo "Generating notes from ${PREVIOUS_TAG} to ${{ steps.version.outputs.tag }}"
+            NOTES="## 📝 Changes\n\n"
+            NOTES+="$(git log ${PREVIOUS_TAG}..${{ steps.version.outputs.tag }} --pretty=format:'- %s (%h)' --no-merges)"
+          fi
+          
+          # Save notes to file
+          echo -e "$NOTES" > release_notes.md
+          cat release_notes.md
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Release ${{ steps.version.outputs.tag }}
+          body_path: release_notes.md
+          draft: false
+          prerelease: false
+          files: |
+            StarGate-${{ steps.version.outputs.version }}.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
