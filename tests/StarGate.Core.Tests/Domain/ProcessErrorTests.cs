@@ -1,5 +1,6 @@
 using FluentAssertions;
 using StarGate.Core.Domain;
+using System.Text.Json;
 using Xunit;
 
 namespace StarGate.Core.Tests.Domain;
@@ -16,7 +17,8 @@ public class ProcessErrorTests
         // Arrange
         string code = "VALIDATION_ERROR";
         string message = "Invalid input data";
-        object details = new { Field = "Amount", Value = -100 };
+        object detailsObject = new { Field = "Amount", Value = -100 };
+        JsonDocument details = JsonDocument.Parse(JsonSerializer.Serialize(detailsObject));
 
         // Act
         ProcessError error = new(code, message, details);
@@ -24,7 +26,8 @@ public class ProcessErrorTests
         // Assert
         error.Code.Should().Be(code);
         error.Message.Should().Be(message);
-        error.Details.Should().BeEquivalentTo(details);
+        error.Details.Should().NotBeNull();
+        error.Details!.RootElement.GetProperty("Field").GetString().Should().Be("Amount");
     }
 
     [Fact]
@@ -56,19 +59,20 @@ public class ProcessErrorTests
     public void ProcessError_Should_SupportComplexDetails()
     {
         // Arrange
-        object complexDetails = new
+        object complexDetailsObject = new
         {
             Timestamp = DateTime.UtcNow,
             Stack = new[] { "Method1", "Method2", "Method3" },
             Context = new { UserId = "user-123", RequestId = "req-456" }
         };
+        JsonDocument complexDetails = JsonDocument.Parse(JsonSerializer.Serialize(complexDetailsObject));
 
         // Act
         ProcessError error = new("COMPLEX_ERROR", "Complex error occurred", complexDetails);
 
         // Assert
         error.Details.Should().NotBeNull();
-        error.Details.Should().BeEquivalentTo(complexDetails);
+        error.Details!.RootElement.GetProperty("Context").GetProperty("UserId").GetString().Should().Be("user-123");
     }
 
     [Theory]

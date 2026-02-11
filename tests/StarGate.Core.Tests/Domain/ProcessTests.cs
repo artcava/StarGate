@@ -1,5 +1,6 @@
 using FluentAssertions;
 using StarGate.Core.Domain;
+using System.Text.Json;
 using Xunit;
 
 namespace StarGate.Core.Tests.Domain;
@@ -111,21 +112,24 @@ public class ProcessTests
     public void Process_Should_StoreData()
     {
         // Arrange
-        object data = new { OrderId = "ORD-001", Amount = 100.50m };
+        object dataObject = new { OrderId = "ORD-001", Amount = 100.50m };
+        JsonDocument data = JsonDocument.Parse(JsonSerializer.Serialize(dataObject));
 
         // Act
         Process process = CreateValidProcess() with { Data = data };
 
         // Assert
         process.Data.Should().NotBeNull();
-        process.Data.Should().BeEquivalentTo(data);
+        process.Data!.RootElement.GetProperty("OrderId").GetString().Should().Be("ORD-001");
+        process.Data.RootElement.GetProperty("Amount").GetDecimal().Should().Be(100.50m);
     }
 
     [Fact]
     public void Process_Should_StoreResult()
     {
         // Arrange
-        object result = new { Status = "Success", TrackingNumber = "TRACK-123" };
+        object resultObject = new { Status = "Success", TrackingNumber = "TRACK-123" };
+        JsonDocument result = JsonDocument.Parse(JsonSerializer.Serialize(resultObject));
 
         // Act
         Process process = CreateValidProcess() with
@@ -137,17 +141,20 @@ public class ProcessTests
 
         // Assert
         process.Result.Should().NotBeNull();
-        process.Result.Should().BeEquivalentTo(result);
+        process.Result!.RootElement.GetProperty("Status").GetString().Should().Be("Success");
+        process.Result.RootElement.GetProperty("TrackingNumber").GetString().Should().Be("TRACK-123");
     }
 
     [Fact]
     public void Process_Should_StoreErrorDetails()
     {
         // Arrange
+        object detailsObject = new { Field = "Amount", Issue = "Must be positive" };
+        JsonDocument details = JsonDocument.Parse(JsonSerializer.Serialize(detailsObject));
         ProcessError error = new(
             "VALIDATION_ERROR",
             "Invalid order data",
-            new { Field = "Amount", Issue = "Must be positive" });
+            details);
 
         // Act
         Process process = CreateValidProcess() with
@@ -160,6 +167,7 @@ public class ProcessTests
         process.Error.Should().NotBeNull();
         process.Error!.Code.Should().Be("VALIDATION_ERROR");
         process.Error.Message.Should().Be("Invalid order data");
+        process.Error.Details.Should().NotBeNull();
     }
 
     [Fact]

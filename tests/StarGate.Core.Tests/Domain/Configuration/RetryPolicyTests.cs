@@ -31,7 +31,7 @@ public class RetryPolicyTests
         // Test validates the design intent with required properties
         RetryPolicy policy = CreateValidRetryPolicy();
 
-        policy.Enabled.Should().BeDefined();
+        policy.Enabled.Should().Be(true);
         policy.MaxAttempts.Should().BeGreaterThan(0);
         policy.InitialDelay.Should().BePositive();
         policy.BackoffStrategy.Should().BeDefined();
