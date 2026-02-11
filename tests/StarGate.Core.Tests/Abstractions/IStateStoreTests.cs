@@ -11,6 +11,7 @@ namespace StarGate.Core.Tests.Abstractions;
 /// Concrete implementations (Redis, in-memory, etc.) must inherit this class
 /// and implement CreateStateStore() and CleanupAsync() methods.
 /// </summary>
+[Trait("Category", "ContractTest")]
 public abstract class IStateStoreTests
 {
     /// <summary>

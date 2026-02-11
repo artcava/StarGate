@@ -11,6 +11,7 @@ namespace StarGate.Core.Tests.Abstractions;
 /// Concrete repository implementations (MongoDB, in-memory, etc.) must inherit this class
 /// and implement CreateRepository() and CleanupAsync() methods.
 /// </summary>
+[Trait("Category", "ContractTest")]
 public abstract class IProcessRepositoryTests
 {
     /// <summary>
