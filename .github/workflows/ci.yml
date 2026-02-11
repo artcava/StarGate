@@ -144,12 +144,11 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore ${{ env.SOLUTION_PATH }}
       
-      # TODO: Re-enable when formatting issues are resolved (Issue #2)
-      # - name: Verify code formatting
-      #   run: |
-      #     dotnet format ${{ env.SOLUTION_PATH }} \
-      #       --verify-no-changes \
-      #       --verbosity diagnostic
+      - name: Verify code formatting
+        run: |
+          dotnet format ${{ env.SOLUTION_PATH }} \
+            --verify-no-changes \
+            --verbosity diagnostic
       
       - name: Run code analyzers
         run: |
