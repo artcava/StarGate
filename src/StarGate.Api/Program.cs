@@ -1,6 +1,6 @@
-var builder = WebApplication.CreateBuilder(args);
+WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
-var app = builder.Build();
+WebApplication app = builder.Build();
 
 app.MapGet("/health/live", () => Results.Ok(new { status = "healthy" }));
 

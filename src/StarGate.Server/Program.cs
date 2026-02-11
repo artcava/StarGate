@@ -1,4 +1,4 @@
-var builder = Host.CreateApplicationBuilder(args);
+HostApplicationBuilder builder = Host.CreateApplicationBuilder(args);
 
-var host = builder.Build();
+IHost host = builder.Build();
 host.Run();
