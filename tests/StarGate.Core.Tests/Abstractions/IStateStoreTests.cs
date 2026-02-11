@@ -1,17 +1,16 @@
 using FluentAssertions;
 using StarGate.Core.Abstractions;
 using StarGate.Core.Domain;
-using Xunit;
 
 namespace StarGate.Core.Tests.Abstractions;
 
 /// <summary>
 /// Contract tests for IStateStore implementations.
 /// These tests verify the expected behavior of any state store implementation.
-/// Concrete implementations (Redis, in-memory, etc.) must inherit this class
-/// and implement CreateStateStore() and CleanupAsync() methods.
+/// Concrete implementations (Redis, in-memory, etc.) must inherit this class,
+/// implement CreateStateStore() and CleanupAsync() methods, and override test methods
+/// with [Fact] attributes to enable test execution.
 /// </summary>
-[Trait("Category", "ContractTest")]
 public abstract class IStateStoreTests
 {
     /// <summary>
@@ -26,8 +25,7 @@ public abstract class IStateStoreTests
     /// </summary>
     protected abstract Task CleanupAsync();
 
-    [Fact]
-    public async Task GetProcessAsync_Should_ReturnNull_WhenNotCached()
+    protected virtual async Task GetProcessAsync_Should_ReturnNull_WhenNotCached()
     {
         // Arrange
         var store = CreateStateStore();
@@ -42,8 +40,7 @@ public abstract class IStateStoreTests
         await CleanupAsync();
     }
 
-    [Fact]
-    public async Task SetProcessAsync_Should_CacheProcess()
+    protected virtual async Task SetProcessAsync_Should_CacheProcess()
     {
         // Arrange
         var store = CreateStateStore();
@@ -62,8 +59,7 @@ public abstract class IStateStoreTests
         await CleanupAsync();
     }
 
-    [Fact]
-    public async Task SetProcessAsync_Should_OverwriteExistingCache()
+    protected virtual async Task SetProcessAsync_Should_OverwriteExistingCache()
     {
         // Arrange
         var store = CreateStateStore();
@@ -87,8 +83,7 @@ public abstract class IStateStoreTests
         await CleanupAsync();
     }
 
-    [Fact]
-    public async Task InvalidateAsync_Should_RemoveCachedProcess()
+    protected virtual async Task InvalidateAsync_Should_RemoveCachedProcess()
     {
         // Arrange
         var store = CreateStateStore();
@@ -105,8 +100,7 @@ public abstract class IStateStoreTests
         await CleanupAsync();
     }
 
-    [Fact]
-    public async Task InvalidateAsync_Should_BeIdempotent()
+    protected virtual async Task InvalidateAsync_Should_BeIdempotent()
     {
         // Arrange
         var store = CreateStateStore();
@@ -119,8 +113,7 @@ public abstract class IStateStoreTests
         await CleanupAsync();
     }
 
-    [Fact]
-    public async Task ExistsAsync_Should_ReturnTrue_WhenCached()
+    protected virtual async Task ExistsAsync_Should_ReturnTrue_WhenCached()
     {
         // Arrange
         var store = CreateStateStore();
@@ -136,8 +129,7 @@ public abstract class IStateStoreTests
         await CleanupAsync();
     }
 
-    [Fact]
-    public async Task ExistsAsync_Should_ReturnFalse_WhenNotCached()
+    protected virtual async Task ExistsAsync_Should_ReturnFalse_WhenNotCached()
     {
         // Arrange
         var store = CreateStateStore();
@@ -152,8 +144,7 @@ public abstract class IStateStoreTests
         await CleanupAsync();
     }
 
-    [Fact]
-    public async Task TrySetStatusAsync_Should_ReturnBoolean()
+    protected virtual async Task TrySetStatusAsync_Should_ReturnBoolean()
     {
         // Arrange
         var store = CreateStateStore();
@@ -176,8 +167,7 @@ public abstract class IStateStoreTests
         await CleanupAsync();
     }
 
-    [Fact]
-    public async Task TrySetStatusAsync_Should_SupportOptimisticConcurrency()
+    protected virtual async Task TrySetStatusAsync_Should_SupportOptimisticConcurrency()
     {
         // Arrange
         var store = CreateStateStore();
@@ -213,7 +203,7 @@ public abstract class IStateStoreTests
     /// Creates a valid process instance for testing.
     /// Each call returns a unique process to avoid conflicts.
     /// </summary>
-    private static Process CreateValidProcess() => new()
+    protected static Process CreateValidProcess() => new()
     {
         ProcessId = Guid.NewGuid(),
         ClientProcessId = $"client-{Guid.NewGuid()}",

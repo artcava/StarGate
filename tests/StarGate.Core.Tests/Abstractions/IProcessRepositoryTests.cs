@@ -1,17 +1,16 @@
 using FluentAssertions;
 using StarGate.Core.Abstractions;
 using StarGate.Core.Domain;
-using Xunit;
 
 namespace StarGate.Core.Tests.Abstractions;
 
 /// <summary>
 /// Contract tests for IProcessRepository implementations.
 /// These tests verify the expected behavior of any repository implementation.
-/// Concrete repository implementations (MongoDB, in-memory, etc.) must inherit this class
-/// and implement CreateRepository() and CleanupAsync() methods.
+/// Concrete repository implementations (MongoDB, in-memory, etc.) must inherit this class,
+/// implement CreateRepository() and CleanupAsync() methods, and override test methods
+/// with [Fact] attributes to enable test execution.
 /// </summary>
-[Trait("Category", "ContractTest")]
 public abstract class IProcessRepositoryTests
 {
     /// <summary>
@@ -26,8 +25,7 @@ public abstract class IProcessRepositoryTests
     /// </summary>
     protected abstract Task CleanupAsync();
 
-    [Fact]
-    public async Task CreateAsync_Should_PersistProcess()
+    protected virtual async Task CreateAsync_Should_PersistProcess()
     {
         // Arrange
         var repository = CreateRepository();
@@ -47,8 +45,7 @@ public abstract class IProcessRepositoryTests
         await CleanupAsync();
     }
 
-    [Fact]
-    public async Task GetByIdAsync_Should_ReturnNull_WhenNotFound()
+    protected virtual async Task GetByIdAsync_Should_ReturnNull_WhenNotFound()
     {
         // Arrange
         var repository = CreateRepository();
@@ -63,8 +60,7 @@ public abstract class IProcessRepositoryTests
         await CleanupAsync();
     }
 
-    [Fact]
-    public async Task GetByClientProcessIdAsync_Should_EnableIdempotency()
+    protected virtual async Task GetByClientProcessIdAsync_Should_EnableIdempotency()
     {
         // Arrange
         var repository = CreateRepository();
@@ -85,8 +81,7 @@ public abstract class IProcessRepositoryTests
         await CleanupAsync();
     }
 
-    [Fact]
-    public async Task GetByClientProcessIdAsync_Should_ReturnNull_WhenNotFound()
+    protected virtual async Task GetByClientProcessIdAsync_Should_ReturnNull_WhenNotFound()
     {
         // Arrange
         var repository = CreateRepository();
@@ -102,8 +97,7 @@ public abstract class IProcessRepositoryTests
         await CleanupAsync();
     }
 
-    [Fact]
-    public async Task UpdateAsync_Should_ModifyExistingProcess()
+    protected virtual async Task UpdateAsync_Should_ModifyExistingProcess()
     {
         // Arrange
         var repository = CreateRepository();
@@ -131,8 +125,7 @@ public abstract class IProcessRepositoryTests
         await CleanupAsync();
     }
 
-    [Fact]
-    public async Task GetByStatusAsync_Should_ReturnProcessesWithMatchingStatus()
+    protected virtual async Task GetByStatusAsync_Should_ReturnProcessesWithMatchingStatus()
     {
         // Arrange
         var repository = CreateRepository();
@@ -155,8 +148,7 @@ public abstract class IProcessRepositoryTests
         await CleanupAsync();
     }
 
-    [Fact]
-    public async Task GetByClientIdAsync_Should_ReturnClientProcesses()
+    protected virtual async Task GetByClientIdAsync_Should_ReturnClientProcesses()
     {
         // Arrange
         var repository = CreateRepository();
@@ -183,8 +175,7 @@ public abstract class IProcessRepositoryTests
         await CleanupAsync();
     }
 
-    [Fact]
-    public async Task CountActiveProcessesAsync_Should_ReturnCorrectCount()
+    protected virtual async Task CountActiveProcessesAsync_Should_ReturnCorrectCount()
     {
         // Arrange
         var repository = CreateRepository();
@@ -230,8 +221,7 @@ public abstract class IProcessRepositoryTests
         await CleanupAsync();
     }
 
-    [Fact]
-    public async Task CountActiveProcessesAsync_Should_FilterByProcessType()
+    protected virtual async Task CountActiveProcessesAsync_Should_FilterByProcessType()
     {
         // Arrange
         var repository = CreateRepository();
@@ -268,7 +258,7 @@ public abstract class IProcessRepositoryTests
     /// Creates a valid process instance for testing.
     /// Each call returns a unique process to avoid conflicts.
     /// </summary>
-    private static Process CreateValidProcess() => new()
+    protected static Process CreateValidProcess() => new()
     {
         ProcessId = Guid.NewGuid(),
         ClientProcessId = $"client-{Guid.NewGuid()}",
