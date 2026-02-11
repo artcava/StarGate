@@ -7,5 +7,6 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <WarningsAsErrors>true</WarningsAsErrors>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 </Project>
