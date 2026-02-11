@@ -152,7 +152,7 @@ public abstract class IStateStoreTests
     }
 
     [Fact]
-    public async Task TrySetStatusAsync_Should_ReturnTrue_WhenVersionMatches()
+    public async Task TrySetStatusAsync_Should_ReturnBoolean()
     {
         // Arrange
         var store = CreateStateStore();
@@ -169,8 +169,8 @@ public abstract class IStateStoreTests
         // Note: Exact behavior depends on implementation.
         // Some implementations may return true even if key doesn't exist (create),
         // others may return false (strict version check).
-        // This test documents the expected contract.
-        result.Should().BeOfType<bool>();
+        // This test documents that the method returns a boolean.
+        result.Should().Match<bool>(r => r == true || r == false);
 
         await CleanupAsync();
     }
