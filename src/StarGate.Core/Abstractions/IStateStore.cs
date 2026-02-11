@@ -16,7 +16,7 @@ public interface IStateStore
     /// </summary>
     /// <param name="processId">Process identifier.</param>
     /// <returns>Cached process if found, null otherwise.</returns>
-    Task<Process?> GetProcessAsync(Guid processId);
+    public Task<Process?> GetProcessAsync(Guid processId);
 
     /// <summary>
     /// Stores a process in cache.
@@ -26,7 +26,7 @@ public interface IStateStore
     /// </summary>
     /// <param name="process">Process to cache.</param>
     /// <returns>Task representing the asynchronous operation.</returns>
-    Task SetProcessAsync(Process process);
+    public Task SetProcessAsync(Process process);
 
     /// <summary>
     /// Invalidates cached process data.
@@ -35,7 +35,7 @@ public interface IStateStore
     /// </summary>
     /// <param name="processId">Process identifier.</param>
     /// <returns>Task representing the asynchronous operation.</returns>
-    Task InvalidateAsync(Guid processId);
+    public Task InvalidateAsync(Guid processId);
 
     /// <summary>
     /// Checks if a process exists in cache.
@@ -44,7 +44,7 @@ public interface IStateStore
     /// </summary>
     /// <param name="processId">Process identifier.</param>
     /// <returns>True if process is cached, false otherwise.</returns>
-    Task<bool> ExistsAsync(Guid processId);
+    public Task<bool> ExistsAsync(Guid processId);
 
     /// <summary>
     /// Sets process status in cache with optimistic concurrency.
@@ -56,7 +56,7 @@ public interface IStateStore
     /// <param name="status">New status.</param>
     /// <param name="expectedVersion">Expected version for optimistic locking.</param>
     /// <returns>True if update succeeded, false if version mismatch.</returns>
-    Task<bool> TrySetStatusAsync(
+    public Task<bool> TrySetStatusAsync(
         Guid processId,
         ProcessStatus status,
         long expectedVersion);

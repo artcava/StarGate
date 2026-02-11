@@ -17,7 +17,7 @@ public interface IPolicyRepository
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Process type policy.</returns>
     /// <exception cref="KeyNotFoundException">If policy not found.</exception>
-    Task<ProcessTypePolicy> GetProcessTypePolicyAsync(
+    public Task<ProcessTypePolicy> GetProcessTypePolicyAsync(
         string processType,
         CancellationToken ct = default);
 
@@ -29,7 +29,7 @@ public interface IPolicyRepository
     /// <param name="processType">Process type identifier.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Client policy override if exists, null otherwise.</returns>
-    Task<ClientPolicyOverride?> GetClientOverrideAsync(
+    public Task<ClientPolicyOverride?> GetClientOverrideAsync(
         string clientId,
         string processType,
         CancellationToken ct = default);
@@ -43,7 +43,7 @@ public interface IPolicyRepository
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Saved policy with updated timestamp.</returns>
     /// <exception cref="ArgumentNullException">If policy is null.</exception>
-    Task<ProcessTypePolicy> SaveProcessTypePolicyAsync(
+    public Task<ProcessTypePolicy> SaveProcessTypePolicyAsync(
         ProcessTypePolicy policy,
         CancellationToken ct = default);
 
@@ -56,7 +56,7 @@ public interface IPolicyRepository
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Saved override with updated timestamp.</returns>
     /// <exception cref="ArgumentNullException">If override is null.</exception>
-    Task<ClientPolicyOverride> SaveClientOverrideAsync(
+    public Task<ClientPolicyOverride> SaveClientOverrideAsync(
         ClientPolicyOverride @override,
         CancellationToken ct = default);
 
@@ -68,7 +68,7 @@ public interface IPolicyRepository
     /// <param name="processType">Process type identifier.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>True if deleted, false if not found.</returns>
-    Task<bool> DeleteClientOverrideAsync(
+    public Task<bool> DeleteClientOverrideAsync(
         string clientId,
         string processType,
         CancellationToken ct = default);
@@ -80,7 +80,7 @@ public interface IPolicyRepository
     /// </summary>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>List of all process type policies.</returns>
-    Task<IReadOnlyList<ProcessTypePolicy>> ListProcessTypePoliciesAsync(
+    public Task<IReadOnlyList<ProcessTypePolicy>> ListProcessTypePoliciesAsync(
         CancellationToken ct = default);
 
     /// <summary>
@@ -91,7 +91,7 @@ public interface IPolicyRepository
     /// <param name="clientId">Client identifier.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>List of client policy overrides.</returns>
-    Task<IReadOnlyList<ClientPolicyOverride>> ListClientOverridesAsync(
+    public Task<IReadOnlyList<ClientPolicyOverride>> ListClientOverridesAsync(
         string clientId,
         CancellationToken ct = default);
 }

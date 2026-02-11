@@ -18,7 +18,7 @@ public interface IProcessRepository
     /// <returns>Created process.</returns>
     /// <exception cref="InvalidOperationException">If process with same ID already exists.</exception>
     /// <exception cref="ArgumentNullException">If process is null.</exception>
-    Task<Process> CreateAsync(Process process, CancellationToken ct = default);
+    public Task<Process> CreateAsync(Process process, CancellationToken ct = default);
 
     /// <summary>
     /// Retrieves a process by its unique identifier.
@@ -27,7 +27,7 @@ public interface IProcessRepository
     /// <param name="processId">Process identifier.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Process if found, null otherwise.</returns>
-    Task<Process?> GetByIdAsync(Guid processId, CancellationToken ct = default);
+    public Task<Process?> GetByIdAsync(Guid processId, CancellationToken ct = default);
 
     /// <summary>
     /// Retrieves a process by client ID and client process ID.
@@ -38,7 +38,7 @@ public interface IProcessRepository
     /// <param name="clientProcessId">Client-provided process identifier.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Process if found, null otherwise.</returns>
-    Task<Process?> GetByClientProcessIdAsync(
+    public Task<Process?> GetByClientProcessIdAsync(
         string clientId,
         string clientProcessId,
         CancellationToken ct = default);
@@ -52,7 +52,7 @@ public interface IProcessRepository
     /// <returns>Updated process.</returns>
     /// <exception cref="InvalidOperationException">If process not found or concurrency conflict.</exception>
     /// <exception cref="ArgumentNullException">If process is null.</exception>
-    Task<Process> UpdateAsync(Process process, CancellationToken ct = default);
+    public Task<Process> UpdateAsync(Process process, CancellationToken ct = default);
 
     /// <summary>
     /// Retrieves processes by status.
@@ -63,7 +63,7 @@ public interface IProcessRepository
     /// <param name="limit">Maximum number of results (default 100, max 1000).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>List of processes with specified status.</returns>
-    Task<IReadOnlyList<Process>> GetByStatusAsync(
+    public Task<IReadOnlyList<Process>> GetByStatusAsync(
         ProcessStatus status,
         int limit = 100,
         CancellationToken ct = default);
@@ -78,7 +78,7 @@ public interface IProcessRepository
     /// <param name="limit">Maximum number of results (default 100, max 1000).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>List of processes for the client.</returns>
-    Task<IReadOnlyList<Process>> GetByClientIdAsync(
+    public Task<IReadOnlyList<Process>> GetByClientIdAsync(
         string clientId,
         int skip = 0,
         int limit = 100,
@@ -93,7 +93,7 @@ public interface IProcessRepository
     /// <param name="processType">Process type.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Number of active processes.</returns>
-    Task<int> CountActiveProcessesAsync(
+    public Task<int> CountActiveProcessesAsync(
         string clientId,
         string processType,
         CancellationToken ct = default);
