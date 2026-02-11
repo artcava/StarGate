@@ -11,9 +11,8 @@ namespace StarGate.Core.Tests.Domain.Configuration;
 public class BackoffStrategyTests
 {
     [Theory]
-    [InlineData(BackoffStrategy.None, 0)]
-    [InlineData(BackoffStrategy.Linear, 1)]
-    [InlineData(BackoffStrategy.Exponential, 2)]
+    [InlineData(BackoffStrategy.Linear, 0)]
+    [InlineData(BackoffStrategy.Exponential, 1)]
     public void BackoffStrategy_Should_HaveCorrectNumericValues(BackoffStrategy strategy, int expectedValue)
     {
         // Assert
@@ -34,7 +33,6 @@ public class BackoffStrategyTests
     }
 
     [Theory]
-    [InlineData("None", BackoffStrategy.None)]
     [InlineData("Linear", BackoffStrategy.Linear)]
     [InlineData("Exponential", BackoffStrategy.Exponential)]
     public void BackoffStrategy_Should_ParseFromString(string strategyString, BackoffStrategy expected)
@@ -53,8 +51,7 @@ public class BackoffStrategyTests
         BackoffStrategy[] allStrategies = Enum.GetValues<BackoffStrategy>();
 
         // Assert
-        allStrategies.Should().HaveCount(3);
-        allStrategies.Should().Contain(BackoffStrategy.None);
+        allStrategies.Should().HaveCount(2);
         allStrategies.Should().Contain(BackoffStrategy.Linear);
         allStrategies.Should().Contain(BackoffStrategy.Exponential);
     }

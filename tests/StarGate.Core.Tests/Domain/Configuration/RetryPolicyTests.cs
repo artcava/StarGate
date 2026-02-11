@@ -90,7 +90,6 @@ public class RetryPolicyTests
     }
 
     [Theory]
-    [InlineData(BackoffStrategy.None)]
     [InlineData(BackoffStrategy.Linear)]
     [InlineData(BackoffStrategy.Exponential)]
     public void RetryPolicy_Should_SupportAllBackoffStrategies(BackoffStrategy strategy)
