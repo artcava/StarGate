@@ -5,10 +5,9 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <WarningsAsErrors>true</WarningsAsErrors>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <!-- Suppress missing XML documentation warnings for now -->
-    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <!-- Exclude CS1591 (missing XML documentation) from being treated as error -->
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);CS1591</WarningsNotAsErrors>
   </PropertyGroup>
 </Project>
