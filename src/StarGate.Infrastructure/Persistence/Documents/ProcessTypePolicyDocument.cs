@@ -1,6 +1,6 @@
-namespace StarGate.Infrastructure.Persistence.Documents;
-
 using MongoDB.Bson.Serialization.Attributes;
+
+namespace StarGate.Infrastructure.Persistence.Documents;
 
 /// <summary>
 /// MongoDB document for ProcessTypePolicy configuration.
@@ -15,52 +15,31 @@ public record ProcessTypePolicyDocument
     public required string ProcessType { get; init; }
 
     /// <summary>
-    /// Maximum execution timeout in seconds.
+    /// Maximum execution timeout.
     /// </summary>
-    [BsonElement("timeoutSeconds")]
-    public required int TimeoutSeconds { get; init; }
+    [BsonElement("timeout")]
+    [BsonTimeSpanOptions(BsonType.Int64, TimeSpanUnits.Seconds)]
+    public required TimeSpan Timeout { get; init; }
 
     /// <summary>
-    /// Whether retry mechanism is enabled.
+    /// Retry policy configuration.
     /// </summary>
-    [BsonElement("retryEnabled")]
-    public required bool RetryEnabled { get; init; }
+    [BsonElement("retryPolicy")]
+    public required RetryPolicyDocument RetryPolicy { get; init; }
 
     /// <summary>
-    /// Maximum number of retry attempts.
+    /// Result retention period.
     /// </summary>
-    [BsonElement("retryMaxAttempts")]
-    public required int RetryMaxAttempts { get; init; }
-
-    /// <summary>
-    /// Initial retry delay in seconds.
-    /// </summary>
-    [BsonElement("retryInitialDelaySeconds")]
-    public required int RetryInitialDelaySeconds { get; init; }
-
-    /// <summary>
-    /// Backoff strategy (Linear, Exponential, Constant).
-    /// </summary>
-    [BsonElement("retryBackoffStrategy")]
-    public required string RetryBackoffStrategy { get; init; }
-
-    /// <summary>
-    /// Maximum retry delay in seconds.
-    /// </summary>
-    [BsonElement("retryMaxDelaySeconds")]
-    public required int RetryMaxDelaySeconds { get; init; }
-
-    /// <summary>
-    /// Result retention period in days.
-    /// </summary>
-    [BsonElement("resultRetentionDays")]
-    public required int ResultRetentionDays { get; init; }
+    [BsonElement("resultRetention")]
+    [BsonTimeSpanOptions(BsonType.Int64, TimeSpanUnits.Days)]
+    public required TimeSpan ResultRetention { get; init; }
 
     /// <summary>
     /// Maximum concurrent processes allowed.
     /// </summary>
     [BsonElement("maxConcurrentProcesses")]
-    public required int MaxConcurrentProcesses { get; init; }
+    [BsonIgnoreIfNull]
+    public int? MaxConcurrentProcesses { get; init; }
 
     /// <summary>
     /// Last update timestamp.
@@ -68,4 +47,43 @@ public record ProcessTypePolicyDocument
     [BsonElement("updatedAt")]
     [BsonDateTimeOptions(Kind = DateTimeKind.Utc)]
     public required DateTime UpdatedAt { get; init; }
+}
+
+/// <summary>
+/// MongoDB embedded document for RetryPolicy configuration.
+/// </summary>
+public record RetryPolicyDocument
+{
+    /// <summary>
+    /// Whether retry mechanism is enabled.
+    /// </summary>
+    [BsonElement("enabled")]
+    public required bool Enabled { get; init; }
+
+    /// <summary>
+    /// Maximum number of retry attempts.
+    /// </summary>
+    [BsonElement("maxAttempts")]
+    public required int MaxAttempts { get; init; }
+
+    /// <summary>
+    /// Initial retry delay.
+    /// </summary>
+    [BsonElement("initialDelay")]
+    [BsonTimeSpanOptions(BsonType.Int64, TimeSpanUnits.Seconds)]
+    public required TimeSpan InitialDelay { get; init; }
+
+    /// <summary>
+    /// Backoff strategy (Linear, Exponential).
+    /// </summary>
+    [BsonElement("backoffStrategy")]
+    [BsonRepresentation(BsonType.String)]
+    public required string BackoffStrategy { get; init; }
+
+    /// <summary>
+    /// Maximum retry delay.
+    /// </summary>
+    [BsonElement("maxDelay")]
+    [BsonTimeSpanOptions(BsonType.Int64, TimeSpanUnits.Seconds)]
+    public required TimeSpan MaxDelay { get; init; }
 }
