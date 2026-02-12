@@ -1,10 +1,10 @@
-namespace StarGate.Infrastructure.Tests.Persistence;
-
 using FluentAssertions;
 using MongoDB.Bson;
 using StarGate.Core.Domain.Configuration;
 using StarGate.Infrastructure.Persistence;
 using Xunit;
+
+namespace StarGate.Infrastructure.Tests.Persistence;
 
 public class PolicyMapperTests
 {
@@ -14,10 +14,10 @@ public class PolicyMapperTests
     public void MapToDocument_ProcessTypePolicy_Should_ConvertCorrectly()
     {
         // Arrange
-        var policy = CreateValidProcessTypePolicy();
+        ProcessTypePolicy policy = CreateValidProcessTypePolicy();
 
         // Act
-        var document = PolicyMapper.MapToDocument(policy);
+        ProcessTypePolicyDocument document = PolicyMapper.MapToDocument(policy);
 
         // Assert
         document.ProcessType.Should().Be(policy.ProcessType);
@@ -43,10 +43,10 @@ public class PolicyMapperTests
     public void MapToDomain_ProcessTypePolicy_Should_ConvertCorrectly()
     {
         // Arrange
-        var document = CreateValidProcessTypePolicyDocument();
+        ProcessTypePolicyDocument document = CreateValidProcessTypePolicyDocument();
 
         // Act
-        var policy = PolicyMapper.MapToDomain(document);
+        ProcessTypePolicy policy = PolicyMapper.MapToDomain(document);
 
         // Assert
         policy.ProcessType.Should().Be(document.ProcessType);
@@ -71,11 +71,11 @@ public class PolicyMapperTests
     public void RoundTrip_ProcessTypePolicy_Should_PreserveData()
     {
         // Arrange
-        var original = CreateValidProcessTypePolicy();
+        ProcessTypePolicy original = CreateValidProcessTypePolicy();
 
         // Act
-        var document = PolicyMapper.MapToDocument(original);
-        var roundTripped = PolicyMapper.MapToDomain(document);
+        ProcessTypePolicyDocument document = PolicyMapper.MapToDocument(original);
+        ProcessTypePolicy roundTripped = PolicyMapper.MapToDomain(document);
 
         // Assert
         roundTripped.ProcessType.Should().Be(original.ProcessType);
@@ -92,10 +92,10 @@ public class PolicyMapperTests
     public void MapToDocument_ClientOverride_Should_ConvertCorrectly()
     {
         // Arrange
-        var clientOverride = CreateValidClientOverride();
+        ClientPolicyOverride clientOverride = CreateValidClientOverride();
 
         // Act
-        var document = PolicyMapper.MapToDocument(clientOverride);
+        ClientPolicyOverrideDocument document = PolicyMapper.MapToDocument(clientOverride);
 
         // Assert
         document.ClientId.Should().Be(clientOverride.ClientId);
@@ -121,10 +121,19 @@ public class PolicyMapperTests
     public void MapToDocument_ClientOverride_Should_HandleNullRetryPolicy()
     {
         // Arrange
-        var clientOverride = CreateValidClientOverride() with { RetryPolicy = null };
+        ClientPolicyOverride clientOverride = new()
+        {
+            ClientId = "test-client",
+            ProcessType = "order",
+            Timeout = TimeSpan.FromMinutes(20),
+            RetryPolicy = null,
+            ResultRetention = TimeSpan.FromDays(30),
+            MaxConcurrentProcesses = 200,
+            UpdatedAt = DateTime.UtcNow
+        };
 
         // Act
-        var document = PolicyMapper.MapToDocument(clientOverride);
+        ClientPolicyOverrideDocument document = PolicyMapper.MapToDocument(clientOverride);
 
         // Assert
         document.RetryPolicy.Should().BeNull();
@@ -134,10 +143,10 @@ public class PolicyMapperTests
     public void MapToDocument_ClientOverride_Should_SetEmptyObjectId()
     {
         // Arrange
-        var clientOverride = CreateValidClientOverride();
+        ClientPolicyOverride clientOverride = CreateValidClientOverride();
 
         // Act
-        var document = PolicyMapper.MapToDocument(clientOverride);
+        ClientPolicyOverrideDocument document = PolicyMapper.MapToDocument(clientOverride);
 
         // Assert
         // ObjectId.Empty is a placeholder - repository will manage the actual ID
@@ -148,7 +157,7 @@ public class PolicyMapperTests
     public void MapToDocument_ClientOverride_Should_HandleNullableFields()
     {
         // Arrange
-        var clientOverride = new ClientPolicyOverride
+        ClientPolicyOverride clientOverride = new()
         {
             ClientId = "test-client",
             ProcessType = "order",
@@ -160,7 +169,7 @@ public class PolicyMapperTests
         };
 
         // Act
-        var document = PolicyMapper.MapToDocument(clientOverride);
+        ClientPolicyOverrideDocument document = PolicyMapper.MapToDocument(clientOverride);
 
         // Assert
         document.Timeout.Should().BeNull();
@@ -173,10 +182,10 @@ public class PolicyMapperTests
     public void MapToDomain_ClientOverride_Should_ConvertCorrectly()
     {
         // Arrange
-        var document = CreateValidClientOverrideDocument();
+        ClientPolicyOverrideDocument document = CreateValidClientOverrideDocument();
 
         // Act
-        var clientOverride = PolicyMapper.MapToDomain(document);
+        ClientPolicyOverride clientOverride = PolicyMapper.MapToDomain(document);
 
         // Assert
         clientOverride.ClientId.Should().Be(document.ClientId);
@@ -200,11 +209,11 @@ public class PolicyMapperTests
     public void RoundTrip_ClientOverride_Should_PreserveData()
     {
         // Arrange
-        var original = CreateValidClientOverride();
+        ClientPolicyOverride original = CreateValidClientOverride();
 
         // Act
-        var document = PolicyMapper.MapToDocument(original);
-        var roundTripped = PolicyMapper.MapToDomain(document);
+        ClientPolicyOverrideDocument document = PolicyMapper.MapToDocument(original);
+        ClientPolicyOverride roundTripped = PolicyMapper.MapToDomain(document);
 
         // Assert
         roundTripped.ClientId.Should().Be(original.ClientId);
@@ -221,16 +230,15 @@ public class PolicyMapperTests
     public void MapToDomain_RetryPolicy_Should_HandleAllBackoffStrategies()
     {
         // Arrange & Act & Assert
-        var strategies = new[]
+        BackoffStrategy[] strategies =
         {
-            BackoffStrategy.Constant,
             BackoffStrategy.Linear,
             BackoffStrategy.Exponential
         };
 
-        foreach (var strategy in strategies)
+        foreach (BackoffStrategy strategy in strategies)
         {
-            var policy = new ProcessTypePolicy
+            ProcessTypePolicy policy = new()
             {
                 ProcessType = "test",
                 Timeout = TimeSpan.FromMinutes(10),
@@ -247,8 +255,8 @@ public class PolicyMapperTests
                 UpdatedAt = DateTime.UtcNow
             };
 
-            var document = PolicyMapper.MapToDocument(policy);
-            var roundTripped = PolicyMapper.MapToDomain(document);
+            ProcessTypePolicyDocument document = PolicyMapper.MapToDocument(policy);
+            ProcessTypePolicy roundTripped = PolicyMapper.MapToDomain(document);
 
             roundTripped.RetryPolicy.BackoffStrategy.Should().Be(strategy);
         }
@@ -258,7 +266,7 @@ public class PolicyMapperTests
     public void MapToDomain_RetryPolicy_Should_ThrowException_OnInvalidBackoffStrategy()
     {
         // Arrange
-        var document = CreateValidProcessTypePolicyDocument();
+        ProcessTypePolicyDocument document = CreateValidProcessTypePolicyDocument();
         document.RetryPolicy.BackoffStrategy = "InvalidStrategy";
 
         // Act
@@ -273,11 +281,11 @@ public class PolicyMapperTests
     public void MapToDomain_RetryPolicy_Should_BeCaseInsensitiveForBackoffStrategy()
     {
         // Arrange
-        var document = CreateValidProcessTypePolicyDocument();
+        ProcessTypePolicyDocument document = CreateValidProcessTypePolicyDocument();
         document.RetryPolicy.BackoffStrategy = "exponential"; // lowercase
 
         // Act
-        var policy = PolicyMapper.MapToDomain(document);
+        ProcessTypePolicy policy = PolicyMapper.MapToDomain(document);
 
         // Assert
         policy.RetryPolicy.BackoffStrategy.Should().Be(BackoffStrategy.Exponential);
@@ -287,10 +295,10 @@ public class PolicyMapperTests
     public void MapToDocument_RetryPolicy_Should_SerializeBackoffStrategyAsString()
     {
         // Arrange
-        var policy = CreateValidProcessTypePolicy();
+        ProcessTypePolicy policy = CreateValidProcessTypePolicy();
 
         // Act
-        var document = PolicyMapper.MapToDocument(policy);
+        ProcessTypePolicyDocument document = PolicyMapper.MapToDocument(policy);
 
         // Assert
         document.RetryPolicy.BackoffStrategy.Should().Be("Exponential");
@@ -304,14 +312,25 @@ public class PolicyMapperTests
     public void MapToDocument_Should_PreserveTimeSpanValues()
     {
         // Arrange
-        var policy = CreateValidProcessTypePolicy();
-        policy.Timeout = TimeSpan.FromMinutes(15);
-        policy.RetryPolicy.InitialDelay = TimeSpan.FromSeconds(5);
-        policy.RetryPolicy.MaxDelay = TimeSpan.FromMinutes(10);
-        policy.ResultRetention = TimeSpan.FromDays(30);
+        ProcessTypePolicy policy = new()
+        {
+            ProcessType = "test",
+            Timeout = TimeSpan.FromMinutes(15),
+            RetryPolicy = new RetryPolicy
+            {
+                Enabled = true,
+                MaxAttempts = 3,
+                InitialDelay = TimeSpan.FromSeconds(5),
+                BackoffStrategy = BackoffStrategy.Exponential,
+                MaxDelay = TimeSpan.FromMinutes(10)
+            },
+            ResultRetention = TimeSpan.FromDays(30),
+            MaxConcurrentProcesses = 100,
+            UpdatedAt = DateTime.UtcNow
+        };
 
         // Act
-        var document = PolicyMapper.MapToDocument(policy);
+        ProcessTypePolicyDocument document = PolicyMapper.MapToDocument(policy);
 
         // Assert
         document.Timeout.Should().Be(TimeSpan.FromMinutes(15));
@@ -324,12 +343,26 @@ public class PolicyMapperTests
     public void MapToDocument_Should_PreserveDateTimeValues()
     {
         // Arrange
-        var updatedAt = new DateTime(2026, 2, 12, 9, 0, 0, DateTimeKind.Utc);
-        var policy = CreateValidProcessTypePolicy();
-        policy.UpdatedAt = updatedAt;
+        DateTime updatedAt = new(2026, 2, 12, 9, 0, 0, DateTimeKind.Utc);
+        ProcessTypePolicy policy = new()
+        {
+            ProcessType = "test",
+            Timeout = TimeSpan.FromMinutes(10),
+            RetryPolicy = new RetryPolicy
+            {
+                Enabled = true,
+                MaxAttempts = 3,
+                InitialDelay = TimeSpan.FromSeconds(10),
+                BackoffStrategy = BackoffStrategy.Exponential,
+                MaxDelay = TimeSpan.FromMinutes(5)
+            },
+            ResultRetention = TimeSpan.FromDays(7),
+            MaxConcurrentProcesses = 100,
+            UpdatedAt = updatedAt
+        };
 
         // Act
-        var document = PolicyMapper.MapToDocument(policy);
+        ProcessTypePolicyDocument document = PolicyMapper.MapToDocument(policy);
 
         // Assert
         document.UpdatedAt.Should().Be(updatedAt);
