@@ -585,4 +585,5 @@ public class MongoPolicyRepositoryTests
         UpdatedAt = DateTime.UtcNow
     };
 
-    #endregion}
+    #endregion
+}
