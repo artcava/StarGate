@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
 using StarGate.Core.Abstractions;
 using StarGate.Core.Domain;
