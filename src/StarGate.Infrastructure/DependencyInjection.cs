@@ -66,6 +66,7 @@ public static class DependencyInjection
 
         // Register repositories
         services.AddScoped<IProcessRepository, MongoProcessRepository>();
+        services.AddScoped<IPolicyRepository, MongoPolicyRepository>();
 
         // Add MongoDB health check
         services.AddHealthChecks()

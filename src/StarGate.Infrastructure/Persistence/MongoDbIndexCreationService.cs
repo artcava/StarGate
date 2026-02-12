@@ -13,6 +13,12 @@ public class MongoDbIndexCreationService : IHostedService
     private readonly IMongoDatabase _database;
     private readonly ILogger<MongoDbIndexCreationService> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="MongoDbIndexCreationService"/> class.
+    /// </summary>
+    /// <param name="database">MongoDB database instance.</param>
+    /// <param name="logger">Logger for tracking index creation.</param>
+    /// <exception cref="ArgumentNullException">Thrown when database or logger is null.</exception>
     public MongoDbIndexCreationService(
         IMongoDatabase database,
         ILogger<MongoDbIndexCreationService> logger)
@@ -21,13 +27,19 @@ public class MongoDbIndexCreationService : IHostedService
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
+    /// <inheritdoc/>
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("Starting MongoDB index creation...");
 
         try
         {
+            // Create indexes for processes collection
             await MongoDbIndexes.CreateProcessIndexesAsync(_database, _logger);
+            
+            // Create indexes for policy collections
+            await MongoDbIndexes.CreatePolicyIndexesAsync(_database, _logger);
+            
             _logger.LogInformation("MongoDB index creation completed successfully");
         }
         catch (Exception ex)
@@ -39,6 +51,7 @@ public class MongoDbIndexCreationService : IHostedService
         }
     }
 
+    /// <inheritdoc/>
     public Task StopAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("MongoDB index creation service stopping");
