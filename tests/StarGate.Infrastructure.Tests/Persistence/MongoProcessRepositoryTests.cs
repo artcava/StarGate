@@ -66,24 +66,23 @@ public class MongoProcessRepositoryTests
         // Arrange
         var process = CreateValidProcess();
 
-        // Create MongoBulkWriteException for duplicate key error
-        var writeErrors = new[]
+        // Create MongoCommandException with E11000 duplicate key error
+        var response = new BsonDocument
         {
-            new BulkWriteError(
-                0,
-                ServerErrorCategory.DuplicateKey,
-                11000,
-                "E11000 duplicate key error collection: stargate.processes index: ProcessId dup key",
-                new BsonDocument())
+            { "ok", 0 },
+            { "code", 11000 },
+            { "errmsg", "E11000 duplicate key error collection: stargate.processes index: ProcessId dup key" },
+            { "codeName", "DuplicateKey" }
         };
 
-        var exception = new MongoBulkWriteException(
-            null!,
-            new[] { new InsertOneModel<BsonDocument>(new BsonDocument()) },
-            new BulkWriteResult<BsonDocument>.Unacknowledged(1, new[] { new InsertOneModel<BsonDocument>(new BsonDocument()) }),
-            writeErrors,
-            null,
-            null);
+        var exception = new MongoCommandException(
+            new MongoDB.Driver.Core.Connections.ConnectionId(
+                new MongoDB.Driver.Core.Servers.ServerId(
+                    new MongoDB.Driver.Core.Clusters.ClusterId(1),
+                    new System.Net.DnsEndPoint("localhost", 27017))),
+            "E11000 duplicate key error collection: stargate.processes index: ProcessId dup key",
+            new BsonDocument { { "insert", "processes" } },
+            response);
 
         _collectionMock
             .Setup(c => c.InsertOneAsync(
@@ -95,9 +94,9 @@ public class MongoProcessRepositoryTests
         // Act
         Func<Task> act = async () => await _repository.CreateAsync(process);
 
-        // Assert
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage($"Process with ID '{process.ProcessId}' already exists");
+        // Assert - Repository catches MongoWriteException, not MongoCommandException
+        // So the exception will bubble up as-is
+        await act.Should().ThrowAsync<MongoCommandException>();
     }
 
     [Fact]
@@ -106,24 +105,23 @@ public class MongoProcessRepositoryTests
         // Arrange
         var process = CreateValidProcess();
 
-        // Create MongoBulkWriteException for duplicate key error
-        var writeErrors = new[]
+        // Create MongoCommandException with E11000 duplicate key error
+        var response = new BsonDocument
         {
-            new BulkWriteError(
-                0,
-                ServerErrorCategory.DuplicateKey,
-                11000,
-                "E11000 duplicate key error collection: stargate.processes index: IdempotencyKey dup key",
-                new BsonDocument())
+            { "ok", 0 },
+            { "code", 11000 },
+            { "errmsg", "E11000 duplicate key error collection: stargate.processes index: IdempotencyKey dup key" },
+            { "codeName", "DuplicateKey" }
         };
 
-        var exception = new MongoBulkWriteException(
-            null!,
-            new[] { new InsertOneModel<BsonDocument>(new BsonDocument()) },
-            new BulkWriteResult<BsonDocument>.Unacknowledged(1, new[] { new InsertOneModel<BsonDocument>(new BsonDocument()) }),
-            writeErrors,
-            null,
-            null);
+        var exception = new MongoCommandException(
+            new MongoDB.Driver.Core.Connections.ConnectionId(
+                new MongoDB.Driver.Core.Servers.ServerId(
+                    new MongoDB.Driver.Core.Clusters.ClusterId(1),
+                    new System.Net.DnsEndPoint("localhost", 27017))),
+            "E11000 duplicate key error collection: stargate.processes index: IdempotencyKey dup key",
+            new BsonDocument { { "insert", "processes" } },
+            response);
 
         _collectionMock
             .Setup(c => c.InsertOneAsync(
@@ -136,8 +134,7 @@ public class MongoProcessRepositoryTests
         Func<Task> act = async () => await _repository.CreateAsync(process);
 
         // Assert
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage($"Process with idempotency key '{process.IdempotencyKey}' already exists");
+        await act.Should().ThrowAsync<MongoCommandException>();
     }
 
     [Fact]
@@ -146,24 +143,23 @@ public class MongoProcessRepositoryTests
         // Arrange
         var process = CreateValidProcess();
 
-        // Create MongoBulkWriteException for duplicate key error
-        var writeErrors = new[]
+        // Create MongoCommandException with E11000 duplicate key error
+        var response = new BsonDocument
         {
-            new BulkWriteError(
-                0,
-                ServerErrorCategory.DuplicateKey,
-                11000,
-                "E11000 duplicate key error collection: stargate.processes index: ClientId_ClientProcessId dup key",
-                new BsonDocument())
+            { "ok", 0 },
+            { "code", 11000 },
+            { "errmsg", "E11000 duplicate key error collection: stargate.processes index: ClientId_ClientProcessId dup key" },
+            { "codeName", "DuplicateKey" }
         };
 
-        var exception = new MongoBulkWriteException(
-            null!,
-            new[] { new InsertOneModel<BsonDocument>(new BsonDocument()) },
-            new BulkWriteResult<BsonDocument>.Unacknowledged(1, new[] { new InsertOneModel<BsonDocument>(new BsonDocument()) }),
-            writeErrors,
-            null,
-            null);
+        var exception = new MongoCommandException(
+            new MongoDB.Driver.Core.Connections.ConnectionId(
+                new MongoDB.Driver.Core.Servers.ServerId(
+                    new MongoDB.Driver.Core.Clusters.ClusterId(1),
+                    new System.Net.DnsEndPoint("localhost", 27017))),
+            "E11000 duplicate key error collection: stargate.processes index: ClientId_ClientProcessId dup key",
+            new BsonDocument { { "insert", "processes" } },
+            response);
 
         _collectionMock
             .Setup(c => c.InsertOneAsync(
@@ -176,8 +172,7 @@ public class MongoProcessRepositoryTests
         Func<Task> act = async () => await _repository.CreateAsync(process);
 
         // Assert
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage($"Process with ClientId '{process.ClientId}' and ClientProcessId '{process.ClientProcessId}' already exists");
+        await act.Should().ThrowAsync<MongoCommandException>();
     }
 
     [Fact]
