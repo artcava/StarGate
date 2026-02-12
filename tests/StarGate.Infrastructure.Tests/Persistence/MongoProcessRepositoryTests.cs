@@ -74,8 +74,7 @@ public class MongoProcessRepositoryTests
             ServerErrorCategory.DuplicateKey,
             11000,
             "E11000 duplicate key error collection: stargate.processes index: ProcessId dup key",
-            new BsonDocument(),
-            null);
+            new BsonDocument());
 
         var writeException = new MongoWriteException(
             new ConnectionId(new ServerId(new ClusterId(), new DnsEndPoint("localhost", 27017))),
@@ -108,8 +107,7 @@ public class MongoProcessRepositoryTests
             ServerErrorCategory.DuplicateKey,
             11000,
             "E11000 duplicate key error collection: stargate.processes index: IdempotencyKey dup key",
-            new BsonDocument(),
-            null);
+            new BsonDocument());
 
         var writeException = new MongoWriteException(
             new ConnectionId(new ServerId(new ClusterId(), new DnsEndPoint("localhost", 27017))),
@@ -142,8 +140,7 @@ public class MongoProcessRepositoryTests
             ServerErrorCategory.DuplicateKey,
             11000,
             "E11000 duplicate key error collection: stargate.processes index: ClientId_ClientProcessId dup key",
-            new BsonDocument(),
-            null);
+            new BsonDocument());
 
         var writeException = new MongoWriteException(
             new ConnectionId(new ServerId(new ClusterId(), new DnsEndPoint("localhost", 27017))),

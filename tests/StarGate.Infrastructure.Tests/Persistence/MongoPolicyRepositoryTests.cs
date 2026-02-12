@@ -266,7 +266,7 @@ public class MongoPolicyRepositoryTests
 
         var replaceResult = new Mock<ReplaceOneResult>();
         replaceResult.Setup(r => r.MatchedCount).Returns(0);
-        replaceResult.Setup(r => r.UpsertedId).Returns(ObjectId.GenerateNewId());
+        replaceResult.Setup(r => r.UpsertedId).Returns(new BsonString($"{clientOverride.ClientId}:{clientOverride.ProcessType}"));
 
         _overrideCollectionMock
             .Setup(c => c.ReplaceOneAsync(
