@@ -1,7 +1,7 @@
-namespace StarGate.Infrastructure.Persistence.Mappers;
-
 using StarGate.Core.Domain.Configuration;
 using StarGate.Infrastructure.Persistence.Documents;
+
+namespace StarGate.Infrastructure.Persistence.Mappers;
 
 /// <summary>
 /// Maps policy domain entities to/from MongoDB documents.
@@ -28,7 +28,7 @@ public static class PolicyMapper
                 MaxDelay = TimeSpan.FromSeconds(document.RetryMaxDelaySeconds)
             },
             ResultRetention = TimeSpan.FromDays(document.ResultRetentionDays),
-            MaxConcurrentProcesses = document.MaxConcurrentProcesses,
+            MaxConcurrentProcesses = document.MaxConcurrentProcesses > 0 ? document.MaxConcurrentProcesses : null,
             UpdatedAt = DateTime.SpecifyKind(document.UpdatedAt, DateTimeKind.Utc)
         };
     }
@@ -50,7 +50,7 @@ public static class PolicyMapper
             RetryBackoffStrategy = policy.RetryPolicy.BackoffStrategy.ToString(),
             RetryMaxDelaySeconds = (int)policy.RetryPolicy.MaxDelay.TotalSeconds,
             ResultRetentionDays = (int)policy.ResultRetention.TotalDays,
-            MaxConcurrentProcesses = policy.MaxConcurrentProcesses,
+            MaxConcurrentProcesses = policy.MaxConcurrentProcesses ?? 0,
             UpdatedAt = DateTime.SpecifyKind(policy.UpdatedAt, DateTimeKind.Utc)
         };
     }
@@ -105,7 +105,6 @@ public static class PolicyMapper
         {
             "Linear" => BackoffStrategy.Linear,
             "Exponential" => BackoffStrategy.Exponential,
-            "Constant" => BackoffStrategy.Constant,
             _ => throw new ArgumentException($"Unknown backoff strategy: {strategy}", nameof(strategy))
         };
     }
