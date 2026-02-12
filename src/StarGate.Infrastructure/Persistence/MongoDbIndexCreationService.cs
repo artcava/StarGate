@@ -37,8 +37,6 @@ public class MongoDbIndexCreationService : IHostedService
                 "Error creating MongoDB indexes. Application will continue, but performance may be degraded.");
             // Don't throw - allow application to start even if index creation fails
         }
-
-        return Task.CompletedTask;
     }
 
     public Task StopAsync(CancellationToken cancellationToken)

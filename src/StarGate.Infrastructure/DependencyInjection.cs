@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 using StarGate.Core.Abstractions;
 using StarGate.Infrastructure.Persistence;
@@ -24,15 +26,10 @@ public static class DependencyInjection
         IConfiguration configuration)
     {
         // Bind MongoDB configuration
-        var mongoOptions = configuration
+        MongoDbOptions mongoOptions = configuration
             .GetSection(MongoDbOptions.SectionName)
-            .Get<MongoDbOptions>();
-
-        if (mongoOptions == null)
-        {
-            throw new InvalidOperationException(
+            .Get<MongoDbOptions>() ?? throw new InvalidOperationException(
                 $"MongoDB configuration section '{MongoDbOptions.SectionName}' not found in appsettings");
-        }
 
         services.Configure<MongoDbOptions>(
             configuration.GetSection(MongoDbOptions.SectionName));
@@ -40,12 +37,12 @@ public static class DependencyInjection
         // Register MongoDB client as singleton (connection pooling)
         services.AddSingleton<IMongoClient>(sp =>
         {
-            var settings = MongoClientSettings.FromConnectionString(mongoOptions.ConnectionString);
+            MongoClientSettings settings = MongoClientSettings.FromConnectionString(mongoOptions.ConnectionString);
             settings.ConnectTimeout = TimeSpan.FromMilliseconds(mongoOptions.ConnectionTimeoutMs);
             settings.ServerSelectionTimeout = TimeSpan.FromMilliseconds(mongoOptions.ServerSelectionTimeoutMs);
             settings.ApplicationName = "StarGate";
 
-            var logger = sp.GetRequiredService<ILogger<MongoClient>>();
+            ILogger<MongoClient> logger = sp.GetRequiredService<ILogger<MongoClient>>();
             logger.LogInformation(
                 "Initializing MongoDB client: Database={DatabaseName}",
                 mongoOptions.DatabaseName);
@@ -56,10 +53,10 @@ public static class DependencyInjection
         // Register MongoDB database as singleton
         services.AddSingleton<IMongoDatabase>(sp =>
         {
-            var client = sp.GetRequiredService<IMongoClient>();
-            var database = client.GetDatabase(mongoOptions.DatabaseName);
+            IMongoClient client = sp.GetRequiredService<IMongoClient>();
+            IMongoDatabase database = client.GetDatabase(mongoOptions.DatabaseName);
 
-            var logger = sp.GetRequiredService<ILogger<IMongoDatabase>>();
+            ILogger<IMongoDatabase> logger = sp.GetRequiredService<ILogger<IMongoDatabase>>();
             logger.LogInformation(
                 "MongoDB database '{DatabaseName}' initialized",
                 mongoOptions.DatabaseName);
