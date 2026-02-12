@@ -1,8 +1,8 @@
-namespace StarGate.Infrastructure.Persistence;
-
 using MongoDB.Bson;
 using StarGate.Core.Domain;
 using System.Text.Json;
+
+namespace StarGate.Infrastructure.Persistence;
 
 /// <summary>
 /// Maps between domain Process entities and MongoDB ProcessDocument.
@@ -65,12 +65,12 @@ public static class ProcessMapper
             Status = ParseEnum<ProcessStatus>(document.Status, nameof(document.Status)),
             Progress = document.Progress,
             CurrentStep = document.CurrentStep,
-            Data = document.Data?.ToJson(),
-            Result = document.Result?.ToJson(),
+            Data = ConvertToJsonDocument(document.Data),
+            Result = ConvertToJsonDocument(document.Result),
             Error = document.Error != null ? new ProcessError(
                 document.Error.Code,
                 document.Error.Message,
-                document.Error.Details?.ToJson()) : null,
+                ConvertToJsonDocument(document.Error.Details)) : null,
             CreatedAt = document.CreatedAt,
             UpdatedAt = document.UpdatedAt,
             CompletedAt = document.CompletedAt,
@@ -80,18 +80,31 @@ public static class ProcessMapper
     }
 
     /// <summary>
-    /// Converts an object to a BSON document.
-    /// Handles both string JSON and object serialization.
+    /// Converts a JsonDocument to a BSON document.
     /// </summary>
-    private static BsonDocument? ConvertToBsonDocument(object? data)
+    private static BsonDocument? ConvertToBsonDocument(JsonDocument? jsonDocument)
     {
-        return data switch
+        if (jsonDocument == null)
         {
-            null => null,
-            string json when !string.IsNullOrWhiteSpace(json) => BsonDocument.Parse(json),
-            string => null,
-            _ => BsonDocument.Parse(JsonSerializer.Serialize(data))
-        };
+            return null;
+        }
+
+        string json = JsonSerializer.Serialize(jsonDocument.RootElement);
+        return BsonDocument.Parse(json);
+    }
+
+    /// <summary>
+    /// Converts a BSON document to a JsonDocument.
+    /// </summary>
+    private static JsonDocument? ConvertToJsonDocument(BsonDocument? bsonDocument)
+    {
+        if (bsonDocument == null)
+        {
+            return null;
+        }
+
+        string json = bsonDocument.ToJson();
+        return JsonDocument.Parse(json);
     }
 
     /// <summary>
@@ -99,7 +112,7 @@ public static class ProcessMapper
     /// </summary>
     private static TEnum ParseEnum<TEnum>(string value, string paramName) where TEnum : struct, Enum
     {
-        if (Enum.TryParse<TEnum>(value, ignoreCase: true, out var result))
+        if (Enum.TryParse<TEnum>(value, ignoreCase: true, out TEnum result))
         {
             return result;
         }
