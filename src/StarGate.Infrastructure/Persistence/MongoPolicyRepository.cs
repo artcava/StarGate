@@ -142,7 +142,7 @@ public class MongoPolicyRepository : IPolicyRepository
     }
 
     /// <inheritdoc />
-    public async Task<List<ProcessTypePolicy>> ListProcessTypePoliciesAsync(
+    public async Task<IReadOnlyList<ProcessTypePolicy>> ListProcessTypePoliciesAsync(
         CancellationToken ct = default)
     {
         var documents = await _processTypePolicies
@@ -153,7 +153,7 @@ public class MongoPolicyRepository : IPolicyRepository
     }
 
     /// <inheritdoc />
-    public async Task<List<ClientPolicyOverride>> ListClientOverridesAsync(
+    public async Task<IReadOnlyList<ClientPolicyOverride>> ListClientOverridesAsync(
         string clientId,
         CancellationToken ct = default)
     {
