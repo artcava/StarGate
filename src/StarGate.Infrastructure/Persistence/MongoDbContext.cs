@@ -1,8 +1,8 @@
-namespace StarGate.Infrastructure.Persistence;
-
 using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
 using StarGate.Infrastructure.Persistence.Documents;
+
+namespace StarGate.Infrastructure.Persistence;
 
 /// <summary>
 /// MongoDB database context for StarGate.
