@@ -250,6 +250,7 @@ public class MongoPolicyRepositoryTests
     {
         // Arrange
         var clientOverride = CreateValidClientOverride();
+        var existingId = $"{clientOverride.ClientId}:{clientOverride.ProcessType}";
 
         // Mock no existing document
         var cursorMock = new Mock<IAsyncCursor<ClientPolicyOverrideDocument>>();
@@ -266,8 +267,7 @@ public class MongoPolicyRepositoryTests
 
         var replaceResult = new Mock<ReplaceOneResult>();
         replaceResult.Setup(r => r.MatchedCount).Returns(0);
-        // UpsertedId is BsonValue, not ObjectId - use BsonString
-        replaceResult.Setup(r => r.UpsertedId).Returns(new BsonString($"{clientOverride.ClientId}:{clientOverride.ProcessType}"));
+        replaceResult.Setup(r => r.UpsertedId).Returns(new BsonString(existingId));
 
         _overrideCollectionMock
             .Setup(c => c.ReplaceOneAsync(
