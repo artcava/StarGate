@@ -250,7 +250,6 @@ public class MongoPolicyRepositoryTests
     {
         // Arrange
         var clientOverride = CreateValidClientOverride();
-        var existingId = $"{clientOverride.ClientId}:{clientOverride.ProcessType}";
 
         // Mock no existing document
         var cursorMock = new Mock<IAsyncCursor<ClientPolicyOverrideDocument>>();
@@ -267,7 +266,9 @@ public class MongoPolicyRepositoryTests
 
         var replaceResult = new Mock<ReplaceOneResult>();
         replaceResult.Setup(r => r.MatchedCount).Returns(0);
-        replaceResult.Setup(r => r.UpsertedId).Returns(new BsonString(existingId));
+        // UpsertedId should be BsonString for composite string key
+        var expectedId = $"{clientOverride.ClientId}:{clientOverride.ProcessType}";
+        replaceResult.Setup(r => r.UpsertedId).Returns(new BsonString(expectedId));
 
         _overrideCollectionMock
             .Setup(c => c.ReplaceOneAsync(
@@ -333,6 +334,7 @@ public class MongoPolicyRepositoryTests
 
         // Assert
         result.Should().Be(clientOverride);
+        // Verify that Id is preserved as string (composite key)
         _overrideCollectionMock.Verify(
             c => c.ReplaceOneAsync(
                 It.IsAny<FilterDefinition<ClientPolicyOverrideDocument>>(),
