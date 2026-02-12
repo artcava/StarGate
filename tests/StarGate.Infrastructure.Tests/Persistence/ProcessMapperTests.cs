@@ -141,7 +141,8 @@ public class ProcessMapperTests
     public void MapToDomain_Should_HandleNullData()
     {
         // Arrange
-        ProcessDocument document = CreateValidDocument() with { Data = null };
+        ProcessDocument document = CreateValidDocument();
+        document.Data = null;
 
         // Act
         Process process = ProcessMapper.MapToDomain(document);
@@ -155,7 +156,8 @@ public class ProcessMapperTests
     {
         // Arrange
         BsonDocument bsonData = BsonDocument.Parse("{\"orderId\":\"ORD-123\",\"total\":99.99}");
-        ProcessDocument document = CreateValidDocument() with { Data = bsonData };
+        ProcessDocument document = CreateValidDocument();
+        document.Data = bsonData;
 
         // Act
         Process process = ProcessMapper.MapToDomain(document);
@@ -176,7 +178,8 @@ public class ProcessMapperTests
             Message = "Process execution timeout",
             Details = BsonDocument.Parse("{\"timeout\":300}")
         };
-        ProcessDocument document = CreateValidDocument() with { Error = errorDocument };
+        ProcessDocument document = CreateValidDocument();
+        document.Error = errorDocument;
 
         // Act
         Process process = ProcessMapper.MapToDomain(document);
@@ -196,16 +199,15 @@ public class ProcessMapperTests
         ProcessStatus[] statuses = 
         { 
             ProcessStatus.Accepted,
-            ProcessStatus.Queued,
-            ProcessStatus.Running,
+            ProcessStatus.Processing,
             ProcessStatus.Completed,
-            ProcessStatus.Failed,
-            ProcessStatus.Cancelled
+            ProcessStatus.Failed
         };
 
         foreach (ProcessStatus status in statuses)
         {
-            ProcessDocument document = CreateValidDocument() with { Status = status.ToString() };
+            ProcessDocument document = CreateValidDocument();
+            document.Status = status.ToString();
             Process process = ProcessMapper.MapToDomain(document);
             process.Status.Should().Be(status);
         }
@@ -215,7 +217,8 @@ public class ProcessMapperTests
     public void MapToDomain_Should_ThrowException_OnInvalidStatus()
     {
         // Arrange
-        ProcessDocument document = CreateValidDocument() with { Status = "InvalidStatus" };
+        ProcessDocument document = CreateValidDocument();
+        document.Status = "InvalidStatus";
 
         // Act
         Action act = () => ProcessMapper.MapToDomain(document);
@@ -229,7 +232,8 @@ public class ProcessMapperTests
     public void MapToDomain_Should_BeCaseInsensitiveForStatus()
     {
         // Arrange
-        ProcessDocument document = CreateValidDocument() with { Status = "accepted" }; // lowercase
+        ProcessDocument document = CreateValidDocument();
+        document.Status = "accepted"; // lowercase
 
         // Act
         Process process = ProcessMapper.MapToDomain(document);
@@ -312,7 +316,8 @@ public class ProcessMapperTests
     public void MapToDomain_Should_HandleNullError()
     {
         // Arrange
-        ProcessDocument document = CreateValidDocument() with { Error = null };
+        ProcessDocument document = CreateValidDocument();
+        document.Error = null;
 
         // Act
         Process process = ProcessMapper.MapToDomain(document);
