@@ -55,15 +55,16 @@ public class ProcessTypePolicyDocument
 /// <summary>
 /// MongoDB document for client-specific policy overrides.
 /// Maps to the 'clientPolicyOverrides' collection.
-/// Uses ObjectId as _id (managed by repository).
+/// Uses composite key (clientId:processType) as _id.
 /// </summary>
 public class ClientPolicyOverrideDocument
 {
     /// <summary>
-    /// MongoDB ObjectId (managed by repository or auto-generated).
+    /// Composite key: "{clientId}:{processType}" (managed by repository).
+    /// This provides natural client+processType uniqueness and better query performance.
     /// </summary>
     [BsonId]
-    public required ObjectId Id { get; set; }
+    public required string Id { get; set; }
 
     /// <summary>
     /// Client identifier this override applies to.
