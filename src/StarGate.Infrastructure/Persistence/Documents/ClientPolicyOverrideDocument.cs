@@ -1,6 +1,6 @@
-namespace StarGate.Infrastructure.Persistence.Documents;
-
 using MongoDB.Bson.Serialization.Attributes;
+
+namespace StarGate.Infrastructure.Persistence.Documents;
 
 /// <summary>
 /// MongoDB document for ClientPolicyOverride configuration.
@@ -8,6 +8,13 @@ using MongoDB.Bson.Serialization.Attributes;
 /// </summary>
 public record ClientPolicyOverrideDocument
 {
+    /// <summary>
+    /// Document identifier.
+    /// </summary>
+    [BsonId]
+    [BsonElement("_id")]
+    public required string Id { get; init; }
+
     /// <summary>
     /// Client identifier.
     /// </summary>
@@ -21,18 +28,20 @@ public record ClientPolicyOverrideDocument
     public required string ProcessType { get; init; }
 
     /// <summary>
-    /// Override timeout in seconds (optional).
+    /// Override timeout (optional).
     /// </summary>
-    [BsonElement("timeoutSeconds")]
+    [BsonElement("timeout")]
+    [BsonTimeSpanOptions(BsonType.Int64, TimeSpanUnits.Seconds)]
     [BsonIgnoreIfNull]
-    public int? TimeoutSeconds { get; init; }
+    public TimeSpan? Timeout { get; init; }
 
     /// <summary>
-    /// Override result retention in days (optional).
+    /// Override result retention (optional).
     /// </summary>
-    [BsonElement("resultRetentionDays")]
+    [BsonElement("resultRetention")]
+    [BsonTimeSpanOptions(BsonType.Int64, TimeSpanUnits.Days)]
     [BsonIgnoreIfNull]
-    public int? ResultRetentionDays { get; init; }
+    public TimeSpan? ResultRetention { get; init; }
 
     /// <summary>
     /// Override max concurrent processes (optional).
