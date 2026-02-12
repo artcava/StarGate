@@ -140,7 +140,7 @@ public class PolicyMapperTests
     }
 
     [Fact]
-    public void MapToDocument_ClientOverride_Should_SetEmptyObjectId()
+    public void MapToDocument_ClientOverride_Should_SetEmptyStringId()
     {
         // Arrange
         ClientPolicyOverride clientOverride = CreateValidClientOverride();
@@ -149,8 +149,8 @@ public class PolicyMapperTests
         ClientPolicyOverrideDocument document = PolicyMapper.MapToDocument(clientOverride);
 
         // Assert
-        // ObjectId.Empty is a placeholder - repository will manage the actual ID
-        document.Id.Should().Be(ObjectId.Empty);
+        // string.Empty is a placeholder - repository will set the composite key
+        document.Id.Should().Be(string.Empty);
     }
 
     [Fact]
@@ -426,7 +426,8 @@ public class PolicyMapperTests
 
     private static ClientPolicyOverrideDocument CreateValidClientOverrideDocument() => new()
     {
-        Id = ObjectId.GenerateNewId(),
+        // Use composite key format: clientId:processType
+        Id = "test-client:order",
         ClientId = "test-client",
         ProcessType = "order",
         Timeout = TimeSpan.FromMinutes(20),
