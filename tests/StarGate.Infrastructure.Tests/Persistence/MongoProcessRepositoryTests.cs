@@ -450,29 +450,12 @@ public class MongoProcessRepositoryTests
             .Setup(c => c.Current)
             .Returns(documents);
 
-        var fluentMock = new Mock<IFindFluent<ProcessDocument, ProcessDocument>>();
-        fluentMock
-            .Setup(f => f.Sort(It.IsAny<SortDefinition<ProcessDocument>>()))
-            .Returns(fluentMock.Object);
-        fluentMock
-            .Setup(f => f.Limit(It.IsAny<int>()))
-            .Returns(fluentMock.Object);
-        fluentMock
-            .Setup(f => f.ToListAsync(default))
-            .ReturnsAsync(documents.ToList());
-
         _collectionMock
-            .Setup(c => c.FindSync(
+            .Setup(c => c.FindAsync(
                 It.IsAny<FilterDefinition<ProcessDocument>>(),
                 It.IsAny<FindOptions<ProcessDocument, ProcessDocument>>(),
                 default))
-            .Returns(cursorMock.Object);
-
-        _collectionMock
-            .Setup(c => c.Find(
-                It.IsAny<FilterDefinition<ProcessDocument>>(),
-                It.IsAny<FindOptions>()))
-            .Returns(fluentMock.Object);
+            .ReturnsAsync(cursorMock.Object);
 
         // Act
         var result = await _repository.GetByStatusAsync(status, 100);
@@ -542,25 +525,21 @@ public class MongoProcessRepositoryTests
             }
         };
 
-        var fluentMock = new Mock<IFindFluent<ProcessDocument, ProcessDocument>>();
-        fluentMock
-            .Setup(f => f.Sort(It.IsAny<SortDefinition<ProcessDocument>>()))
-            .Returns(fluentMock.Object);
-        fluentMock
-            .Setup(f => f.Skip(It.IsAny<int>()))
-            .Returns(fluentMock.Object);
-        fluentMock
-            .Setup(f => f.Limit(It.IsAny<int>()))
-            .Returns(fluentMock.Object);
-        fluentMock
-            .Setup(f => f.ToListAsync(default))
-            .ReturnsAsync(documents.ToList());
+        var cursorMock = new Mock<IAsyncCursor<ProcessDocument>>();
+        cursorMock
+            .SetupSequence(c => c.MoveNextAsync(default))
+            .ReturnsAsync(true)
+            .ReturnsAsync(false);
+        cursorMock
+            .Setup(c => c.Current)
+            .Returns(documents);
 
         _collectionMock
-            .Setup(c => c.Find(
+            .Setup(c => c.FindAsync(
                 It.IsAny<FilterDefinition<ProcessDocument>>(),
-                It.IsAny<FindOptions>()))
-            .Returns(fluentMock.Object);
+                It.IsAny<FindOptions<ProcessDocument, ProcessDocument>>(),
+                default))
+            .ReturnsAsync(cursorMock.Object);
 
         // Act
         var result = await _repository.GetByClientIdAsync(clientId, 0, 100);
