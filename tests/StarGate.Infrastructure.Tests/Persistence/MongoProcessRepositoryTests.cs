@@ -70,7 +70,8 @@ public class MongoProcessRepositoryTests
         // Arrange
         var process = CreateValidProcess();
 
-        var writeError = new WriteError(
+        var writeError = new BulkWriteError(
+            0,
             ServerErrorCategory.DuplicateKey,
             11000,
             "E11000 duplicate key error collection: stargate.processes index: ProcessId dup key",
@@ -103,7 +104,8 @@ public class MongoProcessRepositoryTests
         // Arrange
         var process = CreateValidProcess();
 
-        var writeError = new WriteError(
+        var writeError = new BulkWriteError(
+            0,
             ServerErrorCategory.DuplicateKey,
             11000,
             "E11000 duplicate key error collection: stargate.processes index: IdempotencyKey dup key",
@@ -136,7 +138,8 @@ public class MongoProcessRepositoryTests
         // Arrange
         var process = CreateValidProcess();
 
-        var writeError = new WriteError(
+        var writeError = new BulkWriteError(
+            0,
             ServerErrorCategory.DuplicateKey,
             11000,
             "E11000 duplicate key error collection: stargate.processes index: ClientId_ClientProcessId dup key",

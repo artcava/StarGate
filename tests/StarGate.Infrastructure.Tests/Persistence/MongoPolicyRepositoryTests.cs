@@ -266,6 +266,7 @@ public class MongoPolicyRepositoryTests
 
         var replaceResult = new Mock<ReplaceOneResult>();
         replaceResult.Setup(r => r.MatchedCount).Returns(0);
+        // UpsertedId is BsonValue, not ObjectId - use BsonString
         replaceResult.Setup(r => r.UpsertedId).Returns(new BsonString($"{clientOverride.ClientId}:{clientOverride.ProcessType}"));
 
         _overrideCollectionMock
@@ -293,7 +294,7 @@ public class MongoPolicyRepositoryTests
     }
 
     [Fact]
-    public async Task SaveClientOverrideAsync_Should_PreserveObjectId_WhenUpdating()
+    public async Task SaveClientOverrideAsync_Should_PreserveId_WhenUpdating()
     {
         // Arrange
         var clientOverride = CreateValidClientOverride();
