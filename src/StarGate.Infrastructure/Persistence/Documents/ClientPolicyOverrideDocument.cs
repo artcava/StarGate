@@ -15,6 +15,7 @@ public record ClientPolicyOverrideDocument
     /// </summary>
     [BsonId]
     [BsonElement("_id")]
+    [BsonRepresentation(BsonType.String)]
     public required string Id { get; init; }
 
     /// <summary>
