@@ -1,11 +1,11 @@
-namespace StarGate.Infrastructure.Persistence;
-
 using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
 using StarGate.Core.Abstractions;
 using StarGate.Core.Domain.Configuration;
 using StarGate.Infrastructure.Persistence.Documents;
 using StarGate.Infrastructure.Persistence.Mappers;
+
+namespace StarGate.Infrastructure.Persistence;
 
 /// <summary>
 /// MongoDB implementation of IPolicyRepository.
