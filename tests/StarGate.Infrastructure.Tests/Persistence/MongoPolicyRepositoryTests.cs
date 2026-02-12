@@ -1,9 +1,11 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
+using MongoDB.Bson;
 using MongoDB.Driver;
 using Moq;
 using StarGate.Core.Domain.Configuration;
 using StarGate.Infrastructure.Persistence;
+using StarGate.Infrastructure.Persistence.Documents;
 
 namespace StarGate.Infrastructure.Tests.Persistence;
 
@@ -44,7 +46,7 @@ public class MongoPolicyRepositoryTests
     {
         // Arrange
         var processType = "order";
-        var document = CreateValidPolicyDocument() with { ProcessType = processType };
+        var document = CreateValidPolicyDocument(processType);
 
         var cursorMock = new Mock<IAsyncCursor<ProcessTypePolicyDocument>>();
         cursorMock
@@ -120,11 +122,7 @@ public class MongoPolicyRepositoryTests
         // Arrange
         var clientId = "premium-client";
         var processType = "order";
-        var document = CreateValidOverrideDocument() with
-        {
-            ClientId = clientId,
-            ProcessType = processType
-        };
+        var document = CreateValidOverrideDocument(clientId, processType);
 
         var cursorMock = new Mock<IAsyncCursor<ClientPolicyOverrideDocument>>();
         cursorMock
@@ -269,7 +267,7 @@ public class MongoPolicyRepositoryTests
 
         var replaceResult = new Mock<ReplaceOneResult>();
         replaceResult.Setup(r => r.MatchedCount).Returns(0);
-        replaceResult.Setup(r => r.UpsertedId).Returns(MongoDB.Bson.ObjectId.GenerateNewId());
+        replaceResult.Setup(r => r.UpsertedId).Returns(ObjectId.GenerateNewId());
 
         _overrideCollectionMock
             .Setup(c => c.ReplaceOneAsync(
@@ -300,13 +298,8 @@ public class MongoPolicyRepositoryTests
     {
         // Arrange
         var clientOverride = CreateValidClientOverride();
-        var existingObjectId = MongoDB.Bson.ObjectId.GenerateNewId();
-        var existingDocument = CreateValidOverrideDocument() with
-        {
-            Id = existingObjectId,
-            ClientId = clientOverride.ClientId,
-            ProcessType = clientOverride.ProcessType
-        };
+        var existingId = $"{clientOverride.ClientId}:{clientOverride.ProcessType}";
+        var existingDocument = CreateValidOverrideDocument(clientOverride.ClientId, clientOverride.ProcessType, existingId);
 
         var cursorMock = new Mock<IAsyncCursor<ClientPolicyOverrideDocument>>();
         cursorMock
@@ -343,7 +336,7 @@ public class MongoPolicyRepositoryTests
         _overrideCollectionMock.Verify(
             c => c.ReplaceOneAsync(
                 It.IsAny<FilterDefinition<ClientPolicyOverrideDocument>>(),
-                It.Is<ClientPolicyOverrideDocument>(d => d.Id == existingObjectId),
+                It.Is<ClientPolicyOverrideDocument>(d => d.Id == existingId),
                 It.IsAny<ReplaceOptions>(),
                 default),
             Times.Once);
@@ -429,9 +422,9 @@ public class MongoPolicyRepositoryTests
         // Arrange
         var documents = new[]
         {
-            CreateValidPolicyDocument() with { ProcessType = "order" },
-            CreateValidPolicyDocument() with { ProcessType = "payment" },
-            CreateValidPolicyDocument() with { ProcessType = "shipment" }
+            CreateValidPolicyDocument("order"),
+            CreateValidPolicyDocument("payment"),
+            CreateValidPolicyDocument("shipment")
         };
 
         var cursorMock = new Mock<IAsyncCursor<ProcessTypePolicyDocument>>();
@@ -492,8 +485,8 @@ public class MongoPolicyRepositoryTests
         var clientId = "premium-client";
         var documents = new[]
         {
-            CreateValidOverrideDocument() with { ClientId = clientId, ProcessType = "order" },
-            CreateValidOverrideDocument() with { ClientId = clientId, ProcessType = "payment" }
+            CreateValidOverrideDocument(clientId, "order"),
+            CreateValidOverrideDocument(clientId, "payment")
         };
 
         var cursorMock = new Mock<IAsyncCursor<ClientPolicyOverrideDocument>>();
@@ -562,26 +555,33 @@ public class MongoPolicyRepositoryTests
         UpdatedAt = DateTime.UtcNow
     };
 
-    private static ProcessTypePolicyDocument CreateValidPolicyDocument() => new()
+    private static ProcessTypePolicyDocument CreateValidPolicyDocument(string processType) => new()
     {
-        ProcessType = "order",
-        TimeoutSeconds = 600,
-        RetryEnabled = true,
-        RetryMaxAttempts = 3,
-        RetryInitialDelaySeconds = 10,
-        RetryBackoffStrategy = "Exponential",
-        RetryMaxDelaySeconds = 300,
-        ResultRetentionDays = 7,
+        ProcessType = processType,
+        Timeout = TimeSpan.FromSeconds(600),
+        RetryPolicy = new RetryPolicyDocument
+        {
+            Enabled = true,
+            MaxAttempts = 3,
+            InitialDelay = TimeSpan.FromSeconds(10),
+            BackoffStrategy = "Exponential",
+            MaxDelay = TimeSpan.FromMinutes(5)
+        },
+        ResultRetention = TimeSpan.FromDays(7),
         MaxConcurrentProcesses = 100,
         UpdatedAt = DateTime.UtcNow
     };
 
-    private static ClientPolicyOverrideDocument CreateValidOverrideDocument() => new()
+    private static ClientPolicyOverrideDocument CreateValidOverrideDocument(
+        string clientId,
+        string processType,
+        string? id = null) => new()
     {
-        ClientId = "premium-client",
-        ProcessType = "order",
-        TimeoutSeconds = 1800,
-        ResultRetentionDays = 30,
+        Id = id ?? $"{clientId}:{processType}",
+        ClientId = clientId,
+        ProcessType = processType,
+        Timeout = TimeSpan.FromSeconds(1800),
+        ResultRetention = TimeSpan.FromDays(30),
         MaxConcurrentProcesses = 500,
         UpdatedAt = DateTime.UtcNow
     };
