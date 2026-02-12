@@ -2,9 +2,13 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using MongoDB.Bson;
 using MongoDB.Driver;
+using MongoDB.Driver.Core.Clusters;
+using MongoDB.Driver.Core.Connections;
+using MongoDB.Driver.Core.Servers;
 using Moq;
 using StarGate.Core.Domain;
 using StarGate.Infrastructure.Persistence;
+using System.Net;
 
 namespace StarGate.Infrastructure.Tests.Persistence;
 
@@ -73,8 +77,7 @@ public class MongoProcessRepositoryTests
         var writeError = new WriteError(
             ServerErrorCategory.DuplicateKey,
             11000,
-            "E11000 duplicate key error collection: stargate.processes index: ProcessId dup key",
-            new BsonDocument());
+            "E11000 duplicate key error collection: stargate.processes index: ProcessId dup key");
 
         var mongoException = new MongoWriteException(connectionId, writeError, null, null);
 
@@ -106,8 +109,7 @@ public class MongoProcessRepositoryTests
         var writeError = new WriteError(
             ServerErrorCategory.DuplicateKey,
             11000,
-            "E11000 duplicate key error collection: stargate.processes index: IdempotencyKey dup key",
-            new BsonDocument());
+            "E11000 duplicate key error collection: stargate.processes index: IdempotencyKey dup key");
 
         var mongoException = new MongoWriteException(connectionId, writeError, null, null);
 
@@ -139,8 +141,7 @@ public class MongoProcessRepositoryTests
         var writeError = new WriteError(
             ServerErrorCategory.DuplicateKey,
             11000,
-            "E11000 duplicate key error collection: stargate.processes index: ClientId_ClientProcessId dup key",
-            new BsonDocument());
+            "E11000 duplicate key error collection: stargate.processes index: ClientId_ClientProcessId dup key");
 
         var mongoException = new MongoWriteException(connectionId, writeError, null, null);
 
