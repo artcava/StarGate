@@ -4,7 +4,7 @@ using MongoDB.Driver;
 namespace StarGate.Infrastructure.Persistence;
 
 /// <summary>
-/// Configures MongoDB indexes for the processes collection.
+/// Configures MongoDB indexes for collections.
 /// Indexes are critical for query performance and data integrity.
 /// </summary>
 public static class MongoDbIndexes
@@ -106,34 +106,92 @@ public static class MongoDbIndexes
     }
 
     /// <summary>
+    /// Creates all required indexes for policy collections.
+    /// Should be called during application startup or database migration.
+    /// </summary>
+    /// <param name="database">MongoDB database instance.</param>
+    /// <param name="logger">Logger for tracking index creation.</param>
+    public static async Task CreatePolicyIndexesAsync(
+        IMongoDatabase database,
+        ILogger logger)
+    {
+        ArgumentNullException.ThrowIfNull(database);
+        ArgumentNullException.ThrowIfNull(logger);
+
+        var processTypePolicies = database.GetCollection<ProcessTypePolicyDocument>("processTypePolicies");
+        var clientOverrides = database.GetCollection<ClientPolicyOverrideDocument>("clientPolicyOverrides");
+
+        logger.LogInformation("Creating MongoDB indexes for policy collections...");
+
+        try
+        {
+            // ProcessType is already the primary key (_id) for process type policies
+            // No additional index needed
+
+            // Index 1: Compound unique index on ClientId + ProcessType for client overrides
+            await CreateIndexAsync(
+                clientOverrides,
+                Builders<ClientPolicyOverrideDocument>.IndexKeys
+                    .Ascending(o => o.ClientId)
+                    .Ascending(o => o.ProcessType),
+                new CreateIndexOptions
+                {
+                    Name = "idx_clientId_processType",
+                    Unique = true
+                },
+                logger);
+
+            // Index 2: Index on ClientId for listing overrides by client
+            await CreateIndexAsync(
+                clientOverrides,
+                Builders<ClientPolicyOverrideDocument>.IndexKeys.Ascending(o => o.ClientId),
+                new CreateIndexOptions
+                {
+                    Name = "idx_clientId"
+                },
+                logger);
+
+            logger.LogInformation("MongoDB indexes created successfully for policy collections");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error creating MongoDB indexes for policy collections");
+            throw;
+        }
+    }
+
+    /// <summary>
     /// Helper method to create an index with error handling and logging.
     /// </summary>
-    private static async Task CreateIndexAsync(
-        IMongoCollection<ProcessDocument> collection,
-        IndexKeysDefinition<ProcessDocument> keys,
+    private static async Task CreateIndexAsync<TDocument>(
+        IMongoCollection<TDocument> collection,
+        IndexKeysDefinition<TDocument> keys,
         CreateIndexOptions options,
         ILogger logger)
     {
         try
         {
-            var indexModel = new CreateIndexModel<ProcessDocument>(keys, options);
+            var indexModel = new CreateIndexModel<TDocument>(keys, options);
             var indexName = await collection.Indexes.CreateOneAsync(indexModel);
 
             logger.LogDebug(
-                "Index '{IndexName}' created successfully",
-                options.Name ?? indexName);
+                "Index '{IndexName}' created successfully on collection '{CollectionName}'",
+                options.Name ?? indexName,
+                collection.CollectionNamespace.CollectionName);
         }
         catch (MongoCommandException ex) when (ex.CodeName == "IndexOptionsConflict")
         {
             logger.LogWarning(
-                "Index '{IndexName}' already exists with different options, skipping",
-                options.Name);
+                "Index '{IndexName}' already exists with different options on collection '{CollectionName}', skipping",
+                options.Name,
+                collection.CollectionNamespace.CollectionName);
         }
         catch (MongoCommandException ex) when (ex.CodeName == "IndexAlreadyExists")
         {
             logger.LogDebug(
-                "Index '{IndexName}' already exists, skipping",
-                options.Name);
+                "Index '{IndexName}' already exists on collection '{CollectionName}', skipping",
+                options.Name,
+                collection.CollectionNamespace.CollectionName);
         }
     }
 
