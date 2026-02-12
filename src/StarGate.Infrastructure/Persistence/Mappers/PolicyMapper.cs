@@ -18,17 +18,17 @@ public static class PolicyMapper
         return new ProcessTypePolicy
         {
             ProcessType = document.ProcessType,
-            Timeout = TimeSpan.FromSeconds(document.TimeoutSeconds),
+            Timeout = document.Timeout,
             RetryPolicy = new RetryPolicy
             {
-                Enabled = document.RetryEnabled,
-                MaxAttempts = document.RetryMaxAttempts,
-                InitialDelay = TimeSpan.FromSeconds(document.RetryInitialDelaySeconds),
-                BackoffStrategy = ParseBackoffStrategy(document.RetryBackoffStrategy),
-                MaxDelay = TimeSpan.FromSeconds(document.RetryMaxDelaySeconds)
+                Enabled = document.RetryPolicy.Enabled,
+                MaxAttempts = document.RetryPolicy.MaxAttempts,
+                InitialDelay = document.RetryPolicy.InitialDelay,
+                BackoffStrategy = Enum.Parse<BackoffStrategy>(document.RetryPolicy.BackoffStrategy),
+                MaxDelay = document.RetryPolicy.MaxDelay
             },
-            ResultRetention = TimeSpan.FromDays(document.ResultRetentionDays),
-            MaxConcurrentProcesses = document.MaxConcurrentProcesses > 0 ? document.MaxConcurrentProcesses : null,
+            ResultRetention = document.ResultRetention,
+            MaxConcurrentProcesses = document.MaxConcurrentProcesses,
             UpdatedAt = DateTime.SpecifyKind(document.UpdatedAt, DateTimeKind.Utc)
         };
     }
@@ -43,14 +43,17 @@ public static class PolicyMapper
         return new ProcessTypePolicyDocument
         {
             ProcessType = policy.ProcessType,
-            TimeoutSeconds = (int)policy.Timeout.TotalSeconds,
-            RetryEnabled = policy.RetryPolicy.Enabled,
-            RetryMaxAttempts = policy.RetryPolicy.MaxAttempts,
-            RetryInitialDelaySeconds = (int)policy.RetryPolicy.InitialDelay.TotalSeconds,
-            RetryBackoffStrategy = policy.RetryPolicy.BackoffStrategy.ToString(),
-            RetryMaxDelaySeconds = (int)policy.RetryPolicy.MaxDelay.TotalSeconds,
-            ResultRetentionDays = (int)policy.ResultRetention.TotalDays,
-            MaxConcurrentProcesses = policy.MaxConcurrentProcesses ?? 0,
+            Timeout = policy.Timeout,
+            RetryPolicy = new RetryPolicyDocument
+            {
+                Enabled = policy.RetryPolicy.Enabled,
+                MaxAttempts = policy.RetryPolicy.MaxAttempts,
+                InitialDelay = policy.RetryPolicy.InitialDelay,
+                BackoffStrategy = policy.RetryPolicy.BackoffStrategy.ToString(),
+                MaxDelay = policy.RetryPolicy.MaxDelay
+            },
+            ResultRetention = policy.ResultRetention,
+            MaxConcurrentProcesses = policy.MaxConcurrentProcesses,
             UpdatedAt = DateTime.SpecifyKind(policy.UpdatedAt, DateTimeKind.Utc)
         };
     }
@@ -66,12 +69,8 @@ public static class PolicyMapper
         {
             ClientId = document.ClientId,
             ProcessType = document.ProcessType,
-            Timeout = document.TimeoutSeconds.HasValue
-                ? TimeSpan.FromSeconds(document.TimeoutSeconds.Value)
-                : null,
-            ResultRetention = document.ResultRetentionDays.HasValue
-                ? TimeSpan.FromDays(document.ResultRetentionDays.Value)
-                : null,
+            Timeout = document.Timeout,
+            ResultRetention = document.ResultRetention,
             MaxConcurrentProcesses = document.MaxConcurrentProcesses,
             UpdatedAt = DateTime.SpecifyKind(document.UpdatedAt, DateTimeKind.Utc)
         };
@@ -86,26 +85,13 @@ public static class PolicyMapper
 
         return new ClientPolicyOverrideDocument
         {
+            Id = $"{override_.ClientId}:{override_.ProcessType}",
             ClientId = override_.ClientId,
             ProcessType = override_.ProcessType,
-            TimeoutSeconds = override_.Timeout.HasValue
-                ? (int)override_.Timeout.Value.TotalSeconds
-                : null,
-            ResultRetentionDays = override_.ResultRetention.HasValue
-                ? (int)override_.ResultRetention.Value.TotalDays
-                : null,
+            Timeout = override_.Timeout,
+            ResultRetention = override_.ResultRetention,
             MaxConcurrentProcesses = override_.MaxConcurrentProcesses,
             UpdatedAt = DateTime.SpecifyKind(override_.UpdatedAt, DateTimeKind.Utc)
-        };
-    }
-
-    private static BackoffStrategy ParseBackoffStrategy(string strategy)
-    {
-        return strategy switch
-        {
-            "Linear" => BackoffStrategy.Linear,
-            "Exponential" => BackoffStrategy.Exponential,
-            _ => throw new ArgumentException($"Unknown backoff strategy: {strategy}", nameof(strategy))
         };
     }
 }
