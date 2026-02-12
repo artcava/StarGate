@@ -239,3 +239,6 @@ dotnet_diagnostic.CA1848.severity = suggestion
 
 # CA2007: Do not directly await a Task
 dotnet_diagnostic.CA2007.severity = none
+
+# IDE0008: Use explicit type instead of 'var'
+dotnet_diagnostic.IDE0008.severity = suggestion
