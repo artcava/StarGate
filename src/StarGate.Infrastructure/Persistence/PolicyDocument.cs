@@ -1,7 +1,7 @@
-namespace StarGate.Infrastructure.Persistence;
-
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
+
+namespace StarGate.Infrastructure.Persistence;
 
 public class ProcessTypePolicyDocument
 {

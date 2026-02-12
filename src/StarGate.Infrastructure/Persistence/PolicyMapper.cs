@@ -1,7 +1,7 @@
-namespace StarGate.Infrastructure.Persistence;
-
 using MongoDB.Bson;
 using StarGate.Core.Domain.Configuration;
+
+namespace StarGate.Infrastructure.Persistence;
 
 /// <summary>
 /// Maps between domain Policy entities and MongoDB PolicyDocuments.
@@ -120,7 +120,7 @@ public static class PolicyMapper
     {
         ArgumentNullException.ThrowIfNull(document);
 
-        if (!Enum.TryParse<BackoffStrategy>(document.BackoffStrategy, ignoreCase: true, out var strategy))
+        if (!Enum.TryParse<BackoffStrategy>(document.BackoffStrategy, ignoreCase: true, out BackoffStrategy strategy))
         {
             throw new InvalidOperationException(
                 $"Invalid BackoffStrategy value '{document.BackoffStrategy}'");
