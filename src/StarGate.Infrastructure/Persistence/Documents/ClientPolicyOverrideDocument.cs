@@ -11,9 +11,9 @@ namespace StarGate.Infrastructure.Persistence.Documents;
 public record ClientPolicyOverrideDocument
 {
     /// <summary>
-    /// Document identifier.
+    /// Document identifier (composite: clientId:processType).
     /// </summary>
-    [BsonElement("_id")]
+    [BsonId]
     [BsonRepresentation(BsonType.String)]
     public required string Id { get; init; }
 
