@@ -5,7 +5,6 @@ using MongoDB.Driver;
 using Moq;
 using StarGate.Core.Domain.Configuration;
 using StarGate.Infrastructure.Persistence;
-using StarGate.Infrastructure.Persistence.Documents;
 
 namespace StarGate.Infrastructure.Tests.Persistence;
 
@@ -586,5 +585,4 @@ public class MongoPolicyRepositoryTests
         UpdatedAt = DateTime.UtcNow
     };
 
-    #endregion
-}
+    #endregion}
