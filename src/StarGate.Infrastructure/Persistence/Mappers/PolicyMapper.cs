@@ -1,7 +1,7 @@
-namespace StarGate.Infrastructure.Persistence.Mappers;
-
 using StarGate.Core.Domain.Configuration;
 using StarGate.Infrastructure.Persistence.Documents;
+
+namespace StarGate.Infrastructure.Persistence.Mappers;
 
 /// <summary>
 /// Maps policy domain entities to/from MongoDB documents.
@@ -105,7 +105,6 @@ public static class PolicyMapper
         {
             "Linear" => BackoffStrategy.Linear,
             "Exponential" => BackoffStrategy.Exponential,
-            "Constant" => BackoffStrategy.Constant,
             _ => throw new ArgumentException($"Unknown backoff strategy: {strategy}", nameof(strategy))
         };
     }
