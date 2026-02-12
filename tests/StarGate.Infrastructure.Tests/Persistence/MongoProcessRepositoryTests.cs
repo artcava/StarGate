@@ -66,17 +66,17 @@ public class MongoProcessRepositoryTests
         // Arrange
         var process = CreateValidProcess();
 
-        // Mock MongoWriteException with duplicate key error message
-        var mongoException = new MongoWriteException(
-            null!,
-            null!,
-            null,
-            null);
+        // Create valid ConnectionId (required by MongoDB driver)
+        var serverId = new ServerId(new ClusterId(1), new DnsEndPoint("localhost", 27017));
+        var connectionId = new ConnectionId(serverId);
 
-        // Use reflection to set the Message property via inner exception
-        var innerException = new Exception("E11000 duplicate key error collection: stargate.processes index: ProcessId dup key");
-        typeof(Exception).GetField("_message", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?
-            .SetValue(mongoException, innerException.Message);
+        var writeError = new WriteError(
+            ServerErrorCategory.DuplicateKey,
+            11000,
+            "E11000 duplicate key error collection: stargate.processes index: ProcessId dup key",
+            new BsonDocument());
+
+        var mongoException = new MongoWriteException(connectionId, writeError, null, null);
 
         _collectionMock
             .Setup(c => c.InsertOneAsync(
@@ -99,15 +99,17 @@ public class MongoProcessRepositoryTests
         // Arrange
         var process = CreateValidProcess();
 
-        var mongoException = new MongoWriteException(
-            null!,
-            null!,
-            null,
-            null);
+        // Create valid ConnectionId
+        var serverId = new ServerId(new ClusterId(1), new DnsEndPoint("localhost", 27017));
+        var connectionId = new ConnectionId(serverId);
 
-        var innerException = new Exception("E11000 duplicate key error collection: stargate.processes index: IdempotencyKey dup key");
-        typeof(Exception).GetField("_message", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?
-            .SetValue(mongoException, innerException.Message);
+        var writeError = new WriteError(
+            ServerErrorCategory.DuplicateKey,
+            11000,
+            "E11000 duplicate key error collection: stargate.processes index: IdempotencyKey dup key",
+            new BsonDocument());
+
+        var mongoException = new MongoWriteException(connectionId, writeError, null, null);
 
         _collectionMock
             .Setup(c => c.InsertOneAsync(
@@ -130,15 +132,17 @@ public class MongoProcessRepositoryTests
         // Arrange
         var process = CreateValidProcess();
 
-        var mongoException = new MongoWriteException(
-            null!,
-            null!,
-            null,
-            null);
+        // Create valid ConnectionId
+        var serverId = new ServerId(new ClusterId(1), new DnsEndPoint("localhost", 27017));
+        var connectionId = new ConnectionId(serverId);
 
-        var innerException = new Exception("E11000 duplicate key error collection: stargate.processes index: ClientId_ClientProcessId dup key");
-        typeof(Exception).GetField("_message", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?
-            .SetValue(mongoException, innerException.Message);
+        var writeError = new WriteError(
+            ServerErrorCategory.DuplicateKey,
+            11000,
+            "E11000 duplicate key error collection: stargate.processes index: ClientId_ClientProcessId dup key",
+            new BsonDocument());
+
+        var mongoException = new MongoWriteException(connectionId, writeError, null, null);
 
         _collectionMock
             .Setup(c => c.InsertOneAsync(
