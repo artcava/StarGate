@@ -2,9 +2,13 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using MongoDB.Bson;
 using MongoDB.Driver;
+using MongoDB.Driver.Core.Clusters;
+using MongoDB.Driver.Core.Connections;
+using MongoDB.Driver.Core.Servers;
 using Moq;
 using StarGate.Core.Domain;
 using StarGate.Infrastructure.Persistence;
+using System.Net;
 
 namespace StarGate.Infrastructure.Tests.Persistence;
 
@@ -70,7 +74,8 @@ public class MongoProcessRepositoryTests
             ServerErrorCategory.DuplicateKey,
             11000,
             "E11000 duplicate key error collection: stargate.processes index: ProcessId dup key",
-            new BsonDocument());
+            new BsonDocument(),
+            null);
 
         var writeException = new MongoWriteException(
             new ConnectionId(new ServerId(new ClusterId(), new DnsEndPoint("localhost", 27017))),
@@ -103,7 +108,8 @@ public class MongoProcessRepositoryTests
             ServerErrorCategory.DuplicateKey,
             11000,
             "E11000 duplicate key error collection: stargate.processes index: IdempotencyKey dup key",
-            new BsonDocument());
+            new BsonDocument(),
+            null);
 
         var writeException = new MongoWriteException(
             new ConnectionId(new ServerId(new ClusterId(), new DnsEndPoint("localhost", 27017))),
@@ -136,7 +142,8 @@ public class MongoProcessRepositoryTests
             ServerErrorCategory.DuplicateKey,
             11000,
             "E11000 duplicate key error collection: stargate.processes index: ClientId_ClientProcessId dup key",
-            new BsonDocument());
+            new BsonDocument(),
+            null);
 
         var writeException = new MongoWriteException(
             new ConnectionId(new ServerId(new ClusterId(), new DnsEndPoint("localhost", 27017))),
@@ -178,7 +185,20 @@ public class MongoProcessRepositoryTests
     {
         // Arrange
         var processId = Guid.NewGuid();
-        var document = CreateValidDocument() with { ProcessId = processId };
+        var baseDoc = CreateValidDocument();
+        var document = new ProcessDocument
+        {
+            ProcessId = processId,
+            ClientProcessId = baseDoc.ClientProcessId,
+            ProcessType = baseDoc.ProcessType,
+            ClientId = baseDoc.ClientId,
+            Status = baseDoc.Status,
+            Progress = baseDoc.Progress,
+            CreatedAt = baseDoc.CreatedAt,
+            UpdatedAt = baseDoc.UpdatedAt,
+            IdempotencyKey = baseDoc.IdempotencyKey,
+            Retryable = baseDoc.Retryable
+        };
 
         var cursorMock = new Mock<IAsyncCursor<ProcessDocument>>();
         cursorMock
@@ -239,10 +259,19 @@ public class MongoProcessRepositoryTests
         // Arrange
         var clientId = "test-client";
         var clientProcessId = "client-process-123";
-        var document = CreateValidDocument() with
+        var baseDoc = CreateValidDocument();
+        var document = new ProcessDocument
         {
+            ProcessId = baseDoc.ProcessId,
+            ClientProcessId = clientProcessId,
+            ProcessType = baseDoc.ProcessType,
             ClientId = clientId,
-            ClientProcessId = clientProcessId
+            Status = baseDoc.Status,
+            Progress = baseDoc.Progress,
+            CreatedAt = baseDoc.CreatedAt,
+            UpdatedAt = baseDoc.UpdatedAt,
+            IdempotencyKey = baseDoc.IdempotencyKey,
+            Retryable = baseDoc.Retryable
         };
 
         var cursorMock = new Mock<IAsyncCursor<ProcessDocument>>();
@@ -392,10 +421,35 @@ public class MongoProcessRepositoryTests
     {
         // Arrange
         var status = ProcessStatus.Processing;
+        var baseDoc = CreateValidDocument();
         var documents = new[]
         {
-            CreateValidDocument() with { Status = "Processing" },
-            CreateValidDocument() with { Status = "Processing" }
+            new ProcessDocument
+            {
+                ProcessId = Guid.NewGuid(),
+                ClientProcessId = baseDoc.ClientProcessId,
+                ProcessType = baseDoc.ProcessType,
+                ClientId = baseDoc.ClientId,
+                Status = "Processing",
+                Progress = baseDoc.Progress,
+                CreatedAt = baseDoc.CreatedAt,
+                UpdatedAt = baseDoc.UpdatedAt,
+                IdempotencyKey = Guid.NewGuid().ToString(),
+                Retryable = baseDoc.Retryable
+            },
+            new ProcessDocument
+            {
+                ProcessId = Guid.NewGuid(),
+                ClientProcessId = $"client-{Guid.NewGuid()}",
+                ProcessType = baseDoc.ProcessType,
+                ClientId = baseDoc.ClientId,
+                Status = "Processing",
+                Progress = baseDoc.Progress,
+                CreatedAt = baseDoc.CreatedAt,
+                UpdatedAt = baseDoc.UpdatedAt,
+                IdempotencyKey = Guid.NewGuid().ToString(),
+                Retryable = baseDoc.Retryable
+            }
         };
 
         var cursorMock = new Mock<IAsyncCursor<ProcessDocument>>();
@@ -468,10 +522,35 @@ public class MongoProcessRepositoryTests
     {
         // Arrange
         var clientId = "test-client";
+        var baseDoc = CreateValidDocument();
         var documents = new[]
         {
-            CreateValidDocument() with { ClientId = clientId },
-            CreateValidDocument() with { ClientId = clientId }
+            new ProcessDocument
+            {
+                ProcessId = Guid.NewGuid(),
+                ClientProcessId = baseDoc.ClientProcessId,
+                ProcessType = baseDoc.ProcessType,
+                ClientId = clientId,
+                Status = baseDoc.Status,
+                Progress = baseDoc.Progress,
+                CreatedAt = baseDoc.CreatedAt,
+                UpdatedAt = baseDoc.UpdatedAt,
+                IdempotencyKey = Guid.NewGuid().ToString(),
+                Retryable = baseDoc.Retryable
+            },
+            new ProcessDocument
+            {
+                ProcessId = Guid.NewGuid(),
+                ClientProcessId = $"client-{Guid.NewGuid()}",
+                ProcessType = baseDoc.ProcessType,
+                ClientId = clientId,
+                Status = baseDoc.Status,
+                Progress = baseDoc.Progress,
+                CreatedAt = baseDoc.CreatedAt,
+                UpdatedAt = baseDoc.UpdatedAt,
+                IdempotencyKey = Guid.NewGuid().ToString(),
+                Retryable = baseDoc.Retryable
+            }
         };
 
         var fluentMock = new Mock<IFindFluent<ProcessDocument, ProcessDocument>>();
