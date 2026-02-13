@@ -13,7 +13,7 @@ public interface IMessageSerializer
     /// <returns>Serialized message as byte array.</returns>
     /// <exception cref="ArgumentNullException">Thrown when message is null.</exception>
     /// <exception cref="Core.Exceptions.MessageSerializationException">Thrown when serialization fails.</exception>
-    byte[] Serialize<T>(MessageEnvelope<T> message) where T : class;
+    public byte[] Serialize<T>(MessageEnvelope<T> message) where T : class;
 
     /// <summary>
     /// Deserializes a byte array to a message envelope.
@@ -23,7 +23,7 @@ public interface IMessageSerializer
     /// <returns>Deserialized message envelope.</returns>
     /// <exception cref="ArgumentNullException">Thrown when data is null.</exception>
     /// <exception cref="Core.Exceptions.MessageSerializationException">Thrown when deserialization fails.</exception>
-    MessageEnvelope<T> Deserialize<T>(byte[] data) where T : class;
+    public MessageEnvelope<T> Deserialize<T>(byte[] data) where T : class;
 
     /// <summary>
     /// Deserializes a byte array to a non-generic message envelope.
@@ -33,5 +33,5 @@ public interface IMessageSerializer
     /// <returns>Deserialized message envelope with object payload.</returns>
     /// <exception cref="ArgumentNullException">Thrown when data is null.</exception>
     /// <exception cref="Core.Exceptions.MessageSerializationException">Thrown when deserialization fails.</exception>
-    MessageEnvelope DeserializeUntyped(byte[] data);
+    public MessageEnvelope DeserializeUntyped(byte[] data);
 }
