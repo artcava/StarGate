@@ -2,6 +2,7 @@ using FluentAssertions;
 using StarGate.Core.Abstractions;
 using StarGate.Core.Domain;
 using StarGate.Contracts.Requests;
+using System.Text.Json;
 using Xunit;
 
 namespace StarGate.Core.Tests.Abstractions;
@@ -104,12 +105,15 @@ public abstract class IProcessServiceTests
             "idempotency-key-abc");
         Process created = await service.SubmitProcessAsync(clientId, request);
 
+        // Serialize result to JsonDocument to match signature
+        var resultDoc = JsonSerializer.SerializeToDocument(new { Status = "Success" });
+
         // Act
         Process updated = await service.UpdateProcessStatusAsync(
             created.ProcessId,
             ProcessStatus.Completed,
             progress: 100,
-            result: new { Status = "Success" });
+            result: resultDoc);
 
         // Assert
         updated.Status.Should().Be(ProcessStatus.Completed);

@@ -2,7 +2,9 @@ using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 using StarGate.Core.Abstractions;
 using StarGate.Core.Domain;
+using System.Diagnostics;
 using System.Text.Json;
+using DomainProcess = StarGate.Core.Domain.Process;
 
 namespace StarGate.Infrastructure.Caching;
 
@@ -10,11 +12,13 @@ namespace StarGate.Infrastructure.Caching;
 /// Redis-based implementation of IStateStore for process caching.
 /// Implements fail-safe pattern: cache failures do not break the application.
 /// All exceptions are caught, logged, and result in graceful degradation.
+/// Includes metrics instrumentation for observability.
 /// </summary>
 public class RedisStateStore : IStateStore
 {
     private readonly IConnectionMultiplexer _redis;
     private readonly ILogger<RedisStateStore> _logger;
+    private readonly CacheMetrics? _metrics;
     private readonly TimeSpan _defaultTtl;
     private const string KeyPrefix = "process:";
     private const string StatusKey = ":status";
@@ -26,20 +30,24 @@ public class RedisStateStore : IStateStore
     /// <param name="redis">Redis connection multiplexer.</param>
     /// <param name="logger">Logger instance.</param>
     /// <param name="defaultTtl">Default TTL for cached items. Defaults to 1 hour if not specified.</param>
+    /// <param name="metrics">Optional cache metrics for observability.</param>
     /// <exception cref="ArgumentNullException">If redis or logger is null.</exception>
     public RedisStateStore(
         IConnectionMultiplexer redis,
         ILogger<RedisStateStore> logger,
-        TimeSpan? defaultTtl = null)
+        TimeSpan? defaultTtl = null,
+        CacheMetrics? metrics = null)
     {
         _redis = redis ?? throw new ArgumentNullException(nameof(redis));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _defaultTtl = defaultTtl ?? TimeSpan.FromHours(1);
+        _metrics = metrics;
     }
 
     /// <inheritdoc />
-    public async Task<Process?> GetProcessAsync(Guid processId)
+    public async Task<DomainProcess?> GetProcessAsync(Guid processId)
     {
+        var stopwatch = Stopwatch.StartNew();
         try
         {
             var db = _redis.GetDatabase();
@@ -48,15 +56,17 @@ public class RedisStateStore : IStateStore
 
             if (!cached.HasValue)
             {
+                _metrics?.RecordMiss();
                 _logger.LogDebug(
                     "Cache miss for process {ProcessId}",
                     processId);
                 return null;
             }
 
-            // Explicit cast to string to avoid ambiguous call
-            var process = JsonSerializer.Deserialize<Process>((string)cached!);
+            // Deserialize using type alias to avoid ambiguity
+            var process = JsonSerializer.Deserialize<DomainProcess>((string)cached!);
 
+            _metrics?.RecordHit();
             _logger.LogDebug(
                 "Cache hit for process {ProcessId}",
                 processId);
@@ -65,6 +75,7 @@ public class RedisStateStore : IStateStore
         }
         catch (RedisException ex)
         {
+            _metrics?.RecordError();
             _logger.LogError(
                 ex,
                 "Redis error while getting process {ProcessId}. Failing gracefully.",
@@ -73,6 +84,7 @@ public class RedisStateStore : IStateStore
         }
         catch (JsonException ex)
         {
+            _metrics?.RecordError();
             _logger.LogError(
                 ex,
                 "JSON deserialization error for process {ProcessId}",
@@ -82,13 +94,18 @@ public class RedisStateStore : IStateStore
             await InvalidateAsync(processId);
             return null;
         }
+        finally
+        {
+            _metrics?.RecordOperationDuration(stopwatch.Elapsed.TotalMilliseconds);
+        }
     }
 
     /// <inheritdoc />
-    public async Task SetProcessAsync(Process process)
+    public async Task SetProcessAsync(DomainProcess process)
     {
         ArgumentNullException.ThrowIfNull(process);
 
+        var stopwatch = Stopwatch.StartNew();
         try
         {
             var db = _redis.GetDatabase();
@@ -104,6 +121,7 @@ public class RedisStateStore : IStateStore
         }
         catch (RedisException ex)
         {
+            _metrics?.RecordError();
             _logger.LogError(
                 ex,
                 "Redis error while caching process {ProcessId}. Failing gracefully.",
@@ -112,16 +130,22 @@ public class RedisStateStore : IStateStore
         }
         catch (JsonException ex)
         {
+            _metrics?.RecordError();
             _logger.LogError(
                 ex,
                 "JSON serialization error for process {ProcessId}",
                 process.ProcessId);
+        }
+        finally
+        {
+            _metrics?.RecordOperationDuration(stopwatch.Elapsed.TotalMilliseconds);
         }
     }
 
     /// <inheritdoc />
     public async Task InvalidateAsync(Guid processId)
     {
+        var stopwatch = Stopwatch.StartNew();
         try
         {
             var db = _redis.GetDatabase();
@@ -141,17 +165,23 @@ public class RedisStateStore : IStateStore
         }
         catch (RedisException ex)
         {
+            _metrics?.RecordError();
             _logger.LogError(
                 ex,
                 "Redis error while invalidating cache for process {ProcessId}",
                 processId);
             // Don't throw - cache invalidation failure is not critical
         }
+        finally
+        {
+            _metrics?.RecordOperationDuration(stopwatch.Elapsed.TotalMilliseconds);
+        }
     }
 
     /// <inheritdoc />
     public async Task<bool> ExistsAsync(Guid processId)
     {
+        var stopwatch = Stopwatch.StartNew();
         try
         {
             var db = _redis.GetDatabase();
@@ -160,11 +190,16 @@ public class RedisStateStore : IStateStore
         }
         catch (RedisException ex)
         {
+            _metrics?.RecordError();
             _logger.LogError(
                 ex,
                 "Redis error while checking existence of process {ProcessId}",
                 processId);
             return false; // Fail gracefully
+        }
+        finally
+        {
+            _metrics?.RecordOperationDuration(stopwatch.Elapsed.TotalMilliseconds);
         }
     }
 
@@ -174,6 +209,7 @@ public class RedisStateStore : IStateStore
         ProcessStatus status,
         long expectedVersion)
     {
+        var stopwatch = Stopwatch.StartNew();
         try
         {
             var db = _redis.GetDatabase();
@@ -227,11 +263,16 @@ public class RedisStateStore : IStateStore
         }
         catch (RedisException ex)
         {
+            _metrics?.RecordError();
             _logger.LogError(
                 ex,
                 "Redis error while setting status for process {ProcessId}",
                 processId);
             return false; // Fail gracefully
+        }
+        finally
+        {
+            _metrics?.RecordOperationDuration(stopwatch.Elapsed.TotalMilliseconds);
         }
     }
 

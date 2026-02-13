@@ -1,5 +1,6 @@
 using StarGate.Core.Domain;
 using StarGate.Contracts.Requests;
+using System.Text.Json;
 
 namespace StarGate.Core.Abstractions;
 
@@ -55,13 +56,13 @@ public interface IProcessService
     /// <summary>
     /// Updates process status and related fields.
     /// Invalidates cache and persists changes to repository.
-    /// Sets CompletedAt timestamp for terminal states (Completed, Failed, Cancelled).
+    /// Sets CompletedAt timestamp for terminal states (Completed, Failed).
     /// </summary>
     /// <param name="processId">Process identifier.</param>
     /// <param name="status">New status.</param>
     /// <param name="progress">Progress percentage (0-100). Default is 0.</param>
     /// <param name="currentStep">Current processing step description. Null if not applicable.</param>
-    /// <param name="result">Process result (for completed processes). Null if not completed.</param>
+    /// <param name="result">Process result as JsonDocument (for completed processes). Null if not completed.</param>
     /// <param name="error">Error details (for failed processes). Null if no error.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Updated process.</returns>
@@ -72,7 +73,7 @@ public interface IProcessService
         ProcessStatus status,
         int progress = 0,
         string? currentStep = null,
-        object? result = null,
+        JsonDocument? result = null,
         ProcessError? error = null,
         CancellationToken ct = default);
 
