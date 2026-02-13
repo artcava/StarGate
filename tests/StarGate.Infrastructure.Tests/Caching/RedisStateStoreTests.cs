@@ -33,7 +33,7 @@ public class RedisStateStoreTests
         
         // Create real CacheMetrics instance with mocked IMeterFactory
         var meterFactoryMock = new Mock<IMeterFactory>();
-        var meterMock = new Mock<Meter>("StarGate.Cache", null);
+        var meterMock = new Mock<Meter>("StarGate.Cache", default(object));
         meterFactoryMock.Setup(f => f.Create(It.IsAny<MeterOptions>())).Returns(meterMock.Object);
         _metrics = new CacheMetrics(meterFactoryMock.Object);
 
