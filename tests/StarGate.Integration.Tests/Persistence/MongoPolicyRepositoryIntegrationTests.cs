@@ -106,7 +106,7 @@ public class MongoPolicyRepositoryIntegrationTests : IClassFixture<MongoDbFixtur
                 Enabled = true,
                 MaxAttempts = 5,
                 InitialDelay = TimeSpan.FromSeconds(30),
-                BackoffStrategy = BackoffStrategy.ExponentialWithJitter,
+                BackoffStrategy = BackoffStrategy.Exponential,
                 MaxDelay = TimeSpan.FromMinutes(30)
             },
             ResultRetention = TimeSpan.FromDays(90),
@@ -120,7 +120,7 @@ public class MongoPolicyRepositoryIntegrationTests : IClassFixture<MongoDbFixtur
 
         // Assert
         result.Should().NotBeNull();
-        result.RetryPolicy.BackoffStrategy.Should().Be(BackoffStrategy.ExponentialWithJitter);
+        result.RetryPolicy.BackoffStrategy.Should().Be(BackoffStrategy.Exponential);
         result.RetryPolicy.MaxAttempts.Should().Be(5);
         result.Timeout.Should().Be(TimeSpan.FromHours(2));
     }
@@ -165,7 +165,7 @@ public class MongoPolicyRepositoryIntegrationTests : IClassFixture<MongoDbFixtur
                 Enabled = false,
                 MaxAttempts = 0,
                 InitialDelay = TimeSpan.Zero,
-                BackoffStrategy = BackoffStrategy.None,
+                BackoffStrategy = BackoffStrategy.Linear,
                 MaxDelay = TimeSpan.Zero
             },
             ResultRetention = TimeSpan.FromDays(1),
@@ -181,20 +181,20 @@ public class MongoPolicyRepositoryIntegrationTests : IClassFixture<MongoDbFixtur
         result.Should().NotBeNull();
         result.RetryPolicy.Enabled.Should().BeFalse();
         result.RetryPolicy.MaxAttempts.Should().Be(0);
-        result.RetryPolicy.BackoffStrategy.Should().Be(BackoffStrategy.None);
+        result.RetryPolicy.BackoffStrategy.Should().Be(BackoffStrategy.Linear);
     }
 
     private async Task SeedProcessTypePolicyAsync(ProcessTypePolicy policy)
     {
         var collection = _fixture.Database.GetCollection<ProcessTypePolicyDocument>("processTypePolicies");
-        var document = PolicyMapper.MapPolicyToDocument(policy);
+        var document = PolicyMapper.MapToDocument(policy);
         await collection.InsertOneAsync(document);
     }
 
     private async Task SeedClientOverrideAsync(ClientPolicyOverride clientOverride)
     {
         var collection = _fixture.Database.GetCollection<ClientPolicyOverrideDocument>("clientPolicyOverrides");
-        var document = PolicyMapper.MapOverrideToDocument(clientOverride);
+        var document = PolicyMapper.MapToDocument(clientOverride);
         await collection.InsertOneAsync(document);
     }
 
