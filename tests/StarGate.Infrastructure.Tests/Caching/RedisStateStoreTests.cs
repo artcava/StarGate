@@ -736,7 +736,7 @@ public class RedisStateStoreTests
         capturedValues.Should().NotBeNull();
         capturedValues!.Should().HaveCount(4);
         // Last value is TTL in seconds
-        var ttlSeconds = (int)capturedValues[3];
+        var ttlSeconds = (int)capturedValues![3];
         ttlSeconds.Should().Be((int)_defaultTtl.TotalSeconds);
     }
 
