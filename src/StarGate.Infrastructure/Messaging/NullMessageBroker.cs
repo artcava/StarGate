@@ -1,7 +1,7 @@
-namespace StarGate.Infrastructure.Messaging;
-
 using StarGate.Core.Abstractions;
 using Microsoft.Extensions.Logging;
+
+namespace StarGate.Infrastructure.Messaging;
 
 /// <summary>
 /// Null object implementation of IMessageBroker.

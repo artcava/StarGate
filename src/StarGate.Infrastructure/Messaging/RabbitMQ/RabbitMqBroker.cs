@@ -1,10 +1,10 @@
-namespace StarGate.Infrastructure.Messaging.RabbitMQ;
-
 using RabbitMQ.Client;
 using RabbitMQ.Client.Exceptions;
 using StarGate.Core.Abstractions;
 using StarGate.Core.Exceptions;
 using Microsoft.Extensions.Logging;
+
+namespace StarGate.Infrastructure.Messaging.RabbitMQ;
 
 /// <summary>
 /// RabbitMQ implementation of IMessageBroker.
