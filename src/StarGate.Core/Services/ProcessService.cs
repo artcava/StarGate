@@ -18,7 +18,7 @@ public class ProcessService : IProcessService
     private readonly IMessageBroker _messageBroker;
     private readonly IPolicyProvider _policyProvider;
     private readonly ILogger<ProcessService> _logger;
-    private const string ProcessQueueName = "stargate.processes";
+    private const string _processQueueName = "stargate.processes";
 
     /// <summary>
     /// Initializes a new instance of ProcessService.
@@ -117,7 +117,7 @@ public class ProcessService : IProcessService
 
         // Finally, publish to message broker for async processing
         await _messageBroker.PublishAsync(
-            ProcessQueueName,
+            _processQueueName,
             process,
             new MessageProperties
             {
