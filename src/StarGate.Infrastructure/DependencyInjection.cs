@@ -4,14 +4,16 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
+using StackExchange.Redis;
 using StarGate.Core.Abstractions;
+using StarGate.Infrastructure.Caching;
 using StarGate.Infrastructure.Persistence;
 
 namespace StarGate.Infrastructure;
 
 /// <summary>
 /// Extension methods for configuring Infrastructure services.
-/// Registers MongoDB, repositories, and related infrastructure components.
+/// Registers MongoDB, Redis, repositories, and related infrastructure components.
 /// </summary>
 public static class DependencyInjection
 {
@@ -25,7 +27,9 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        // Bind MongoDB configuration
+        // ============================================
+        // MongoDB Configuration
+        // ============================================
         MongoDbOptions mongoOptions = configuration
             .GetSection(MongoDbOptions.SectionName)
             .Get<MongoDbOptions>() ?? throw new InvalidOperationException(
@@ -79,6 +83,48 @@ public static class DependencyInjection
         if (mongoOptions.CreateIndexesOnStartup)
         {
             services.AddHostedService<MongoDbIndexCreationService>();
+        }
+
+        // ============================================
+        // Redis Cache Configuration
+        // ============================================
+        RedisOptions? redisOptions = configuration
+            .GetSection(RedisOptions.SectionName)
+            .Get<RedisOptions>();
+
+        if (redisOptions?.Enabled == true)
+        {
+            services.Configure<RedisOptions>(
+                configuration.GetSection(RedisOptions.SectionName));
+
+            // Register Redis connection multiplexer as singleton
+            services.AddSingleton<IConnectionMultiplexer>(sp =>
+            {
+                // Use non-generic ILogger since RedisConnectionFactory is static
+                ILogger logger = sp.GetRequiredService<ILoggerFactory>().CreateLogger("RedisConnectionFactory");
+                return RedisConnectionFactory.CreateConnection(
+                    redisOptions.ConnectionString,
+                    logger);
+            });
+
+            // Register Redis state store
+            services.AddSingleton<IStateStore>(sp =>
+            {
+                IConnectionMultiplexer redis = sp.GetRequiredService<IConnectionMultiplexer>();
+                ILogger<RedisStateStore> logger = sp.GetRequiredService<ILogger<RedisStateStore>>();
+                TimeSpan ttl = TimeSpan.FromSeconds(redisOptions.DefaultTtlSeconds);
+                
+                logger.LogInformation(
+                    "Redis cache enabled with TTL {TtlSeconds}s",
+                    redisOptions.DefaultTtlSeconds);
+                
+                return new RedisStateStore(redis, logger, ttl);
+            });
+        }
+        else
+        {
+            // Null object pattern - no-op cache when Redis is disabled
+            services.AddSingleton<IStateStore, NullStateStore>();
         }
 
         return services;
