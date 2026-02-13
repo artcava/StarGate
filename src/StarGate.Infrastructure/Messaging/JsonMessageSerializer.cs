@@ -1,11 +1,11 @@
-namespace StarGate.Infrastructure.Messaging;
-
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using StarGate.Core.Abstractions;
 using StarGate.Core.Exceptions;
+namespace StarGate.Infrastructure.Messaging;
+
 
 /// <summary>
 /// JSON-based implementation of IMessageSerializer using System.Text.Json.
@@ -91,13 +91,8 @@ public class JsonMessageSerializer : IMessageSerializer
         try
         {
             var json = Encoding.UTF8.GetString(data);
-            var envelope = JsonSerializer.Deserialize<MessageEnvelope<T>>(json, _options);
-
-            if (envelope == null)
-            {
-                throw new MessageSerializationException(
+            var envelope = JsonSerializer.Deserialize<MessageEnvelope<T>>(json, _options) ?? throw new MessageSerializationException(
                     "Deserialization returned null envelope");
-            }
 
             _logger.LogDebug(
                 "Deserialized message {MessageId} of type {MessageType}",
@@ -142,13 +137,8 @@ public class JsonMessageSerializer : IMessageSerializer
         try
         {
             var json = Encoding.UTF8.GetString(data);
-            var envelope = JsonSerializer.Deserialize<MessageEnvelope>(json, _options);
-
-            if (envelope == null)
-            {
-                throw new MessageSerializationException(
+            var envelope = JsonSerializer.Deserialize<MessageEnvelope>(json, _options) ?? throw new MessageSerializationException(
                     "Deserialization returned null envelope");
-            }
 
             _logger.LogDebug(
                 "Deserialized untyped message {MessageId} of type {MessageType}",

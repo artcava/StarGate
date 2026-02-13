@@ -1,8 +1,8 @@
-namespace StarGate.Infrastructure.Tests.Messaging;
-
 using FluentAssertions;
 using StarGate.Infrastructure.Messaging;
 using Xunit;
+
+namespace StarGate.Infrastructure.Tests.Messaging;
 
 public class MessageEnvelopeFactoryTests
 {

@@ -1,6 +1,6 @@
-namespace StarGate.Infrastructure.Messaging;
-
 using StarGate.Core.Abstractions;
+
+namespace StarGate.Infrastructure.Messaging;
 
 /// <summary>
 /// Factory for creating message envelopes with consistent metadata.
