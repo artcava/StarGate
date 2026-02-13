@@ -225,7 +225,7 @@ public class ProcessService : IProcessService
 
         var process = await _repository.GetByIdAsync(processId, ct);
 
-        if (process is null)
+        if (process == null)
         {
             throw new InvalidOperationException(
                 $"Process with ID '{processId}' not found");
@@ -309,7 +309,7 @@ public class ProcessService : IProcessService
         // Get effective policy for this client and process type
         var policy = await _policyProvider.GetEffectivePolicyAsync(clientId, processType, ct);
 
-        if (policy.MaxConcurrentProcesses is null)
+        if (policy.MaxConcurrentProcesses == null)
         {
             _logger.LogDebug(
                 "No concurrency limit set for client {ClientId}, process type {ProcessType}. Allowing submission.",
