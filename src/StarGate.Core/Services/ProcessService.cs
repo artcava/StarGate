@@ -64,7 +64,7 @@ public class ProcessService : IProcessService
             request.ClientProcessId,
             ct);
 
-        if (existing is not null)
+        if (existing != null)
         {
             _logger.LogInformation(
                 "Idempotent request detected for client process {ClientProcessId}. Returning existing process {ProcessId}",
@@ -145,7 +145,7 @@ public class ProcessService : IProcessService
 
         // Try cache first (cache-aside pattern)
         var cached = await _cache.GetProcessAsync(processId);
-        if (cached is not null)
+        if (cached != null)
         {
             _logger.LogDebug(
                 "Process {ProcessId} retrieved from cache",
@@ -160,7 +160,7 @@ public class ProcessService : IProcessService
 
         var process = await _repository.GetByIdAsync(processId, ct);
 
-        if (process is not null)
+        if (process != null)
         {
             // Populate cache for future requests
             await _cache.SetProcessAsync(process);
