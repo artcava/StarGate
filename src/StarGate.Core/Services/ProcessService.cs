@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using StarGate.Core.Abstractions;
 using StarGate.Core.Domain;
 using StarGate.Contracts.Requests;
+using System.Text.Json;
 
 namespace StarGate.Core.Services;
 
@@ -86,6 +87,9 @@ public class ProcessService : IProcessService
 
         var processId = Guid.NewGuid();
 
+        // Serialize payload to JsonDocument
+        var dataJson = JsonSerializer.SerializeToDocument(request.Payload);
+
         var process = new Process
         {
             ProcessId = processId,
@@ -95,7 +99,7 @@ public class ProcessService : IProcessService
             Status = ProcessStatus.Accepted,
             Progress = 0,
             CurrentStep = null,
-            Data = request.Data,
+            Data = dataJson,
             Result = null,
             Error = null,
             CreatedAt = DateTime.UtcNow,
@@ -199,7 +203,7 @@ public class ProcessService : IProcessService
         ProcessStatus status,
         int progress = 0,
         string? currentStep = null,
-        object? result = null,
+        JsonDocument? result = null,
         ProcessError? error = null,
         CancellationToken ct = default)
     {
@@ -235,7 +239,7 @@ public class ProcessService : IProcessService
             Result = result,
             Error = error,
             UpdatedAt = DateTime.UtcNow,
-            CompletedAt = status is ProcessStatus.Completed or ProcessStatus.Failed or ProcessStatus.Cancelled
+            CompletedAt = status is ProcessStatus.Completed or ProcessStatus.Failed
                 ? DateTime.UtcNow
                 : process.CompletedAt
         };
@@ -283,7 +287,9 @@ public class ProcessService : IProcessService
             limit);
 
         // Direct repository query
-        return await _repository.GetByClientIdAsync(clientId, status, skip, limit, ct);
+        // Note: Current IProcessRepository.GetByClientIdAsync doesn't support status filtering
+        // If status filtering is needed, repository interface should be extended
+        return await _repository.GetByClientIdAsync(clientId, skip, limit, ct);
     }
 
     /// <inheritdoc />
@@ -300,32 +306,31 @@ public class ProcessService : IProcessService
             clientId,
             processType);
 
-        // Get policy for this client and process type
-        var policy = await _policyProvider.GetPolicyAsync(clientId, processType, ct);
+        // Get effective policy for this client and process type
+        var policy = await _policyProvider.GetEffectivePolicyAsync(clientId, processType, ct);
 
-        if (policy is null)
+        if (policy.MaxConcurrentProcesses is null)
         {
-            _logger.LogWarning(
-                "No policy found for client {ClientId}, process type {ProcessType}. Allowing submission.",
+            _logger.LogDebug(
+                "No concurrency limit set for client {ClientId}, process type {ProcessType}. Allowing submission.",
                 clientId,
                 processType);
-            return true; // No policy = no limit
+            return true; // No limit = unlimited
         }
 
         // Count active processes (Accepted, Processing)
-        var activeCount = await _repository.CountByClientIdAndTypeAsync(
+        var activeCount = await _repository.CountActiveProcessesAsync(
             clientId,
             processType,
-            new[] { ProcessStatus.Accepted, ProcessStatus.Processing },
             ct);
 
-        var canSubmit = activeCount < policy.MaxConcurrentProcesses;
+        var canSubmit = activeCount < policy.MaxConcurrentProcesses.Value;
 
         _logger.LogDebug(
             "Client {ClientId} has {ActiveCount}/{MaxConcurrent} active processes for type {ProcessType}. Can submit: {CanSubmit}",
             clientId,
             activeCount,
-            policy.MaxConcurrentProcesses,
+            policy.MaxConcurrentProcesses.Value,
             processType,
             canSubmit);
 
