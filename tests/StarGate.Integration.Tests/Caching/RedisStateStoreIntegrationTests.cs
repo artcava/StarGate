@@ -136,7 +136,9 @@ public class RedisStateStoreIntegrationTests : IClassFixture<RedisFixture>, IAsy
             }
         };
 
-        var process = CreateValidProcess() with { Data = complexData };
+        var json = JsonSerializer.Serialize(complexData);
+        var jsonDocument = JsonDocument.Parse(json);
+        var process = CreateValidProcess() with { Data = jsonDocument };
 
         // Act
         await _fixture.StateStore.SetProcessAsync(process);
@@ -146,7 +148,7 @@ public class RedisStateStoreIntegrationTests : IClassFixture<RedisFixture>, IAsy
         retrieved.Should().NotBeNull();
         retrieved!.Data.Should().NotBeNull();
 
-        var dataJson = retrieved.Data.ToString();
+        var dataJson = retrieved.Data!.RootElement.GetRawText();
         dataJson.Should().Contain("ORD-12345");
         dataJson.Should().Contain("John Doe");
         dataJson.Should().Contain("SKU-001");
@@ -156,10 +158,14 @@ public class RedisStateStoreIntegrationTests : IClassFixture<RedisFixture>, IAsy
     public async Task SetProcessAsync_Should_HandleError_Serialization()
     {
         // Arrange
+        var errorDetails = new { field = "orderId", value = "" };
+        var errorDetailsJson = JsonSerializer.Serialize(errorDetails);
+        var errorDetailsDocument = JsonDocument.Parse(errorDetailsJson);
+
         var error = new ProcessError(
             "VALIDATION_ERROR",
             "Invalid order data",
-            new { field = "orderId", value = "" });
+            errorDetailsDocument);
 
         var process = CreateValidProcess() with
         {
@@ -264,7 +270,9 @@ public class RedisStateStoreIntegrationTests : IClassFixture<RedisFixture>, IAsy
             }).ToArray()
         };
 
-        var process = CreateValidProcess() with { Data = largeData };
+        var json = JsonSerializer.Serialize(largeData);
+        var jsonDocument = JsonDocument.Parse(json);
+        var process = CreateValidProcess() with { Data = jsonDocument };
 
         // Act
         await _fixture.StateStore.SetProcessAsync(process);
