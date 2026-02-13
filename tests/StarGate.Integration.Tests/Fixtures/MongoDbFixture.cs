@@ -1,9 +1,9 @@
-namespace StarGate.Integration.Tests.Fixtures;
-
 using MongoDB.Driver;
 using StarGate.Infrastructure.Persistence;
 using Testcontainers.MongoDb;
 using Xunit;
+
+namespace StarGate.Integration.Tests.Fixtures;
 
 /// <summary>
 /// Provides a MongoDB test container for integration tests.
@@ -46,15 +46,17 @@ public class MongoDbFixture : IAsyncLifetime
 
     public async Task ResetDatabaseAsync()
     {
-        await _database.DropCollectionAsync("processes");
-        await _database.DropCollectionAsync("processTypePolicies");
-        await _database.DropCollectionAsync("clientPolicyOverrides");
+        // _database is guaranteed to be non-null after InitializeAsync
+        await _database!.DropCollectionAsync("processes");
+        await _database!.DropCollectionAsync("processTypePolicies");
+        await _database!.DropCollectionAsync("clientPolicyOverrides");
         await CreateIndexesAsync();
     }
 
     private async Task CreateIndexesAsync()
     {
-        var processCollection = _database.GetCollection<ProcessDocument>("processes");
+        // _database is guaranteed to be non-null when this method is called
+        var processCollection = _database!.GetCollection<ProcessDocument>("processes");
 
         // Unique index on ProcessId
         await processCollection.Indexes.CreateOneAsync(

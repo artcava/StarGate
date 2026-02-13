@@ -1,5 +1,3 @@
-namespace StarGate.Integration.Tests.Persistence;
-
 using System.Text.Json;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -7,6 +5,8 @@ using StarGate.Core.Domain;
 using StarGate.Infrastructure.Persistence;
 using StarGate.Integration.Tests.Fixtures;
 using Xunit;
+
+namespace StarGate.Integration.Tests.Persistence;
 
 public class MongoProcessRepositoryIntegrationTests : IClassFixture<MongoDbFixture>, IAsyncLifetime
 {
