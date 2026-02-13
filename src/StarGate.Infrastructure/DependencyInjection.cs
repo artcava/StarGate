@@ -1,3 +1,5 @@
+namespace StarGate.Infrastructure;
+
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using RabbitMQ.Client;
@@ -5,8 +7,6 @@ using StarGate.Core.Abstractions;
 using StarGate.Infrastructure.Messaging;
 using StarGate.Infrastructure.Messaging.RabbitMQ;
 using Microsoft.Extensions.Logging;
-
-namespace StarGate.Infrastructure;
 
 public static partial class DependencyInjection
 {
@@ -23,7 +23,8 @@ public static partial class DependencyInjection
             // Register RabbitMQ connection as singleton
             services.AddSingleton<IConnection>(sp =>
             {
-                var logger = sp.GetRequiredService<ILogger<RabbitMqConnectionFactory>>();
+                var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
+                var logger = loggerFactory.CreateLogger("RabbitMQ.Connection");
                 return RabbitMqConnectionFactory.CreateConnection(options, logger);
             });
 
@@ -35,12 +36,6 @@ public static partial class DependencyInjection
 
             // Register RabbitMQ broker
             services.AddSingleton<IMessageBroker, RabbitMqBroker>();
-
-            services.AddLogging(builder =>
-            {
-                builder.Services.AddSingleton(sp =>
-                    sp.GetRequiredService<ILoggerFactory>().CreateLogger("RabbitMQ"));
-            });
         }
         else
         {
