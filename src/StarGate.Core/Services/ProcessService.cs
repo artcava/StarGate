@@ -223,13 +223,9 @@ public class ProcessService : IProcessService
             status,
             progress);
 
-        var process = await _repository.GetByIdAsync(processId, ct);
-
-        if (process == null)
-        {
-            throw new InvalidOperationException(
+        var process = await _repository.GetByIdAsync(processId, ct)
+            ?? throw new InvalidOperationException(
                 $"Process with ID '{processId}' not found");
-        }
 
         var updated = process with
         {
