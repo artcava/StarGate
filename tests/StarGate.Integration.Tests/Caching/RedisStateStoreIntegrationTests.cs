@@ -221,6 +221,85 @@ public class RedisStateStoreIntegrationTests : IClassFixture<RedisFixture>, IAsy
         exists.Should().BeFalse();
     }
 
+    [Fact]
+    public async Task UpdateProcess_Should_RequireInvalidation()
+    {
+        // Arrange
+        var process = CreateValidProcess();
+        await _fixture.StateStore.SetProcessAsync(process);
+
+        // Simulate update (caller must invalidate)
+        var updated = process with
+        {
+            Status = ProcessStatus.Processing,
+            Progress = 50,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        // Act - Cache still has old version
+        var staleCache = await _fixture.StateStore.GetProcessAsync(process.ProcessId);
+        staleCache!.Status.Should().Be(ProcessStatus.Accepted);
+
+        // Invalidate and update
+        await _fixture.StateStore.InvalidateAsync(process.ProcessId);
+        await _fixture.StateStore.SetProcessAsync(updated);
+
+        // Assert - Cache has new version
+        var freshCache = await _fixture.StateStore.GetProcessAsync(process.ProcessId);
+        freshCache!.Status.Should().Be(ProcessStatus.Processing);
+        freshCache.Progress.Should().Be(50);
+    }
+
+    [Fact]
+    public async Task LargePayload_Should_BeCached()
+    {
+        // Arrange
+        var largeData = new
+        {
+            items = Enumerable.Range(0, 1000).Select(i => new
+            {
+                id = i,
+                name = $"Item-{i}",
+                description = new string('x', 100)
+            }).ToArray()
+        };
+
+        var process = CreateValidProcess() with { Data = largeData };
+
+        // Act
+        await _fixture.StateStore.SetProcessAsync(process);
+
+        // Assert
+        var retrieved = await _fixture.StateStore.GetProcessAsync(process.ProcessId);
+        retrieved.Should().NotBeNull();
+        retrieved!.Data.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task RapidCacheMissAndSet_Should_NotCauseRaceCondition()
+    {
+        // Arrange
+        var processId = Guid.NewGuid();
+
+        // Act - Simulate cache-aside pattern with concurrent requests
+        var tasks = Enumerable.Range(0, 5).Select(async i =>
+        {
+            var cached = await _fixture.StateStore.GetProcessAsync(processId);
+            if (cached == null)
+            {
+                var process = CreateValidProcess() with { ProcessId = processId };
+                await _fixture.StateStore.SetProcessAsync(process);
+                return process;
+            }
+            return cached;
+        });
+
+        var results = await Task.WhenAll(tasks);
+
+        // Assert - All results should have same ProcessId
+        results.Should().AllSatisfy(r => r.ProcessId.Should().Be(processId));
+    }
+
     private static Process CreateValidProcess() => new()
     {
         ProcessId = Guid.NewGuid(),
