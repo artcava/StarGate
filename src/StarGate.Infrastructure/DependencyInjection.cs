@@ -143,12 +143,7 @@ public static class DependencyInjection
             // Null object pattern - no-op cache when Redis is disabled
             services.AddSingleton<IStateStore, NullStateStore>();
 
-            ILogger logger = services.BuildServiceProvider()
-                .GetRequiredService<ILoggerFactory>()
-                .CreateLogger("DependencyInjection");
-
-            logger.LogWarning(
-                "Redis is disabled. Using NullStateStore (no caching).");
+            // Warning will be logged during application startup when NullStateStore is resolved
         }
 
         return services;
