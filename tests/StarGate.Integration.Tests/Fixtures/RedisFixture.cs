@@ -37,7 +37,7 @@ public class RedisFixture : IAsyncLifetime
 
         _redis = RedisConnectionFactory.CreateConnection(
             ConnectionString,
-            NullLogger<RedisConnectionFactory>.Instance);
+            NullLogger.Instance);
 
         _stateStore = new RedisStateStore(
             _redis,
