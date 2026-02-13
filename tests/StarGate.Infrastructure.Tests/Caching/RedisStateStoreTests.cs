@@ -1,5 +1,3 @@
-namespace StarGate.Infrastructure.Tests.Caching;
-
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -9,6 +7,8 @@ using StarGate.Infrastructure.Caching;
 using System.Text.Json;
 using Xunit;
 using DomainProcess = StarGate.Core.Domain.Process;
+
+namespace StarGate.Infrastructure.Tests.Caching;
 
 /// <summary>
 /// UNIT TESTS for RedisStateStore using MOCKED Redis.
@@ -90,12 +90,11 @@ public class RedisStateStoreTests
     }
 
     [Fact]
-    public void Constructor_WithNullTtl_ShouldUseDefaultOneHour()
+    public async Task Constructor_WithNullTtl_ShouldUseDefaultOneHour()
     {
         // Arrange
         var processId = Guid.NewGuid();
         var process = CreateTestProcess(processId);
-        var json = JsonSerializer.Serialize(process);
 
         TimeSpan? capturedTtl = null;
         _databaseMock
@@ -116,7 +115,7 @@ public class RedisStateStoreTests
             _loggerMock.Object,
             defaultTtl: null);
 
-        store.SetProcessAsync(process).Wait();
+        await store.SetProcessAsync(process);
 
         // Assert
         capturedTtl.Should().Be(TimeSpan.FromHours(1));
@@ -161,7 +160,7 @@ public class RedisStateStoreTests
         result.Should().NotBeNull();
         result!.ProcessId.Should().Be(processId);
         result.Status.Should().Be(expectedProcess.Status);
-        result.RequestPayload.Should().Be(expectedProcess.RequestPayload);
+        result.ClientProcessId.Should().Be(expectedProcess.ClientProcessId);
 
         _metricsMock.Verify(m => m.RecordHit(), Times.Once);
         _databaseMock.Verify(
@@ -735,9 +734,9 @@ public class RedisStateStoreTests
 
         // Assert
         capturedValues.Should().NotBeNull();
-        capturedValues.Should().HaveCount(4);
+        capturedValues!.Should().HaveCount(4);
         // Last value is TTL in seconds
-        var ttlSeconds = (int)capturedValues![3];
+        var ttlSeconds = (int)capturedValues[3];
         ttlSeconds.Should().Be((int)_defaultTtl.TotalSeconds);
     }
 
@@ -834,12 +833,24 @@ public class RedisStateStoreTests
     /// </summary>
     private static DomainProcess CreateTestProcess(Guid processId)
     {
-        return new DomainProcess(
-            processId: processId,
-            requestPayload: "{\"test\":\"data\"}",
-            status: ProcessStatus.Accepted,
-            createdAt: DateTime.UtcNow,
-            updatedAt: DateTime.UtcNow);
+        return new DomainProcess
+        {
+            ProcessId = processId,
+            ClientProcessId = $"client-{processId}",
+            ProcessType = "test-process",
+            ClientId = "test-client",
+            Status = ProcessStatus.Accepted,
+            Progress = 0,
+            CurrentStep = null,
+            Data = JsonDocument.Parse("{\"test\":\"data\"}"),
+            Result = null,
+            Error = null,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+            CompletedAt = null,
+            IdempotencyKey = $"idem-{processId}",
+            Retryable = true
+        };
     }
 
     #endregion
