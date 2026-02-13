@@ -675,7 +675,7 @@ public class RedisStateStoreTests
 
         // Assert
         capturedScript.Should().NotBeNullOrEmpty();
-        capturedScript.Should().Contain("GET");
+        capturedScript!.Should().Contain("GET");
         capturedScript.Should().Contain("SET");
         capturedScript.Should().Contain("EXPIRE");
     }
@@ -789,7 +789,10 @@ public class RedisStateStoreTests
 
         // Assert
         capturedKey.Should().NotBeNull();
-        capturedKey!.Value.ToString().Should().Be(expectedKey);
+        if (capturedKey.HasValue)
+        {
+            capturedKey.Value.ToString().Should().Be(expectedKey);
+        }
     }
 
     [Fact]
@@ -819,8 +822,8 @@ public class RedisStateStoreTests
 
         // Assert
         capturedKeys.Should().NotBeNull();
-        capturedKeys!.Should().HaveCount(2);
-        capturedKeys[0].ToString().Should().Be(expectedStatusKey);
+        capturedKeys.Should().HaveCount(2);
+        capturedKeys![0].ToString().Should().Be(expectedStatusKey);
         capturedKeys[1].ToString().Should().Be(expectedVersionKey);
     }
 
