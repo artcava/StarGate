@@ -81,12 +81,12 @@ public static class StateStoreExtensions
             try
             {
                 var exists = await stateStore.ExistsAsync(id);
-                return (id, exists);
+                return (id: id, exists: exists);
             }
             catch (Exception)
             {
                 // On error, assume not cached (fail gracefully)
-                return (id, false);
+                return (id: id, exists: false);
             }
         });
 
