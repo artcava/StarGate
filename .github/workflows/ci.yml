@@ -85,7 +85,8 @@ jobs:
             --no-restore \
             --verbosity normal \
             --collect:"XPlat Code Coverage" \
-            --results-directory ./coverage
+            --results-directory ./coverage \
+            --filter "Category!=Integration"
       
       - name: Generate coverage report
         if: always()

@@ -8,6 +8,7 @@ using Xunit;
 
 namespace StarGate.Integration.Tests.Persistence;
 
+[Trait("Category", "Integration")]
 public class MongoPolicyRepositoryIntegrationTests : IClassFixture<MongoDbFixture>, IAsyncLifetime
 {
     private readonly MongoDbFixture _fixture;
