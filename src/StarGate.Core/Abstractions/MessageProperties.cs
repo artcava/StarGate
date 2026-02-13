@@ -3,7 +3,7 @@ namespace StarGate.Core.Abstractions;
 /// <summary>
 /// Properties for message publishing.
 /// </summary>
-public class MessageProperties
+public record MessageProperties
 {
     /// <summary>
     /// Unique message identifier.
