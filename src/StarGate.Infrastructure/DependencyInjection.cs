@@ -100,7 +100,8 @@ public static class DependencyInjection
             // Register Redis connection multiplexer as singleton
             services.AddSingleton<IConnectionMultiplexer>(sp =>
             {
-                ILogger<RedisConnectionFactory> logger = sp.GetRequiredService<ILogger<RedisConnectionFactory>>();
+                // Use non-generic ILogger since RedisConnectionFactory is static
+                ILogger logger = sp.GetRequiredService<ILoggerFactory>().CreateLogger("RedisConnectionFactory");
                 return RedisConnectionFactory.CreateConnection(
                     redisOptions.ConnectionString,
                     logger);
@@ -112,21 +113,18 @@ public static class DependencyInjection
                 IConnectionMultiplexer redis = sp.GetRequiredService<IConnectionMultiplexer>();
                 ILogger<RedisStateStore> logger = sp.GetRequiredService<ILogger<RedisStateStore>>();
                 TimeSpan ttl = TimeSpan.FromSeconds(redisOptions.DefaultTtlSeconds);
+                
+                logger.LogInformation(
+                    "Redis cache enabled with TTL {TtlSeconds}s",
+                    redisOptions.DefaultTtlSeconds);
+                
                 return new RedisStateStore(redis, logger, ttl);
             });
-
-            ILogger logger = services.BuildServiceProvider().GetRequiredService<ILogger<DependencyInjection>>();
-            logger.LogInformation(
-                "Redis cache enabled with TTL {TtlSeconds}s",
-                redisOptions.DefaultTtlSeconds);
         }
         else
         {
             // Null object pattern - no-op cache when Redis is disabled
             services.AddSingleton<IStateStore, NullStateStore>();
-
-            ILogger logger = services.BuildServiceProvider().GetRequiredService<ILogger<DependencyInjection>>();
-            logger.LogInformation("Redis cache disabled - using NullStateStore");
         }
 
         return services;

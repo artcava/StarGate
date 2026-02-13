@@ -54,7 +54,8 @@ public class RedisStateStore : IStateStore
                 return null;
             }
 
-            var process = JsonSerializer.Deserialize<Process>(cached!);
+            // Explicit cast to string to avoid ambiguous call
+            var process = JsonSerializer.Deserialize<Process>((string)cached!);
 
             _logger.LogDebug(
                 "Cache hit for process {ProcessId}",
