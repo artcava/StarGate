@@ -23,7 +23,7 @@ public class MessageProperties
     /// <summary>
     /// Message expiration time (TTL).
     /// </summary>
-    public TimeSpan? Expiration { get; init; }
+    public TimeSpan? TimeToLive { get; init; }
 
     /// <summary>
     /// Custom headers for the message.
