@@ -82,9 +82,9 @@ public class RabbitMqBroker : IMessageBroker, IDisposable
                 basicProperties.Priority = (byte)properties.Priority.Value;
             }
 
-            if (properties?.Expiration.HasValue == true)
+            if (properties?.TimeToLive.HasValue == true)
             {
-                basicProperties.Expiration = properties.Expiration.Value.TotalMilliseconds.ToString("F0");
+                basicProperties.Expiration = properties.TimeToLive.Value.TotalMilliseconds.ToString("F0");
             }
 
             // Publish to exchange with routing key = queue name
