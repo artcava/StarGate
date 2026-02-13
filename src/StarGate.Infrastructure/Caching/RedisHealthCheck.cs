@@ -1,8 +1,8 @@
-namespace StarGate.Infrastructure.Caching;
-
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
+
+namespace StarGate.Infrastructure.Caching;
 
 /// <summary>
 /// Health check for Redis connection and operations.
