@@ -103,12 +103,12 @@ public static class DependencyInjection
             // Register cache metrics for observability
             services.AddSingleton<CacheMetrics>();
 
-            // Register Redis connection multiplexer as singleton
+            // Register Redis connection multiplexer as singleton (connection pooling)
             services.AddSingleton<IConnectionMultiplexer>(sp =>
             {
                 // Use non-generic ILogger since RedisConnectionFactory is static
                 ILogger logger = sp.GetRequiredService<ILoggerFactory>().CreateLogger("RedisConnectionFactory");
-                return RedisConnectionFactory.CreateConnection(
+                return RedisConnectionFactory.GetOrCreateConnection(
                     redisOptions.ConnectionString,
                     logger);
             });
@@ -127,11 +127,28 @@ public static class DependencyInjection
 
                 return new RedisStateStore(redis, logger, ttl, metrics);
             });
+
+            // Register diagnostics
+            services.AddSingleton<RedisConnectionDiagnostics>();
+
+            // Add Redis health check
+            services.AddHealthChecks()
+                .AddCheck<RedisHealthCheck>(
+                    name: "redis",
+                    failureStatus: HealthStatus.Degraded,
+                    tags: new[] { "cache", "redis", "ready" });
         }
         else
         {
             // Null object pattern - no-op cache when Redis is disabled
             services.AddSingleton<IStateStore, NullStateStore>();
+
+            ILogger logger = services.BuildServiceProvider()
+                .GetRequiredService<ILoggerFactory>()
+                .CreateLogger("DependencyInjection");
+
+            logger.LogWarning(
+                "Redis is disabled. Using NullStateStore (no caching).");
         }
 
         return services;
