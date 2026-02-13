@@ -1,7 +1,7 @@
-namespace StarGate.Infrastructure.Caching;
-
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
+
+namespace StarGate.Infrastructure.Caching;
 
 /// <summary>
 /// Factory for creating and configuring Redis connections with pooling.
@@ -82,7 +82,6 @@ public static class RedisConnectionFactory
         options.ClientName = "StarGate";
 
         // Socket configuration for better performance
-        options.ResponseTimeout = 10000;
         options.SocketManager = SocketManager.Shared;
 
         logger.LogInformation(
