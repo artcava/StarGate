@@ -20,13 +20,34 @@ public class NullMessageBroker : IMessageBroker
     public Task PublishAsync<T>(
         string queueName,
         T message,
-        MessageProperties? properties = null,
-        CancellationToken cancellationToken = default) where T : class
+        CancellationToken ct = default) where T : class
     {
         _logger.LogWarning(
             "NullMessageBroker: Ignoring message publication to queue {Queue}",
             queueName);
 
         return Task.CompletedTask;
+    }
+
+    public Task PublishAsync<T>(
+        string queueName,
+        T message,
+        MessageProperties properties,
+        CancellationToken ct = default) where T : class
+    {
+        _logger.LogWarning(
+            "NullMessageBroker: Ignoring message publication to queue {Queue}",
+            queueName);
+
+        return Task.CompletedTask;
+    }
+
+    public IMessageConsumer CreateConsumer(string queueName, CancellationToken cancellationToken = default)
+    {
+        _logger.LogWarning(
+            "NullMessageBroker: Cannot create consumer for queue {Queue}",
+            queueName);
+
+        throw new NotSupportedException("NullMessageBroker does not support message consumers");
     }
 }

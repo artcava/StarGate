@@ -45,14 +45,23 @@ public class RabbitMqBroker : IMessageBroker, IDisposable
             _options.PublisherConfirms);
     }
 
+    public Task PublishAsync<T>(
+        string queueName,
+        T message,
+        CancellationToken ct = default) where T : class
+    {
+        return PublishAsync(queueName, message, new MessageProperties(), ct);
+    }
+
     public async Task PublishAsync<T>(
         string queueName,
         T message,
-        MessageProperties? properties = null,
-        CancellationToken cancellationToken = default) where T : class
+        MessageProperties properties,
+        CancellationToken ct = default) where T : class
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(queueName);
         ArgumentNullException.ThrowIfNull(message);
+        ArgumentNullException.ThrowIfNull(properties);
 
         try
         {
@@ -62,8 +71,8 @@ public class RabbitMqBroker : IMessageBroker, IDisposable
             // Create message envelope
             var envelope = MessageEnvelopeFactory.Create(
                 message,
-                properties?.CorrelationId,
-                properties?.Headers);
+                properties.CorrelationId,
+                properties.Headers);
 
             // Serialize message
             var body = _serializer.Serialize(envelope);
@@ -71,18 +80,18 @@ public class RabbitMqBroker : IMessageBroker, IDisposable
             // Create basic properties
             var basicProperties = _channel.CreateBasicProperties();
             basicProperties.Persistent = true; // Durable messages
-            basicProperties.MessageId = properties?.MessageId ?? envelope.MessageId;
-            basicProperties.CorrelationId = properties?.CorrelationId;
+            basicProperties.MessageId = properties.MessageId ?? envelope.MessageId;
+            basicProperties.CorrelationId = properties.CorrelationId;
             basicProperties.Timestamp = new AmqpTimestamp(DateTimeOffset.UtcNow.ToUnixTimeSeconds());
             basicProperties.ContentType = "application/json";
             basicProperties.ContentEncoding = "utf-8";
 
-            if (properties?.Priority.HasValue == true)
+            if (properties.Priority.HasValue)
             {
                 basicProperties.Priority = (byte)properties.Priority.Value;
             }
 
-            if (properties?.TimeToLive.HasValue == true)
+            if (properties.TimeToLive.HasValue)
             {
                 basicProperties.Expiration = properties.TimeToLive.Value.TotalMilliseconds.ToString("F0");
             }
@@ -153,6 +162,12 @@ public class RabbitMqBroker : IMessageBroker, IDisposable
                 $"Failed to publish message to queue '{queueName}'",
                 ex);
         }
+    }
+
+    public IMessageConsumer CreateConsumer(string queueName, CancellationToken cancellationToken = default)
+    {
+        // Consumer implementation is part of Phase 3.2
+        throw new NotImplementedException("Consumer functionality will be implemented in Phase 3.2");
     }
 
     private void DeclareInfrastructure()
