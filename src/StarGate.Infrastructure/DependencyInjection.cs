@@ -92,10 +92,16 @@ public static class DependencyInjection
             .GetSection(RedisOptions.SectionName)
             .Get<RedisOptions>();
 
+        // Cache lock manager (always registered for stampede prevention)
+        services.AddSingleton<CacheLockManager>();
+
         if (redisOptions?.Enabled == true)
         {
             services.Configure<RedisOptions>(
                 configuration.GetSection(RedisOptions.SectionName));
+
+            // Register cache metrics for observability
+            services.AddSingleton<CacheMetrics>();
 
             // Register Redis connection multiplexer as singleton
             services.AddSingleton<IConnectionMultiplexer>(sp =>
@@ -107,18 +113,19 @@ public static class DependencyInjection
                     logger);
             });
 
-            // Register Redis state store
+            // Register Redis state store with metrics
             services.AddSingleton<IStateStore>(sp =>
             {
                 IConnectionMultiplexer redis = sp.GetRequiredService<IConnectionMultiplexer>();
                 ILogger<RedisStateStore> logger = sp.GetRequiredService<ILogger<RedisStateStore>>();
+                CacheMetrics metrics = sp.GetRequiredService<CacheMetrics>();
                 TimeSpan ttl = TimeSpan.FromSeconds(redisOptions.DefaultTtlSeconds);
-                
+
                 logger.LogInformation(
-                    "Redis cache enabled with TTL {TtlSeconds}s",
+                    "Redis cache enabled with TTL {TtlSeconds}s and metrics collection",
                     redisOptions.DefaultTtlSeconds);
-                
-                return new RedisStateStore(redis, logger, ttl);
+
+                return new RedisStateStore(redis, logger, ttl, metrics);
             });
         }
         else
