@@ -1,7 +1,7 @@
-namespace StarGate.Infrastructure.Caching;
-
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
+
+namespace StarGate.Infrastructure.Caching;
 
 /// <summary>
 /// Provides diagnostics information for Redis connections.
