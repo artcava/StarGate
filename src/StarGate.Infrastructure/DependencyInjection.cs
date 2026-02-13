@@ -1,5 +1,3 @@
-namespace StarGate.Infrastructure;
-
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using RabbitMQ.Client;
@@ -7,6 +5,8 @@ using StarGate.Core.Abstractions;
 using StarGate.Infrastructure.Messaging;
 using StarGate.Infrastructure.Messaging.RabbitMQ;
 using Microsoft.Extensions.Logging;
+
+namespace StarGate.Infrastructure;
 
 public static partial class DependencyInjection
 {
