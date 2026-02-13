@@ -82,12 +82,12 @@ This document outlines the technical analysis and development plan for the StarG
 ### Phase 2: Data Layer (Week 3)
 
 #### Sprint 2.1: MongoDB Implementation
-- [ ] Implement MongoProcessRepository
-- [ ] Implement MongoPolicyRepository
-- [ ] Create ProcessDocument and mapping logic
-- [ ] Configure MongoDB indexes
-- [ ] Write unit tests for repositories
-- [ ] Integration tests with MongoDB container
+- [x] Implement MongoProcessRepository
+- [x] Implement MongoPolicyRepository
+- [x] Create ProcessDocument and mapping logic
+- [x] Configure MongoDB indexes
+- [x] Write unit tests for repositories
+- [x] Integration tests with MongoDB container
 
 #### Sprint 2.2: Redis Cache
 - [x] **#24** Implement RedisStateStore
