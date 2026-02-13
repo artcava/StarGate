@@ -4,6 +4,7 @@ using StarGate.Core.Abstractions;
 using StarGate.Core.Domain;
 using System.Diagnostics;
 using System.Text.Json;
+using DomainProcess = StarGate.Core.Domain.Process;
 
 namespace StarGate.Infrastructure.Caching;
 
@@ -44,7 +45,7 @@ public class RedisStateStore : IStateStore
     }
 
     /// <inheritdoc />
-    public async Task<Process?> GetProcessAsync(Guid processId)
+    public async Task<DomainProcess?> GetProcessAsync(Guid processId)
     {
         var stopwatch = Stopwatch.StartNew();
         try
@@ -62,8 +63,8 @@ public class RedisStateStore : IStateStore
                 return null;
             }
 
-            // Explicit cast to string to avoid ambiguous call
-            var process = JsonSerializer.Deserialize<Process>((string)cached!);
+            // Deserialize using type alias to avoid ambiguity
+            var process = JsonSerializer.Deserialize<DomainProcess>((string)cached!);
 
             _metrics?.RecordHit();
             _logger.LogDebug(
@@ -100,7 +101,7 @@ public class RedisStateStore : IStateStore
     }
 
     /// <inheritdoc />
-    public async Task SetProcessAsync(Process process)
+    public async Task SetProcessAsync(DomainProcess process)
     {
         ArgumentNullException.ThrowIfNull(process);
 
