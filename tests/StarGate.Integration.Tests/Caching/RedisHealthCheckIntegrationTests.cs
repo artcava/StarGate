@@ -1,11 +1,11 @@
-namespace StarGate.Integration.Tests.Caching;
-
 using FluentAssertions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging.Abstractions;
 using StarGate.Infrastructure.Caching;
 using StarGate.Integration.Tests.Fixtures;
 using Xunit;
+
+namespace StarGate.Integration.Tests.Caching;
 
 public class RedisHealthCheckIntegrationTests : IClassFixture<RedisFixture>
 {

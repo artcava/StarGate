@@ -1,9 +1,9 @@
-namespace StarGate.Integration.Tests.Caching;
-
 using FluentAssertions;
 using StarGate.Core.Domain;
 using StarGate.Integration.Tests.Fixtures;
 using Xunit;
+
+namespace StarGate.Integration.Tests.Caching;
 
 public class RedisStateStoreIntegrationTests : IClassFixture<RedisFixture>, IAsyncLifetime
 {

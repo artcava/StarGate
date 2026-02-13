@@ -1,10 +1,10 @@
-namespace StarGate.Integration.Tests.Fixtures;
-
 using Microsoft.Extensions.Logging.Abstractions;
 using StackExchange.Redis;
 using StarGate.Infrastructure.Caching;
 using Testcontainers.Redis;
 using Xunit;
+
+namespace StarGate.Integration.Tests.Fixtures;
 
 /// <summary>
 /// Provides a Redis test container for integration tests.
