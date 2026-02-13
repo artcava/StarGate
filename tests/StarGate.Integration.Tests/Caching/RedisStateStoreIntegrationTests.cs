@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluentAssertions;
 using StarGate.Core.Domain;
 using StarGate.Integration.Tests.Fixtures;
