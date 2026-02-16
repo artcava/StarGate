@@ -1,4 +1,7 @@
 using Microsoft.Extensions.Logging;
+using MongoDB.Bson;
+using MongoDB.Bson.Serialization;
+using MongoDB.Bson.Serialization.Conventions;
 using MongoDB.Driver;
 using StarGate.Core.Abstractions;
 using StarGate.Core.Domain;
@@ -15,6 +18,14 @@ public class MongoProcessRepository : IProcessRepository
     private readonly IMongoCollection<ProcessDocument> _collection;
     private readonly ILogger<MongoProcessRepository> _logger;
 
+    static MongoProcessRepository()
+    {
+        // Configure MongoDB to use Standard GUID representation globally
+        // This must match the [BsonGuidRepresentation(GuidRepresentation.Standard)] attribute
+        // on ProcessDocument.ProcessId
+        BsonDefaults.GuidRepresentationMode = GuidRepresentationMode.V3;
+    }
+
     public MongoProcessRepository(
         IMongoDatabase database,
         ILogger<MongoProcessRepository> logger)
@@ -22,7 +33,13 @@ public class MongoProcessRepository : IProcessRepository
         ArgumentNullException.ThrowIfNull(database);
         ArgumentNullException.ThrowIfNull(logger);
 
-        _collection = database.GetCollection<ProcessDocument>("processes");
+        // Get collection with explicit GuidRepresentation configuration
+        var settings = new MongoCollectionSettings
+        {
+            GuidRepresentation = GuidRepresentation.Standard
+        };
+        
+        _collection = database.GetCollection<ProcessDocument>("processes", settings);
         _logger = logger;
     }
 
