@@ -1,10 +1,10 @@
-namespace StarGate.Application.Services;
-
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using StarGate.Core.Abstractions;
 using StarGate.Core.Domain.Configuration;
 using System.Collections.Concurrent;
+
+namespace StarGate.Application.Services;
 
 /// <summary>
 /// Provides process configuration policies with two-tier caching and override resolution.
