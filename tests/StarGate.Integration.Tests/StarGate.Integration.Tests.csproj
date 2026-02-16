@@ -19,6 +19,7 @@
     <PackageReference Include="MongoDB.Driver" Version="3.0.0" />
     <PackageReference Include="Testcontainers" Version="4.0.0" />
     <PackageReference Include="Testcontainers.MongoDb" Version="3.10.0" />
+    <PackageReference Include="Testcontainers.RabbitMq" Version="4.3.0" />
     <PackageReference Include="Testcontainers.Redis" Version="4.0.0" />
     <PackageReference Include="xunit" Version="2.6.6" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.5.6">
