@@ -100,8 +100,10 @@ public class MongoProcessRepository : IProcessRepository
     {
         _logger.LogDebug("Retrieving process {ProcessId}", processId);
 
-        // ProcessId is mapped to _id in MongoDB, so we query _id directly
-        var filter = Builders<ProcessDocument>.Filter.Eq("_id", processId);
+        // CRITICAL: Use lambda expression instead of string literal
+        // This ensures MongoDB uses the ProcessDocument class map for serialization
+        // which has Standard GuidSerializer configured for ProcessId
+        var filter = Builders<ProcessDocument>.Filter.Eq(p => p.ProcessId, processId);
         var document = await _collection.Find(filter).FirstOrDefaultAsync(ct);
 
         if (document == null)
@@ -172,8 +174,9 @@ public class MongoProcessRepository : IProcessRepository
         {
             var document = ProcessMapper.MapToDocument(process);
             
-            // ProcessId is mapped to _id in MongoDB, so we filter by _id directly
-            var filter = Builders<ProcessDocument>.Filter.Eq("_id", process.ProcessId);
+            // CRITICAL: Use lambda expression instead of string literal
+            // This ensures MongoDB uses the ProcessDocument class map for serialization
+            var filter = Builders<ProcessDocument>.Filter.Eq(p => p.ProcessId, process.ProcessId);
 
             var result = await _collection.ReplaceOneAsync(
                 filter,
