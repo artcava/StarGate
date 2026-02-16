@@ -1,8 +1,8 @@
+namespace StarGate.Infrastructure.Messaging.RabbitMQ;
+
 using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
 using System.Text;
-
-namespace StarGate.Infrastructure.Messaging.RabbitMQ;
 
 /// <summary>
 /// Provides diagnostics and monitoring for RabbitMQ connections.
@@ -25,20 +25,19 @@ public class RabbitMqConnectionDiagnostics
     /// </summary>
     public ConnectionStatus GetStatus()
     {
+        var isAutoRecovering = _connection is IAutorecoveringConnection;
+        var isRecoveryInProgress = isAutoRecovering && !_connection.IsOpen;
+
         var status = new ConnectionStatus
         {
             IsOpen = _connection.IsOpen,
             Endpoint = _connection.Endpoint?.ToString() ?? "unknown",
             ClientProvidedName = _connection.ClientProvidedName,
             KnownHosts = _connection.KnownHosts?.Count ?? 0,
-            ServerProperties = GetServerProperties()
+            ServerProperties = GetServerProperties(),
+            AutomaticRecoveryEnabled = isAutoRecovering,
+            RecoveryInProgress = isRecoveryInProgress
         };
-
-        if (_connection is IAutorecoveringConnection autoRecovering)
-        {
-            status.AutomaticRecoveryEnabled = true;
-            status.RecoveryInProgress = !_connection.IsOpen;
-        }
 
         return status;
     }
@@ -104,8 +103,8 @@ public class RabbitMqConnectionDiagnostics
         public required string Endpoint { get; init; }
         public required string ClientProvidedName { get; init; }
         public required int KnownHosts { get; init; }
+        public required Dictionary<string, string> ServerProperties { get; init; }
         public bool AutomaticRecoveryEnabled { get; init; }
         public bool RecoveryInProgress { get; init; }
-        public required Dictionary<string, string> ServerProperties { get; init; }
     }
 }
