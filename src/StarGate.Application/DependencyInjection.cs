@@ -24,13 +24,28 @@ public static class DependencyInjection
         services.Configure<PolicyProviderOptions>(options =>
         {
             var section = configuration.GetSection(PolicyProviderOptions.SectionName);
-            options.CacheTtlMinutes = section.GetValue<int>(nameof(PolicyProviderOptions.CacheTtlMinutes), 60);
-            options.DefaultTimeoutSeconds = section.GetValue<int>(nameof(PolicyProviderOptions.DefaultTimeoutSeconds), 300);
-            options.DefaultMaxRetryAttempts = section.GetValue<int>(nameof(PolicyProviderOptions.DefaultMaxRetryAttempts), 3);
-            options.DefaultRetryDelaySeconds = section.GetValue<int>(nameof(PolicyProviderOptions.DefaultRetryDelaySeconds), 5);
-            options.DefaultRetentionDays = section.GetValue<int>(nameof(PolicyProviderOptions.DefaultRetentionDays), 30);
-            options.DefaultMaxConcurrentProcesses = section.GetValue<int?>(nameof(PolicyProviderOptions.DefaultMaxConcurrentProcesses), 10);
-            options.DefaultBackoffStrategy = section.GetValue<string>(nameof(PolicyProviderOptions.DefaultBackoffStrategy), "Exponential") ?? "Exponential";
+            
+            options.CacheTtlMinutes = int.TryParse(section[nameof(PolicyProviderOptions.CacheTtlMinutes)], out var cacheTtl) 
+                ? cacheTtl : 60;
+            
+            options.DefaultTimeoutSeconds = int.TryParse(section[nameof(PolicyProviderOptions.DefaultTimeoutSeconds)], out var timeout) 
+                ? timeout : 300;
+            
+            options.DefaultMaxRetryAttempts = int.TryParse(section[nameof(PolicyProviderOptions.DefaultMaxRetryAttempts)], out var maxRetry) 
+                ? maxRetry : 3;
+            
+            options.DefaultRetryDelaySeconds = int.TryParse(section[nameof(PolicyProviderOptions.DefaultRetryDelaySeconds)], out var retryDelay) 
+                ? retryDelay : 5;
+            
+            options.DefaultRetentionDays = int.TryParse(section[nameof(PolicyProviderOptions.DefaultRetentionDays)], out var retention) 
+                ? retention : 30;
+            
+            var concurrentStr = section[nameof(PolicyProviderOptions.DefaultMaxConcurrentProcesses)];
+            options.DefaultMaxConcurrentProcesses = string.IsNullOrEmpty(concurrentStr) 
+                ? 10 
+                : int.TryParse(concurrentStr, out var concurrent) ? concurrent : 10;
+            
+            options.DefaultBackoffStrategy = section[nameof(PolicyProviderOptions.DefaultBackoffStrategy)] ?? "Exponential";
         });
 
         // Register PolicyProvider as singleton (thread-safe with internal caching)
