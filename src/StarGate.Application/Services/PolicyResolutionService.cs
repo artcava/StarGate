@@ -13,11 +13,11 @@ public class PolicyResolutionService
     private readonly ILogger<PolicyResolutionService> _logger;
 
     // Validation constants
-    private const int MaxTimeoutSeconds = 86400; // 24 hours
-    private const int MaxRetryAttempts = 10;
-    private const int MaxRetryDelaySeconds = 3600; // 1 hour
-    private const int MaxRetentionDays = 365;
-    private const int MaxConcurrentExecutions = 1000;
+    private const int _maxTimeoutSeconds = 86400; // 24 hours
+    private const int _maxRetryAttempts = 10;
+    private const int _maxRetryDelaySeconds = 3600; // 1 hour
+    private const int _maxRetentionDays = 365;
+    private const int _maxConcurrentExecutions = 1000;
 
     public PolicyResolutionService(ILogger<PolicyResolutionService> logger)
     {
@@ -87,7 +87,7 @@ public class PolicyResolutionService
             errors.Add($"Timeout must be positive (value: {policy.Timeout})");
         }
 
-        if (policy.Timeout.TotalSeconds > MaxTimeoutSeconds)
+        if (policy.Timeout.TotalSeconds > _maxTimeoutSeconds)
         {
             errors.Add($"Timeout cannot exceed 24 hours (value: {policy.Timeout})");
         }
@@ -105,7 +105,7 @@ public class PolicyResolutionService
             errors.Add($"ResultRetention must be positive (value: {policy.ResultRetention})");
         }
 
-        if (policy.ResultRetention.TotalDays > MaxRetentionDays)
+        if (policy.ResultRetention.TotalDays > _maxRetentionDays)
         {
             errors.Add($"ResultRetention cannot exceed 365 days (value: {policy.ResultRetention})");
         }
@@ -118,9 +118,9 @@ public class PolicyResolutionService
                 errors.Add($"MaxConcurrentProcesses must be positive (value: {policy.MaxConcurrentProcesses})");
             }
 
-            if (policy.MaxConcurrentProcesses.Value > MaxConcurrentExecutions)
+            if (policy.MaxConcurrentProcesses.Value > _maxConcurrentExecutions)
             {
-                errors.Add($"MaxConcurrentProcesses cannot exceed {MaxConcurrentExecutions} (value: {policy.MaxConcurrentProcesses})");
+                errors.Add($"MaxConcurrentProcesses cannot exceed {_maxConcurrentExecutions} (value: {policy.MaxConcurrentProcesses})");
             }
         }
 
@@ -170,7 +170,8 @@ public class PolicyResolutionService
             {
                 errors.Add($"Timeout must be positive (value: {clientOverride.Timeout})");
             }
-            if (clientOverride.Timeout.Value.TotalSeconds > MaxTimeoutSeconds)
+
+            if (clientOverride.Timeout.Value.TotalSeconds > _maxTimeoutSeconds)
             {
                 errors.Add($"Timeout cannot exceed 24 hours (value: {clientOverride.Timeout})");
             }
@@ -188,7 +189,8 @@ public class PolicyResolutionService
             {
                 errors.Add($"ResultRetention must be positive (value: {clientOverride.ResultRetention})");
             }
-            if (clientOverride.ResultRetention.Value.TotalDays > MaxRetentionDays)
+
+            if (clientOverride.ResultRetention.Value.TotalDays > _maxRetentionDays)
             {
                 errors.Add($"ResultRetention cannot exceed 365 days (value: {clientOverride.ResultRetention})");
             }
@@ -200,9 +202,10 @@ public class PolicyResolutionService
             {
                 errors.Add($"MaxConcurrentProcesses must be positive (value: {clientOverride.MaxConcurrentProcesses})");
             }
-            if (clientOverride.MaxConcurrentProcesses.Value > MaxConcurrentExecutions)
+
+            if (clientOverride.MaxConcurrentProcesses.Value > _maxConcurrentExecutions)
             {
-                errors.Add($"MaxConcurrentProcesses cannot exceed {MaxConcurrentExecutions} (value: {clientOverride.MaxConcurrentProcesses})");
+                errors.Add($"MaxConcurrentProcesses cannot exceed {_maxConcurrentExecutions} (value: {clientOverride.MaxConcurrentProcesses})");
             }
         }
 
@@ -297,9 +300,9 @@ public class PolicyResolutionService
             errors.Add($"RetryPolicy.MaxAttempts cannot be negative (value: {retryPolicy.MaxAttempts})");
         }
 
-        if (retryPolicy.MaxAttempts > MaxRetryAttempts)
+        if (retryPolicy.MaxAttempts > _maxRetryAttempts)
         {
-            errors.Add($"RetryPolicy.MaxAttempts cannot exceed {MaxRetryAttempts} (value: {retryPolicy.MaxAttempts})");
+            errors.Add($"RetryPolicy.MaxAttempts cannot exceed {_maxRetryAttempts} (value: {retryPolicy.MaxAttempts})");
         }
 
         if (retryPolicy.InitialDelay < TimeSpan.Zero)
@@ -307,7 +310,7 @@ public class PolicyResolutionService
             errors.Add($"RetryPolicy.InitialDelay cannot be negative (value: {retryPolicy.InitialDelay})");
         }
 
-        if (retryPolicy.InitialDelay.TotalSeconds > MaxRetryDelaySeconds)
+        if (retryPolicy.InitialDelay.TotalSeconds > _maxRetryDelaySeconds)
         {
             errors.Add($"RetryPolicy.InitialDelay cannot exceed 1 hour (value: {retryPolicy.InitialDelay})");
         }
@@ -333,8 +336,15 @@ public class PolicyResolutionService
     /// </summary>
     private bool AreRetryPoliciesEqual(RetryPolicy? policy1, RetryPolicy? policy2)
     {
-        if (policy1 == null && policy2 == null) return true;
-        if (policy1 == null || policy2 == null) return false;
+        if (policy1 == null && policy2 == null)
+        {
+            return true;
+        }
+
+        if (policy1 == null || policy2 == null)
+        {
+            return false;
+        }
 
         return policy1.Enabled == policy2.Enabled &&
                policy1.MaxAttempts == policy2.MaxAttempts &&
@@ -348,7 +358,10 @@ public class PolicyResolutionService
     /// </summary>
     private string FormatRetryPolicy(RetryPolicy? policy)
     {
-        if (policy == null) return "null";
+        if (policy == null)
+        {
+            return "null";
+        }
 
         return $"{{Enabled={policy.Enabled}, MaxAttempts={policy.MaxAttempts}, " +
                $"InitialDelay={policy.InitialDelay}, BackoffStrategy={policy.BackoffStrategy}, " +
@@ -366,16 +379,24 @@ public class PolicyResolutionService
         var overrides = new List<string>();
 
         if (clientOverride.Timeout.HasValue)
+        {
             overrides.Add($"Timeout: {typeDefault.Timeout} -> {resolved.Timeout}");
+        }
 
         if (clientOverride.RetryPolicy != null)
+        {
             overrides.Add($"RetryPolicy: {FormatRetryPolicy(typeDefault.RetryPolicy)} -> {FormatRetryPolicy(resolved.RetryPolicy)}");
+        }
 
         if (clientOverride.ResultRetention.HasValue)
+        {
             overrides.Add($"ResultRetention: {typeDefault.ResultRetention} -> {resolved.ResultRetention}");
+        }
 
         if (clientOverride.MaxConcurrentProcesses.HasValue)
+        {
             overrides.Add($"MaxConcurrentProcesses: {typeDefault.MaxConcurrentProcesses?.ToString() ?? "null"} -> {resolved.MaxConcurrentProcesses?.ToString() ?? "null"}");
+        }
 
         if (overrides.Count > 0)
         {
