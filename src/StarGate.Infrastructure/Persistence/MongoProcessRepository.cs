@@ -59,7 +59,9 @@ public class MongoProcessRepository : IProcessRepository
 
             // Determine which unique constraint was violated
             var errorMessage = ex.WriteError.Message;
-            if (errorMessage.Contains("ProcessId"))
+            
+            // Check for _id constraint (ProcessId is mapped to _id)
+            if (errorMessage.Contains("_id_") || errorMessage.Contains("ProcessId"))
             {
                 throw new InvalidOperationException(
                     $"Process with ID '{process.ProcessId}' already exists",
@@ -91,7 +93,8 @@ public class MongoProcessRepository : IProcessRepository
     {
         _logger.LogDebug("Retrieving process {ProcessId}", processId);
 
-        var filter = Builders<ProcessDocument>.Filter.Eq(p => p.ProcessId, processId);
+        // ProcessId is mapped to _id in MongoDB, so we query _id directly
+        var filter = Builders<ProcessDocument>.Filter.Eq("_id", processId);
         var document = await _collection.Find(filter).FirstOrDefaultAsync(ct);
 
         if (document == null)
@@ -161,7 +164,9 @@ public class MongoProcessRepository : IProcessRepository
         try
         {
             var document = ProcessMapper.MapToDocument(process);
-            var filter = Builders<ProcessDocument>.Filter.Eq(p => p.ProcessId, process.ProcessId);
+            
+            // ProcessId is mapped to _id in MongoDB, so we filter by _id directly
+            var filter = Builders<ProcessDocument>.Filter.Eq("_id", process.ProcessId);
 
             var result = await _collection.ReplaceOneAsync(
                 filter,
