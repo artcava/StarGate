@@ -80,8 +80,8 @@ public class RabbitMqErrorHandlingTests : IClassFixture<RabbitMqFixture>, IAsync
             // Cancel after first message
             cts.Cancel();
             
-            // Simulate work that respects cancellation
-            await Task.Delay(1000, ct: CancellationToken.None);
+            // Simulate work
+            await Task.Delay(1000);
             
             await context.AcknowledgeAsync();
         }
