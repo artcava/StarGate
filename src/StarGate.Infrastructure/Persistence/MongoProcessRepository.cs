@@ -27,12 +27,16 @@ public class MongoProcessRepository : IProcessRepository
     private static void RegisterSerializers()
     {
         if (_serializersRegistered)
+        {
             return;
+        }
 
         lock (_lock)
         {
             if (_serializersRegistered)
+            {
                 return;
+            }
 
             // Register GuidSerializer with Standard representation
             // This is required for MongoDB.Driver 2.28.0+ to honor [BsonGuidRepresentation]
