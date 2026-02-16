@@ -21,11 +21,9 @@ public static class DependencyInjection
         IConfiguration configuration)
     {
         // Configure PolicyProvider options from appsettings.json
-        services.Configure<PolicyProviderOptions>(options =>
-        {
-            var section = configuration.GetSection(PolicyProviderOptions.SectionName);
-            section.Bind(options);
-        });
+        // Uses IConfiguration.GetSection which returns IConfiguration, compatible with Configure<T>
+        services.Configure<PolicyProviderOptions>(
+            configuration.GetSection(PolicyProviderOptions.SectionName));
 
         // Register PolicyProvider as singleton (thread-safe with internal caching)
         services.AddSingleton<IPolicyProvider, PolicyProvider>();
