@@ -17,6 +17,7 @@ public class PolicyProvider : IPolicyProvider
     private readonly ICacheStore _cacheStore;
     private readonly ILogger<PolicyProvider> _logger;
     private readonly PolicyProviderOptions _options;
+    private readonly PolicyResolutionService _resolutionService;
     private readonly ConcurrentDictionary<string, ProcessTypePolicy> _memoryCache;
     private readonly ConcurrentDictionary<string, ClientPolicyOverride> _overrideCache;
     private readonly SemaphoreSlim _refreshLock;
@@ -25,11 +26,13 @@ public class PolicyProvider : IPolicyProvider
         IPolicyRepository policyRepository,
         ICacheStore cacheStore,
         IOptions<PolicyProviderOptions> options,
+        PolicyResolutionService resolutionService,
         ILogger<PolicyProvider> logger)
     {
         _policyRepository = policyRepository ?? throw new ArgumentNullException(nameof(policyRepository));
         _cacheStore = cacheStore ?? throw new ArgumentNullException(nameof(cacheStore));
         _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
+        _resolutionService = resolutionService ?? throw new ArgumentNullException(nameof(resolutionService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _memoryCache = new ConcurrentDictionary<string, ProcessTypePolicy>();
         _overrideCache = new ConcurrentDictionary<string, ClientPolicyOverride>();
@@ -108,7 +111,7 @@ public class PolicyProvider : IPolicyProvider
         // Get client override (with caching)
         var clientOverride = await GetClientOverrideAsync(clientId, processType, ct);
 
-        // Merge and create effective policy
+        // Merge and create effective policy using resolution service
         var effectivePolicy = MergePolicies(typePolicy, clientOverride, clientId);
 
         _logger.LogDebug(
@@ -223,6 +226,7 @@ public class PolicyProvider : IPolicyProvider
     /// <summary>
     /// Merges type policy with client override to create effective policy.
     /// Client override values take precedence.
+    /// Uses PolicyResolutionService for validation and merge logic.
     /// </summary>
     private EffectivePolicy MergePolicies(
         ProcessTypePolicy typePolicy,
@@ -231,14 +235,50 @@ public class PolicyProvider : IPolicyProvider
     {
         var hasOverride = clientOverride != null;
 
+        // Use resolution service to merge policies
+        ProcessTypePolicy resolvedPolicy = typePolicy;
+        
+        if (clientOverride != null)
+        {
+            // Validate client override first
+            var overrideValidation = _resolutionService.ValidateClientOverride(clientOverride);
+            if (!overrideValidation.IsValid)
+            {
+                _logger.LogWarning(
+                    "Client override validation failed, using type default: ClientId={ClientId}, ProcessType={ProcessType}, Errors={Errors}",
+                    clientId,
+                    typePolicy.ProcessType,
+                    overrideValidation.GetErrorMessage());
+            }
+            else
+            {
+                // Resolve policy with override
+                resolvedPolicy = _resolutionService.ResolvePolicy(typePolicy, clientOverride);
+                
+                // Validate resolved policy
+                var validationResult = _resolutionService.ValidatePolicy(resolvedPolicy);
+                if (!validationResult.IsValid)
+                {
+                    _logger.LogError(
+                        "Resolved policy validation failed, falling back to type default: ClientId={ClientId}, ProcessType={ProcessType}, Errors={Errors}",
+                        clientId,
+                        typePolicy.ProcessType,
+                        validationResult.GetErrorMessage());
+                    
+                    // Fallback to type default
+                    resolvedPolicy = typePolicy;
+                }
+            }
+        }
+
         return new EffectivePolicy
         {
-            ProcessType = typePolicy.ProcessType,
+            ProcessType = resolvedPolicy.ProcessType,
             ClientId = clientId,
-            Timeout = clientOverride?.Timeout ?? typePolicy.Timeout,
-            RetryPolicy = clientOverride?.RetryPolicy ?? typePolicy.RetryPolicy,
-            ResultRetention = clientOverride?.ResultRetention ?? typePolicy.ResultRetention,
-            MaxConcurrentProcesses = clientOverride?.MaxConcurrentProcesses ?? typePolicy.MaxConcurrentProcesses,
+            Timeout = resolvedPolicy.Timeout,
+            RetryPolicy = resolvedPolicy.RetryPolicy,
+            ResultRetention = resolvedPolicy.ResultRetention,
+            MaxConcurrentProcesses = resolvedPolicy.MaxConcurrentProcesses,
             Source = new PolicySource
             {
                 TimeoutFromOverride = clientOverride?.Timeout.HasValue ?? false,
