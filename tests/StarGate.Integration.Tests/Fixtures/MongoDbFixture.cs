@@ -62,11 +62,11 @@ public class MongoDbFixture : IAsyncLifetime
                 return;
             }
 
-            // Register global GuidSerializer with Standard representation
-            // This must happen before any MongoClient is created
+            // Register global GuidSerializer with Unspecified representation
+            // This matches BsonBinaryData behavior with BsonBinarySubType.UuidStandard
             try
             {
-                BsonSerializer.RegisterSerializer(new GuidSerializer(GuidRepresentation.Standard));
+                BsonSerializer.RegisterSerializer(new GuidSerializer(GuidRepresentation.Unspecified));
             }
             catch (BsonSerializationException)
             {
@@ -80,7 +80,7 @@ public class MongoDbFixture : IAsyncLifetime
                 {
                     cm.AutoMap();
                     cm.MapIdMember(c => c.ProcessId)
-                        .SetSerializer(new GuidSerializer(GuidRepresentation.Standard));
+                        .SetSerializer(new GuidSerializer(GuidRepresentation.Unspecified));
                 });
             }
 
