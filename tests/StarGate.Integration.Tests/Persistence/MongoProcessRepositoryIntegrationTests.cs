@@ -20,6 +20,10 @@ public class MongoProcessRepositoryIntegrationTests : IClassFixture<MongoDbFixtu
         _repository = new MongoProcessRepository(
             _fixture.Database,
             NullLogger<MongoProcessRepository>.Instance);
+        
+        // TEMPORARY DEBUG: Print connection string for MongoDB Compass
+        Console.WriteLine($"\n\n=== MONGODB CONNECTION STRING ===");
+        Console.WriteLine(_fixture.ConnectionString);
     }
 
     public Task InitializeAsync() => Task.CompletedTask;
@@ -41,6 +45,9 @@ public class MongoProcessRepositoryIntegrationTests : IClassFixture<MongoDbFixtu
         // Assert
         created.Should().NotBeNull();
         created.ProcessId.Should().Be(process.ProcessId);
+        
+        // DEBUG: Print ProcessId for manual inspection
+        Console.WriteLine($"Created ProcessId: {process.ProcessId}");
 
         // Verify persistence
         var retrieved = await _repository.GetByIdAsync(process.ProcessId);

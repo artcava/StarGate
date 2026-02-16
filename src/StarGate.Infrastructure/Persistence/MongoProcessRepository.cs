@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using MongoDB.Bson;
 using MongoDB.Driver;
 using StarGate.Core.Abstractions;
 using StarGate.Core.Domain;
@@ -14,6 +15,13 @@ public class MongoProcessRepository : IProcessRepository
 {
     private readonly IMongoCollection<ProcessDocument> _collection;
     private readonly ILogger<MongoProcessRepository> _logger;
+
+    static MongoProcessRepository()
+    {
+        // Register BsonClassMap for ProcessDocument with explicit Guid serialization
+        // This ensures ProcessId (_id) uses Standard GuidRepresentation
+        ProcessDocumentClassMap.Register();
+    }
 
     public MongoProcessRepository(
         IMongoDatabase database,
@@ -59,7 +67,9 @@ public class MongoProcessRepository : IProcessRepository
 
             // Determine which unique constraint was violated
             var errorMessage = ex.WriteError.Message;
-            if (errorMessage.Contains("ProcessId"))
+            
+            // Check for _id constraint (ProcessId is mapped to _id)
+            if (errorMessage.Contains("_id_") || errorMessage.Contains("ProcessId"))
             {
                 throw new InvalidOperationException(
                     $"Process with ID '{process.ProcessId}' already exists",
@@ -91,7 +101,10 @@ public class MongoProcessRepository : IProcessRepository
     {
         _logger.LogDebug("Retrieving process {ProcessId}", processId);
 
-        var filter = Builders<ProcessDocument>.Filter.Eq(p => p.ProcessId, processId);
+        // CRITICAL: Use GuidRepresentation.Standard to match database storage (subType 03)
+        var bsonGuid = new BsonBinaryData(processId, GuidRepresentation.Standard);
+        var filter = Builders<ProcessDocument>.Filter.Eq("_id", bsonGuid);
+        
         var document = await _collection.Find(filter).FirstOrDefaultAsync(ct);
 
         if (document == null)
@@ -161,7 +174,10 @@ public class MongoProcessRepository : IProcessRepository
         try
         {
             var document = ProcessMapper.MapToDocument(process);
-            var filter = Builders<ProcessDocument>.Filter.Eq(p => p.ProcessId, process.ProcessId);
+            
+            // CRITICAL: Use GuidRepresentation.Standard to match database storage (subType 03)
+            var bsonGuid = new BsonBinaryData(process.ProcessId, GuidRepresentation.Standard);
+            var filter = Builders<ProcessDocument>.Filter.Eq("_id", bsonGuid);
 
             var result = await _collection.ReplaceOneAsync(
                 filter,

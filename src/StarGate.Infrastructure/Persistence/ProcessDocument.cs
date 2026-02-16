@@ -11,10 +11,8 @@ public class ProcessDocument
 {
     /// <summary>
     /// Unique process identifier (GUID).
-    /// Stored as _id in MongoDB.
+    /// Mapped to _id via BsonClassMap (not via attribute).
     /// </summary>
-    [BsonId]
-    [BsonGuidRepresentation(GuidRepresentation.Standard)]
     public required Guid ProcessId { get; set; }
 
     /// <summary>

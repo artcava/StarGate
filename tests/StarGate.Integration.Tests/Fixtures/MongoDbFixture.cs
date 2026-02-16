@@ -1,3 +1,6 @@
+using MongoDB.Bson;
+using MongoDB.Bson.Serialization;
+using MongoDB.Bson.Serialization.Serializers;
 using MongoDB.Driver;
 using StarGate.Infrastructure.Persistence;
 using Testcontainers.MongoDb;
@@ -14,6 +17,8 @@ public class MongoDbFixture : IAsyncLifetime
     private readonly MongoDbContainer _mongoContainer;
     private IMongoClient? _mongoClient;
     private IMongoDatabase? _database;
+    private static bool _serializersRegistered;
+    private static readonly object _lock = new();
 
     public MongoDbFixture()
     {
@@ -30,13 +35,63 @@ public class MongoDbFixture : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
+        // CRITICAL: Register serializers BEFORE creating MongoClient
+        RegisterSerializers();
+
         await _mongoContainer.StartAsync();
 
-        _mongoClient = new MongoClient(ConnectionString);
+        // CRITICAL: Configure MongoClientSettings with explicit GuidRepresentation
+        // This ensures ALL Guid operations use Standard representation (subType 03)
+        var settings = MongoClientSettings.FromConnectionString(ConnectionString);
+        
+#pragma warning disable CS0618 // GuidRepresentation is obsolete but required for MongoDB.Driver 2.28.0
+        settings.GuidRepresentation = GuidRepresentation.Standard;
+#pragma warning restore CS0618
+
+        _mongoClient = new MongoClient(settings);
         _database = _mongoClient.GetDatabase("stargate-test");
 
         // Ensure indexes are created
         await CreateIndexesAsync();
+    }
+
+    private static void RegisterSerializers()
+    {
+        if (_serializersRegistered)
+        {
+            return;
+        }
+
+        lock (_lock)
+        {
+            if (_serializersRegistered)
+            {
+                return;
+            }
+
+            // Register global GuidSerializer with Standard representation (subType 03)
+            try
+            {
+                BsonSerializer.RegisterSerializer(new GuidSerializer(GuidRepresentation.Standard));
+            }
+            catch (BsonSerializationException)
+            {
+                // Already registered - safe to ignore
+            }
+
+            // Register ProcessDocument class map
+            if (!BsonClassMap.IsClassMapRegistered(typeof(ProcessDocument)))
+            {
+                BsonClassMap.RegisterClassMap<ProcessDocument>(cm =>
+                {
+                    cm.AutoMap();
+                    cm.MapIdMember(c => c.ProcessId)
+                        .SetSerializer(new GuidSerializer(GuidRepresentation.Standard));
+                });
+            }
+
+            _serializersRegistered = true;
+        }
     }
 
     public async Task DisposeAsync()
@@ -55,37 +110,58 @@ public class MongoDbFixture : IAsyncLifetime
 
     private async Task CreateIndexesAsync()
     {
-        // _database is guaranteed to be non-null when this method is called
         var processCollection = _database!.GetCollection<ProcessDocument>("processes");
 
-        // Unique index on ProcessId
-        await processCollection.Indexes.CreateOneAsync(
-            new CreateIndexModel<ProcessDocument>(
-                Builders<ProcessDocument>.IndexKeys.Ascending(p => p.ProcessId),
-                new CreateIndexOptions { Unique = true }));
-
-        // Composite unique index on ClientId + ClientProcessId
+        // Index 1: Composite unique index on ClientId + ClientProcessId (idempotency)
         await processCollection.Indexes.CreateOneAsync(
             new CreateIndexModel<ProcessDocument>(
                 Builders<ProcessDocument>.IndexKeys
                     .Ascending(p => p.ClientId)
                     .Ascending(p => p.ClientProcessId),
-                new CreateIndexOptions { Unique = true }));
+                new CreateIndexOptions { Unique = true, Name = "idx_clientId_clientProcessId" }));
 
-        // Index on Status
+        // Index 2: Index on Status (query optimization for status-based queries)
         await processCollection.Indexes.CreateOneAsync(
             new CreateIndexModel<ProcessDocument>(
-                Builders<ProcessDocument>.IndexKeys.Ascending(p => p.Status)));
+                Builders<ProcessDocument>.IndexKeys.Ascending(p => p.Status),
+                new CreateIndexOptions { Name = "idx_status" }));
 
-        // Index on CreatedAt
+        // Index 3: Index on CreatedAt (query optimization for time-based queries)
         await processCollection.Indexes.CreateOneAsync(
             new CreateIndexModel<ProcessDocument>(
-                Builders<ProcessDocument>.IndexKeys.Ascending(p => p.CreatedAt)));
+                Builders<ProcessDocument>.IndexKeys.Ascending(p => p.CreatedAt),
+                new CreateIndexOptions { Name = "idx_createdAt" }));
 
-        // Unique index on IdempotencyKey
+        // Index 4: Unique index on IdempotencyKey (prevent duplicate submissions)
         await processCollection.Indexes.CreateOneAsync(
             new CreateIndexModel<ProcessDocument>(
                 Builders<ProcessDocument>.IndexKeys.Ascending(p => p.IdempotencyKey),
-                new CreateIndexOptions { Unique = true }));
+                new CreateIndexOptions { Unique = true, Name = "idx_idempotencyKey" }));
+
+        // Index 5: Composite index on ClientId + ProcessType + Status (concurrency limit queries)
+        await processCollection.Indexes.CreateOneAsync(
+            new CreateIndexModel<ProcessDocument>(
+                Builders<ProcessDocument>.IndexKeys
+                    .Ascending(p => p.ClientId)
+                    .Ascending(p => p.ProcessType)
+                    .Ascending(p => p.Status),
+                new CreateIndexOptions { Name = "idx_clientId_processType_status" }));
+
+        // ClientPolicyOverrideDocument indexes
+        var clientOverridesCollection = _database!.GetCollection<ClientPolicyOverrideDocument>("clientPolicyOverrides");
+        
+        // Index 1: Composite index on ClientId + ProcessType for queries
+        await clientOverridesCollection.Indexes.CreateOneAsync(
+            new CreateIndexModel<ClientPolicyOverrideDocument>(
+                Builders<ClientPolicyOverrideDocument>.IndexKeys
+                    .Ascending(o => o.ClientId)
+                    .Ascending(o => o.ProcessType),
+                new CreateIndexOptions { Name = "idx_clientId_processType" }));
+
+        // Index 2: Index on ClientId alone for listing overrides by client
+        await clientOverridesCollection.Indexes.CreateOneAsync(
+            new CreateIndexModel<ClientPolicyOverrideDocument>(
+                Builders<ClientPolicyOverrideDocument>.IndexKeys.Ascending(o => o.ClientId),
+                new CreateIndexOptions { Name = "idx_clientId" }));
     }
 }
