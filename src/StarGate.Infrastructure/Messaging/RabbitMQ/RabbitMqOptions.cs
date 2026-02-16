@@ -61,4 +61,17 @@ public class RabbitMqOptions
     /// Dead letter queue name.
     /// </summary>
     public string DeadLetterQueue { get; init; } = "stargate.dlq";
+
+    /// <summary>
+    /// Consumer prefetch count (QoS).
+    /// Maximum number of unacknowledged messages per consumer.
+    /// Controls throughput and backpressure.
+    /// </summary>
+    public ushort PrefetchCount { get; init; } = 10;
+
+    /// <summary>
+    /// Grace period in milliseconds for graceful consumer shutdown.
+    /// Time to wait for pending messages to complete before closing channels.
+    /// </summary>
+    public int ShutdownGracePeriodMs { get; init; } = 1000;
 }
