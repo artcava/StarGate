@@ -1,10 +1,11 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
 using StarGate.Core.Abstractions;
 using StarGate.Infrastructure.Messaging;
 using StarGate.Infrastructure.Messaging.RabbitMQ;
-using Microsoft.Extensions.Logging;
 
 namespace StarGate.Infrastructure;
 
@@ -37,6 +38,16 @@ public static partial class DependencyInjection
             // Register RabbitMQ broker and consumer
             services.AddSingleton<IMessageBroker, RabbitMqBroker>();
             services.AddSingleton<IMessageConsumer, RabbitMqConsumer>();
+
+            // Register diagnostics
+            services.AddSingleton<RabbitMqConnectionDiagnostics>();
+
+            // Add health check
+            services.AddHealthChecks()
+                .AddCheck<RabbitMqHealthCheck>(
+                    name: "rabbitmq",
+                    failureStatus: HealthStatus.Degraded,
+                    tags: new[] { "message-broker", "rabbitmq", "ready" });
         }
         else
         {
