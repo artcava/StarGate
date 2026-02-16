@@ -28,18 +28,11 @@ public static class MongoDbIndexes
 
         try
         {
-            // Index 1: Unique index on ProcessId (Primary Key)
-            await CreateIndexAsync(
-                collection,
-                Builders<ProcessDocument>.IndexKeys.Ascending(p => p.ProcessId),
-                new CreateIndexOptions
-                {
-                    Name = "idx_processId",
-                    Unique = true
-                },
-                logger);
+            // IMPORTANT: ProcessId is marked with [BsonId] and maps to MongoDB's _id field.
+            // MongoDB automatically creates a unique index on _id.
+            // We must NOT create an explicit index on ProcessId as it would be redundant and invalid.
 
-            // Index 2: Composite unique index on ClientId + ClientProcessId (Idempotency)
+            // Index 1: Composite unique index on ClientId + ClientProcessId (Idempotency)
             await CreateIndexAsync(
                 collection,
                 Builders<ProcessDocument>.IndexKeys
@@ -52,7 +45,7 @@ public static class MongoDbIndexes
                 },
                 logger);
 
-            // Index 3: Index on Status (Query optimization)
+            // Index 2: Index on Status (Query optimization)
             await CreateIndexAsync(
                 collection,
                 Builders<ProcessDocument>.IndexKeys.Ascending(p => p.Status),
@@ -62,7 +55,7 @@ public static class MongoDbIndexes
                 },
                 logger);
 
-            // Index 4: Index on CreatedAt (Query optimization)
+            // Index 3: Index on CreatedAt (Query optimization)
             await CreateIndexAsync(
                 collection,
                 Builders<ProcessDocument>.IndexKeys.Ascending(p => p.CreatedAt),
@@ -72,7 +65,7 @@ public static class MongoDbIndexes
                 },
                 logger);
 
-            // Index 5: Unique index on IdempotencyKey (Prevent duplicates)
+            // Index 4: Unique index on IdempotencyKey (Prevent duplicates)
             await CreateIndexAsync(
                 collection,
                 Builders<ProcessDocument>.IndexKeys.Ascending(p => p.IdempotencyKey),
@@ -83,7 +76,7 @@ public static class MongoDbIndexes
                 },
                 logger);
 
-            // Index 6: Composite index on ClientId + ProcessType + Status (Concurrency limit queries)
+            // Index 5: Composite index on ClientId + ProcessType + Status (Concurrency limit queries)
             await CreateIndexAsync(
                 collection,
                 Builders<ProcessDocument>.IndexKeys
@@ -128,7 +121,8 @@ public static class MongoDbIndexes
             // ProcessType is already the primary key (_id) for process type policies
             // No additional index needed
 
-            // Index 1: Compound unique index on ClientId + ProcessType for client overrides
+            // Index 1: Compound index on ClientId + ProcessType for client overrides
+            // Note: This is for query optimization, not uniqueness (Id field handles uniqueness)
             await CreateIndexAsync(
                 clientOverrides,
                 Builders<ClientPolicyOverrideDocument>.IndexKeys
@@ -136,8 +130,7 @@ public static class MongoDbIndexes
                     .Ascending(o => o.ProcessType),
                 new CreateIndexOptions
                 {
-                    Name = "idx_clientId_processType",
-                    Unique = true
+                    Name = "idx_clientId_processType"
                 },
                 logger);
 
