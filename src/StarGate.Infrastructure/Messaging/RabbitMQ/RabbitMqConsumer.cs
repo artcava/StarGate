@@ -82,9 +82,10 @@ public sealed class RabbitMqConsumer : IMessageConsumer
                 // Create async consumer
                 var consumer = new AsyncEventingBasicConsumer(channel);
 
+                // Capture the handler and cancellation token for the event handler
                 consumer.Received += async (_, eventArgs) =>
                 {
-                    await HandleMessageAsync(
+                    await HandleMessageAsync<T>(
                         channel,
                         eventArgs,
                         messageHandler,
