@@ -173,8 +173,8 @@ public sealed class RabbitMqConsumer : IMessageConsumer
                 eventArgs.RoutingKey,
                 deliveryTag);
 
-            // Deserialize message envelope
-            var envelope = _serializer.Deserialize<MessageEnvelope<T>>(eventArgs.Body.ToArray());
+            // Deserialize message envelope - T is the payload type, not MessageEnvelope<T>
+            var envelope = _serializer.Deserialize<T>(eventArgs.Body.ToArray());
 
             if (envelope?.Payload is null)
             {
@@ -184,9 +184,9 @@ public sealed class RabbitMqConsumer : IMessageConsumer
             // Build message context with acknowledgment delegates
             var context = new MessageContext
             {
-                MessageId = messageId,
-                CorrelationId = correlationId,
-                Timestamp = DateTime.UtcNow,
+                MessageId = envelope.MessageId,
+                CorrelationId = envelope.CorrelationId,
+                Timestamp = envelope.Timestamp,
                 DeliveryTag = (long)deliveryTag, // Cast ulong to long
                 DeliveryCount = eventArgs.Redelivered ? 2 : 1, // Simplified delivery count
                 Headers = envelope.Metadata != null 
@@ -215,7 +215,7 @@ public sealed class RabbitMqConsumer : IMessageConsumer
                 }
             };
 
-            // Invoke message handler with the payload (not the envelope)
+            // Invoke message handler with the payload (envelope.Payload is of type T)
             await messageHandler(envelope.Payload, context)
                 .ConfigureAwait(false);
         }
