@@ -1,8 +1,8 @@
+namespace StarGate.Infrastructure.Messaging.RabbitMQ;
+
 using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
 using System.Text;
-
-namespace StarGate.Infrastructure.Messaging.RabbitMQ;
 
 /// <summary>
 /// Provides diagnostics and monitoring for RabbitMQ connections.
@@ -79,9 +79,12 @@ public class RabbitMqConnectionDiagnostics
     {
         try
         {
-            // KnownHosts might be a method or property depending on RabbitMQ.Client version
             var knownHosts = _connection.KnownHosts;
-            return knownHosts?.Count ?? 0;
+            if (knownHosts == null)
+            {
+                return 0;
+            }
+            return knownHosts.Count;
         }
         catch
         {
