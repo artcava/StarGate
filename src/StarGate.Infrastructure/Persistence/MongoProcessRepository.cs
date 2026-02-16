@@ -101,11 +101,8 @@ public class MongoProcessRepository : IProcessRepository
     {
         _logger.LogDebug("Retrieving process {ProcessId}", processId);
 
-        // CRITICAL: MongoDB stores Guid with subType 04 (UUID Standard RFC 4122)
-        // We must create BsonBinaryData with the exact same subType
-        // BsonBinaryData constructor with byte array creates subType 04 by default
-        var guidBytes = processId.ToByteArray();
-        var bsonGuid = new BsonBinaryData(guidBytes, BsonBinarySubType.UuidStandard);
+        // CRITICAL: Use GuidRepresentation.Standard to match database storage (subType 03)
+        var bsonGuid = new BsonBinaryData(processId, GuidRepresentation.Standard);
         var filter = Builders<ProcessDocument>.Filter.Eq("_id", bsonGuid);
         
         var document = await _collection.Find(filter).FirstOrDefaultAsync(ct);
@@ -178,9 +175,8 @@ public class MongoProcessRepository : IProcessRepository
         {
             var document = ProcessMapper.MapToDocument(process);
             
-            // CRITICAL: Use same BsonBinaryData construction as GetByIdAsync
-            var guidBytes = process.ProcessId.ToByteArray();
-            var bsonGuid = new BsonBinaryData(guidBytes, BsonBinarySubType.UuidStandard);
+            // CRITICAL: Use GuidRepresentation.Standard to match database storage (subType 03)
+            var bsonGuid = new BsonBinaryData(process.ProcessId, GuidRepresentation.Standard);
             var filter = Builders<ProcessDocument>.Filter.Eq("_id", bsonGuid);
 
             var result = await _collection.ReplaceOneAsync(
@@ -275,7 +271,6 @@ public class MongoProcessRepository : IProcessRepository
                 nameof(skip),
                 skip,
                 "Skip must be non-negative");
-
         }
 
         if (limit < 1 || limit > 1000)
