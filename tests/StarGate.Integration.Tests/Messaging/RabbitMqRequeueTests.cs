@@ -10,12 +10,11 @@ namespace StarGate.Integration.Tests.Messaging;
 public class RabbitMqRequeueTests : IClassFixture<RabbitMqFixture>, IAsyncLifetime
 {
     private readonly RabbitMqFixture _fixture;
-    private readonly string _testQueue;
+    private const string QueueName = "stargate.process"; // Standard queue naming convention
 
     public RabbitMqRequeueTests(RabbitMqFixture fixture)
     {
         _fixture = fixture;
-        _testQueue = $"test.requeue.{Guid.NewGuid()}";
     }
 
     public Task InitializeAsync() => Task.CompletedTask;
@@ -31,7 +30,7 @@ public class RabbitMqRequeueTests : IClassFixture<RabbitMqFixture>, IAsyncLifeti
             // Consumer was not started, ignore
         }
         
-        _fixture.DeleteQueue(_testQueue);
+        _fixture.PurgeQueue(QueueName);
     }
 
     [Fact]
@@ -59,8 +58,8 @@ public class RabbitMqRequeueTests : IClassFixture<RabbitMqFixture>, IAsyncLifeti
 
         var process = CreateTestProcess();
 
-        // Act - Publish FIRST to create queue, THEN start consumer
-        await _fixture.Broker.PublishAsync(_testQueue, process);
+        // Act - Publish to standard queue
+        await _fixture.Broker.PublishAsync(QueueName, process);
         await _fixture.Consumer.StartConsumingAsync<Process>(Handler, CancellationToken.None);
 
         var completed = await Task.WhenAny(tcs.Task, Task.Delay(15000)) == tcs.Task;
@@ -74,6 +73,8 @@ public class RabbitMqRequeueTests : IClassFixture<RabbitMqFixture>, IAsyncLifeti
     public async Task Consumer_Should_PreserveMessageOrder_WhenRequeuing()
     {
         // Arrange
+        _fixture.PurgeQueue(QueueName); // Clean queue before test
+        
         var receivedMessages = new ConcurrentBag<string>();
         var requeue1 = true;
         var requeue2 = true;
@@ -107,10 +108,10 @@ public class RabbitMqRequeueTests : IClassFixture<RabbitMqFixture>, IAsyncLifeti
         var process1 = CreateTestProcess() with { ClientProcessId = "process-1" };
         var process2 = CreateTestProcess() with { ClientProcessId = "process-2" };
 
-        // Act - Publish first message FIRST to create queue
-        await _fixture.Broker.PublishAsync(_testQueue, process1);
+        // Act
+        await _fixture.Broker.PublishAsync(QueueName, process1);
+        await _fixture.Broker.PublishAsync(QueueName, process2);
         await _fixture.Consumer.StartConsumingAsync<Process>(Handler, CancellationToken.None);
-        await _fixture.Broker.PublishAsync(_testQueue, process2);
 
         var completed = await Task.WhenAny(tcs.Task, Task.Delay(15000)) == tcs.Task;
 
@@ -124,6 +125,8 @@ public class RabbitMqRequeueTests : IClassFixture<RabbitMqFixture>, IAsyncLifeti
     public async Task Consumer_Should_HandleConcurrentRequeues()
     {
         // Arrange
+        _fixture.PurgeQueue(QueueName);
+        
         var attemptCounts = new ConcurrentDictionary<Guid, int>();
         var completedCount = 0;
         var totalMessages = 10;
@@ -152,15 +155,13 @@ public class RabbitMqRequeueTests : IClassFixture<RabbitMqFixture>, IAsyncLifeti
             .Select(_ => CreateTestProcess())
             .ToList();
 
-        // Act - Publish first message to create queue
-        await _fixture.Broker.PublishAsync(_testQueue, processes[0]);
-        await _fixture.Consumer.StartConsumingAsync<Process>(Handler, CancellationToken.None);
-
-        // Publish remaining messages
-        foreach (var process in processes.Skip(1))
+        // Act - Publish all messages
+        foreach (var process in processes)
         {
-            await _fixture.Broker.PublishAsync(_testQueue, process);
+            await _fixture.Broker.PublishAsync(QueueName, process);
         }
+        
+        await _fixture.Consumer.StartConsumingAsync<Process>(Handler, CancellationToken.None);
 
         var completed = await Task.WhenAny(tcs.Task, Task.Delay(30000)) == tcs.Task;
 
@@ -173,6 +174,8 @@ public class RabbitMqRequeueTests : IClassFixture<RabbitMqFixture>, IAsyncLifeti
     public async Task Consumer_Should_NotLoseMessages_WhenRequeuing()
     {
         // Arrange
+        _fixture.PurgeQueue(QueueName);
+        
         var receivedProcessIds = new ConcurrentBag<Guid>();
         var attemptCounts = new ConcurrentDictionary<Guid, int>();
         var tcs = new TaskCompletionSource();
@@ -203,15 +206,13 @@ public class RabbitMqRequeueTests : IClassFixture<RabbitMqFixture>, IAsyncLifeti
             .Select(_ => CreateTestProcess())
             .ToList();
 
-        // Act - Publish first message to create queue
-        await _fixture.Broker.PublishAsync(_testQueue, processes[0]);
-        await _fixture.Consumer.StartConsumingAsync<Process>(Handler, CancellationToken.None);
-
-        // Publish remaining messages
-        foreach (var process in processes.Skip(1))
+        // Act - Publish all messages
+        foreach (var process in processes)
         {
-            await _fixture.Broker.PublishAsync(_testQueue, process);
+            await _fixture.Broker.PublishAsync(QueueName, process);
         }
+        
+        await _fixture.Consumer.StartConsumingAsync<Process>(Handler, CancellationToken.None);
 
         var completed = await Task.WhenAny(tcs.Task, Task.Delay(20000)) == tcs.Task;
 
