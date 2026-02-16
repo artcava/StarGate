@@ -332,17 +332,15 @@ public class PolicyResolutionService
             errors.Add($"RetryPolicy.InitialDelay cannot exceed 1 hour (value: {retryPolicy.InitialDelay})");
         }
 
-        if (retryPolicy.MaxDelay.HasValue)
+        // MaxDelay is required TimeSpan (not nullable), compare directly
+        if (retryPolicy.MaxDelay < TimeSpan.Zero)
         {
-            if (retryPolicy.MaxDelay.Value < TimeSpan.Zero)
-            {
-                errors.Add($"RetryPolicy.MaxDelay cannot be negative (value: {retryPolicy.MaxDelay})");
-            }
+            errors.Add($"RetryPolicy.MaxDelay cannot be negative (value: {retryPolicy.MaxDelay})");
+        }
 
-            if (retryPolicy.MaxDelay.Value < retryPolicy.InitialDelay)
-            {
-                errors.Add($"RetryPolicy.MaxDelay ({retryPolicy.MaxDelay}) cannot be less than InitialDelay ({retryPolicy.InitialDelay})");
-            }
+        if (retryPolicy.MaxDelay < retryPolicy.InitialDelay)
+        {
+            errors.Add($"RetryPolicy.MaxDelay ({retryPolicy.MaxDelay}) cannot be less than InitialDelay ({retryPolicy.InitialDelay})");
         }
 
         return errors;
@@ -382,7 +380,7 @@ public class PolicyResolutionService
 
         return $"{{Enabled={policy.Enabled}, MaxAttempts={policy.MaxAttempts}, " +
                $"InitialDelay={policy.InitialDelay}, BackoffStrategy={policy.BackoffStrategy}, " +
-               $"MaxDelay={policy.MaxDelay?.ToString() ?? "null"}}}";
+               $"MaxDelay={policy.MaxDelay}}}";
     }
 
     /// <summary>
