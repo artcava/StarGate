@@ -1,7 +1,4 @@
 using Microsoft.Extensions.Logging;
-using MongoDB.Bson;
-using MongoDB.Bson.Serialization;
-using MongoDB.Bson.Serialization.Serializers;
 using MongoDB.Driver;
 using StarGate.Core.Abstractions;
 using StarGate.Core.Domain;
@@ -17,38 +14,12 @@ public class MongoProcessRepository : IProcessRepository
 {
     private readonly IMongoCollection<ProcessDocument> _collection;
     private readonly ILogger<MongoProcessRepository> _logger;
-    private static readonly object _lock = new();
 
     static MongoProcessRepository()
     {
-        RegisterSerializers();
-    }
-
-    private static void RegisterSerializers()
-    {
-        lock (_lock)
-        {
-            try
-            {
-                // CRITICAL: Always attempt to register the GuidSerializer with Standard representation
-                // This is required for MongoDB.Driver 2.28.0+ to honor [BsonGuidRepresentation]
-                // 
-                // BsonSerializer.RegisterSerializer will throw BsonSerializationException
-                // if already registered, which we catch and ignore (idempotent operation)
-                //
-                // We do NOT use a flag because:
-                // 1. Static constructor runs once per AppDomain
-                // 2. In test scenarios, AppDomain may be reused across test classes
-                // 3. Flag would block registration even if it never actually succeeded
-                // 4. Let MongoDB's RegisterSerializer be the single source of truth
-                BsonSerializer.RegisterSerializer(new GuidSerializer(GuidRepresentation.Standard));
-            }
-            catch (BsonSerializationException)
-            {
-                // Serializer already registered - this is expected and safe
-                // MongoDB will use the previously registered serializer
-            }
-        }
+        // Register BsonClassMap for ProcessDocument with explicit Guid serialization
+        // This ensures ProcessId (_id) uses Standard GuidRepresentation
+        ProcessDocumentClassMap.Register();
     }
 
     public MongoProcessRepository(
