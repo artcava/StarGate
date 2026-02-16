@@ -1,8 +1,9 @@
-namespace StarGate.Infrastructure.Messaging.RabbitMQ;
-
 using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
+using System.Linq;
 using System.Text;
+
+namespace StarGate.Infrastructure.Messaging.RabbitMQ;
 
 /// <summary>
 /// Provides diagnostics and monitoring for RabbitMQ connections.
@@ -27,14 +28,13 @@ public class RabbitMqConnectionDiagnostics
     {
         var isAutoRecovering = _connection is IAutorecoveringConnection;
         var isRecoveryInProgress = isAutoRecovering && !_connection.IsOpen;
-        var knownHostsCount = GetKnownHostsCount();
 
         var status = new ConnectionStatus
         {
             IsOpen = _connection.IsOpen,
             Endpoint = _connection.Endpoint?.ToString() ?? "unknown",
             ClientProvidedName = _connection.ClientProvidedName,
-            KnownHosts = knownHostsCount,
+            KnownHosts = _connection.KnownHosts.Length,
             ServerProperties = GetServerProperties(),
             AutomaticRecoveryEnabled = isAutoRecovering,
             RecoveryInProgress = isRecoveryInProgress
@@ -72,23 +72,6 @@ public class RabbitMqConnectionDiagnostics
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting RabbitMQ diagnostics");
-        }
-    }
-
-    private int GetKnownHostsCount()
-    {
-        try
-        {
-            var knownHosts = _connection.KnownHosts;
-            if (knownHosts == null)
-            {
-                return 0;
-            }
-            return knownHosts.Count;
-        }
-        catch
-        {
-            return 0;
         }
     }
 
