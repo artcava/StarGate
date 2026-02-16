@@ -17,7 +17,6 @@ public class MongoProcessRepository : IProcessRepository
 {
     private readonly IMongoCollection<ProcessDocument> _collection;
     private readonly ILogger<MongoProcessRepository> _logger;
-    private static bool _serializersRegistered;
     private static readonly object _lock = new();
 
     static MongoProcessRepository()
@@ -27,37 +26,28 @@ public class MongoProcessRepository : IProcessRepository
 
     private static void RegisterSerializers()
     {
-        if (_serializersRegistered)
-        {
-            return;
-        }
-
         lock (_lock)
         {
-            if (_serializersRegistered)
-            {
-                return;
-            }
-
             try
             {
-                // ALWAYS attempt to register the GuidSerializer with Standard representation
-                // This is critical for MongoDB.Driver 2.28.0+ to honor [BsonGuidRepresentation]
+                // CRITICAL: Always attempt to register the GuidSerializer with Standard representation
+                // This is required for MongoDB.Driver 2.28.0+ to honor [BsonGuidRepresentation]
                 // 
-                // If already registered (multi-test scenarios), BsonSerializationException is thrown
-                // which we catch and ignore - making this operation idempotent
+                // BsonSerializer.RegisterSerializer will throw BsonSerializationException
+                // if already registered, which we catch and ignore (idempotent operation)
                 //
-                // Note: LookupSerializer always returns a serializer (default CSharpLegacy),
-                // so we can't use it to check if OUR Standard serializer is registered
+                // We do NOT use a flag because:
+                // 1. Static constructor runs once per AppDomain
+                // 2. In test scenarios, AppDomain may be reused across test classes
+                // 3. Flag would block registration even if it never actually succeeded
+                // 4. Let MongoDB's RegisterSerializer be the single source of truth
                 BsonSerializer.RegisterSerializer(new GuidSerializer(GuidRepresentation.Standard));
             }
             catch (BsonSerializationException)
             {
-                // Serializer already registered - this is expected in multi-test scenarios
-                // Safe to ignore
+                // Serializer already registered - this is expected and safe
+                // MongoDB will use the previously registered serializer
             }
-            
-            _serializersRegistered = true;
         }
     }
 
