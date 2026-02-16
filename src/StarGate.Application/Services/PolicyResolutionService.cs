@@ -164,16 +164,17 @@ public class PolicyResolutionService
         }
 
         // Validate individual override values if provided
-        if (clientOverride.Timeout.HasValue)
+        TimeSpan? timeout = clientOverride.Timeout;
+        if (timeout.HasValue)
         {
-            if (clientOverride.Timeout.Value <= TimeSpan.Zero)
+            if (timeout.Value <= TimeSpan.Zero)
             {
-                errors.Add($"Timeout must be positive (value: {clientOverride.Timeout})");
+                errors.Add($"Timeout must be positive (value: {timeout})");
             }
 
-            if (clientOverride.Timeout.Value.TotalSeconds > _maxTimeoutSeconds)
+            if (timeout.Value.TotalSeconds > _maxTimeoutSeconds)
             {
-                errors.Add($"Timeout cannot exceed 24 hours (value: {clientOverride.Timeout})");
+                errors.Add($"Timeout cannot exceed 24 hours (value: {timeout})");
             }
         }
 
@@ -183,16 +184,17 @@ public class PolicyResolutionService
             errors.AddRange(retryErrors);
         }
 
-        if (clientOverride.ResultRetention.HasValue)
+        TimeSpan? retention = clientOverride.ResultRetention;
+        if (retention.HasValue)
         {
-            if (clientOverride.ResultRetention.Value <= TimeSpan.Zero)
+            if (retention.Value <= TimeSpan.Zero)
             {
-                errors.Add($"ResultRetention must be positive (value: {clientOverride.ResultRetention})");
+                errors.Add($"ResultRetention must be positive (value: {retention})");
             }
 
-            if (clientOverride.ResultRetention.Value.TotalDays > _maxRetentionDays)
+            if (retention.Value.TotalDays > _maxRetentionDays)
             {
-                errors.Add($"ResultRetention cannot exceed 365 days (value: {clientOverride.ResultRetention})");
+                errors.Add($"ResultRetention cannot exceed 365 days (value: {retention})");
             }
         }
 
@@ -282,18 +284,23 @@ public class PolicyResolutionService
         ArgumentNullException.ThrowIfNull(typeDefault);
         ArgumentNullException.ThrowIfNull(clientOverride);
 
-        // Compare nullable TimeSpan? from clientOverride with non-nullable TimeSpan from typeDefault
-        var timeoutChanged = clientOverride.Timeout.HasValue && 
-                            clientOverride.Timeout.Value != typeDefault.Timeout;
+        // Extract nullable values into explicit variables
+        TimeSpan? overrideTimeout = clientOverride.Timeout;
+        TimeSpan? overrideRetention = clientOverride.ResultRetention;
         
-        var retryPolicyChanged = clientOverride.RetryPolicy != null && 
-                                !AreRetryPoliciesEqual(clientOverride.RetryPolicy, typeDefault.RetryPolicy);
+        // Check timeout change
+        bool timeoutChanged = overrideTimeout.HasValue && overrideTimeout.Value != typeDefault.Timeout;
         
-        var retentionChanged = clientOverride.ResultRetention.HasValue && 
-                              clientOverride.ResultRetention.Value != typeDefault.ResultRetention;
+        // Check retry policy change
+        bool retryPolicyChanged = clientOverride.RetryPolicy != null && 
+                                 !AreRetryPoliciesEqual(clientOverride.RetryPolicy, typeDefault.RetryPolicy);
         
-        var concurrencyChanged = clientOverride.MaxConcurrentProcesses.HasValue && 
-                                clientOverride.MaxConcurrentProcesses.Value != typeDefault.MaxConcurrentProcesses;
+        // Check retention change
+        bool retentionChanged = overrideRetention.HasValue && overrideRetention.Value != typeDefault.ResultRetention;
+        
+        // Check concurrency change
+        bool concurrencyChanged = clientOverride.MaxConcurrentProcesses.HasValue && 
+                                 clientOverride.MaxConcurrentProcesses.Value != typeDefault.MaxConcurrentProcesses;
 
         return timeoutChanged || retryPolicyChanged || retentionChanged || concurrencyChanged;
     }
@@ -388,7 +395,8 @@ public class PolicyResolutionService
     {
         var overrides = new List<string>();
 
-        if (clientOverride.Timeout.HasValue)
+        TimeSpan? overrideTimeout = clientOverride.Timeout;
+        if (overrideTimeout.HasValue)
         {
             overrides.Add($"Timeout: {typeDefault.Timeout} -> {resolved.Timeout}");
         }
@@ -398,7 +406,8 @@ public class PolicyResolutionService
             overrides.Add($"RetryPolicy: {FormatRetryPolicy(typeDefault.RetryPolicy)} -> {FormatRetryPolicy(resolved.RetryPolicy)}");
         }
 
-        if (clientOverride.ResultRetention.HasValue)
+        TimeSpan? overrideRetention = clientOverride.ResultRetention;
+        if (overrideRetention.HasValue)
         {
             overrides.Add($"ResultRetention: {typeDefault.ResultRetention} -> {resolved.ResultRetention}");
         }
