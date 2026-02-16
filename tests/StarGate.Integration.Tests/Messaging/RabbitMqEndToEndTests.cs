@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluentAssertions;
 using StarGate.Core.Abstractions;
 using StarGate.Core.Domain;
@@ -33,16 +34,15 @@ public class RabbitMqEndToEndTests : IClassFixture<RabbitMqFixture>, IAsyncLifet
         Process? receivedProcess = null;
         var tcs = new TaskCompletionSource();
 
-        Func<MessageEnvelope<Process>, CancellationToken, Task<MessageHandlingResult>> handler =
-            async (envelope, ct) =>
-            {
-                receivedProcess = envelope.Payload;
-                tcs.TrySetResult(true);
-                return await Task.FromResult(MessageHandlingResult.Acknowledge);
-            };
+        async Task Handler(Process message, MessageContext context)
+        {
+            receivedProcess = message;
+            await context.AcknowledgeAsync();
+            tcs.SetResult();
+        }
 
         // Act
-        await _fixture.Consumer.StartConsumingAsync(_testQueue, handler, CancellationToken.None);
+        await _fixture.Consumer.StartConsumingAsync<Process>(_testQueue, Handler, CancellationToken.None);
         await _fixture.Broker.PublishAsync(_testQueue, originalProcess);
 
         var consumed = await Task.WhenAny(tcs.Task, Task.Delay(5000)) == tcs.Task;
@@ -67,28 +67,31 @@ public class RabbitMqEndToEndTests : IClassFixture<RabbitMqFixture>, IAsyncLifet
             items = new[] { new { sku = "SKU-001", quantity = 10 } }
         };
 
-        var originalProcess = CreateTestProcess() with { Data = complexData };
-        MessageEnvelope<Process>? receivedEnvelope = null;
+        // Convert anonymous type to JsonDocument
+        var jsonString = JsonSerializer.Serialize(complexData);
+        var jsonDocument = JsonDocument.Parse(jsonString);
+
+        var originalProcess = CreateTestProcess() with { Data = jsonDocument };
+        Process? receivedProcess = null;
         var tcs = new TaskCompletionSource();
 
-        Func<MessageEnvelope<Process>, CancellationToken, Task<MessageHandlingResult>> handler =
-            async (envelope, ct) =>
-            {
-                receivedEnvelope = envelope;
-                tcs.TrySetResult(true);
-                return await Task.FromResult(MessageHandlingResult.Acknowledge);
-            };
+        async Task Handler(Process message, MessageContext context)
+        {
+            receivedProcess = message;
+            await context.AcknowledgeAsync();
+            tcs.SetResult();
+        }
 
         // Act
-        await _fixture.Consumer.StartConsumingAsync(_testQueue, handler, CancellationToken.None);
+        await _fixture.Consumer.StartConsumingAsync<Process>(_testQueue, Handler, CancellationToken.None);
         await _fixture.Broker.PublishAsync(_testQueue, originalProcess);
 
         var consumed = await Task.WhenAny(tcs.Task, Task.Delay(5000)) == tcs.Task;
 
         // Assert
         consumed.Should().BeTrue();
-        receivedEnvelope.Should().NotBeNull();
-        receivedEnvelope!.Payload.Data.Should().NotBeNull();
+        receivedProcess.Should().NotBeNull();
+        receivedProcess!.Data.Should().NotBeNull();
     }
 
     private static Process CreateTestProcess() => new()

@@ -1,8 +1,9 @@
+using System.Collections.Concurrent;
+using System.Text.Json;
 using FluentAssertions;
 using StarGate.Core.Abstractions;
 using StarGate.Core.Domain;
 using StarGate.Integration.Tests.Fixtures;
-using System.Collections.Concurrent;
 using Xunit;
 
 namespace StarGate.Integration.Tests.Messaging;
@@ -30,22 +31,21 @@ public class RabbitMqConsumerIntegrationTests : IClassFixture<RabbitMqFixture>, 
     public async Task StartConsumingAsync_Should_ConsumePublishedMessage()
     {
         // Arrange
-        var receivedMessages = new ConcurrentBag<MessageEnvelope<Process>>();
+        var receivedMessages = new ConcurrentBag<Process>();
         var tcs = new TaskCompletionSource();
 
-        Func<MessageEnvelope<Process>, CancellationToken, Task<MessageHandlingResult>> handler =
-            async (envelope, ct) =>
-            {
-                receivedMessages.Add(envelope);
-                tcs.TrySetResult(true);
-                return await Task.FromResult(MessageHandlingResult.Acknowledge);
-            };
+        async Task Handler(Process message, MessageContext context)
+        {
+            receivedMessages.Add(message);
+            await context.AcknowledgeAsync();
+            tcs.SetResult();
+        }
 
         var process = CreateTestProcess();
 
         // Act
         await _fixture.Broker.PublishAsync(_testQueue, process);
-        await _fixture.Consumer.StartConsumingAsync(_testQueue, handler, CancellationToken.None);
+        await _fixture.Consumer.StartConsumingAsync<Process>(_testQueue, Handler, CancellationToken.None);
 
         // Wait for message to be consumed (with timeout)
         var consumed = await Task.WhenAny(tcs.Task, Task.Delay(5000)) == tcs.Task;
@@ -53,7 +53,7 @@ public class RabbitMqConsumerIntegrationTests : IClassFixture<RabbitMqFixture>, 
         // Assert
         consumed.Should().BeTrue("message should be consumed within timeout");
         receivedMessages.Should().HaveCount(1);
-        receivedMessages.First().Payload.ProcessId.Should().Be(process.ProcessId);
+        receivedMessages.First().ProcessId.Should().Be(process.ProcessId);
     }
 
     [Fact]
@@ -62,18 +62,17 @@ public class RabbitMqConsumerIntegrationTests : IClassFixture<RabbitMqFixture>, 
         // Arrange
         var tcs = new TaskCompletionSource();
 
-        Func<MessageEnvelope<Process>, CancellationToken, Task<MessageHandlingResult>> handler =
-            async (envelope, ct) =>
-            {
-                tcs.TrySetResult(true);
-                return await Task.FromResult(MessageHandlingResult.Acknowledge);
-            };
+        async Task Handler(Process message, MessageContext context)
+        {
+            await context.AcknowledgeAsync();
+            tcs.SetResult();
+        }
 
         var process = CreateTestProcess();
 
         // Act
         await _fixture.Broker.PublishAsync(_testQueue, process);
-        await _fixture.Consumer.StartConsumingAsync(_testQueue, handler, CancellationToken.None);
+        await _fixture.Consumer.StartConsumingAsync<Process>(_testQueue, Handler, CancellationToken.None);
         await Task.WhenAny(tcs.Task, Task.Delay(5000));
 
         // Assert - Message should be removed from queue
@@ -83,29 +82,31 @@ public class RabbitMqConsumerIntegrationTests : IClassFixture<RabbitMqFixture>, 
     }
 
     [Fact]
-    public async Task StartConsumingAsync_Should_RequeueMessage_WhenHandlerReturnsRequeue()
+    public async Task StartConsumingAsync_Should_RequeueMessage_WhenHandlerRejectsWithRequeue()
     {
         // Arrange
         var attemptCount = 0;
         var tcs = new TaskCompletionSource();
 
-        Func<MessageEnvelope<Process>, CancellationToken, Task<MessageHandlingResult>> handler =
-            async (envelope, ct) =>
+        async Task Handler(Process message, MessageContext context)
+        {
+            attemptCount++;
+            if (attemptCount == 1)
             {
-                attemptCount++;
-                if (attemptCount == 1)
-                {
-                    return await Task.FromResult(MessageHandlingResult.Requeue);
-                }
-                tcs.TrySetResult(true);
-                return await Task.FromResult(MessageHandlingResult.Acknowledge);
-            };
+                await context.RejectAsync(requeue: true);
+            }
+            else
+            {
+                await context.AcknowledgeAsync();
+                tcs.SetResult();
+            }
+        }
 
         var process = CreateTestProcess();
 
         // Act
         await _fixture.Broker.PublishAsync(_testQueue, process);
-        await _fixture.Consumer.StartConsumingAsync(_testQueue, handler, CancellationToken.None);
+        await _fixture.Consumer.StartConsumingAsync<Process>(_testQueue, Handler, CancellationToken.None);
         await Task.WhenAny(tcs.Task, Task.Delay(10000));
 
         // Assert
@@ -116,20 +117,19 @@ public class RabbitMqConsumerIntegrationTests : IClassFixture<RabbitMqFixture>, 
     public async Task StartConsumingAsync_Should_ConsumeMultipleMessages()
     {
         // Arrange
-        var receivedMessages = new ConcurrentBag<MessageEnvelope<Process>>();
+        var receivedMessages = new ConcurrentBag<Process>();
         var expectedCount = 10;
         var tcs = new TaskCompletionSource();
 
-        Func<MessageEnvelope<Process>, CancellationToken, Task<MessageHandlingResult>> handler =
-            async (envelope, ct) =>
+        async Task Handler(Process message, MessageContext context)
+        {
+            receivedMessages.Add(message);
+            await context.AcknowledgeAsync();
+            if (receivedMessages.Count >= expectedCount)
             {
-                receivedMessages.Add(envelope);
-                if (receivedMessages.Count >= expectedCount)
-                {
-                    tcs.TrySetResult(true);
-                }
-                return await Task.FromResult(MessageHandlingResult.Acknowledge);
-            };
+                tcs.SetResult();
+            }
+        }
 
         var processes = Enumerable.Range(0, expectedCount)
             .Select(_ => CreateTestProcess())
@@ -141,7 +141,7 @@ public class RabbitMqConsumerIntegrationTests : IClassFixture<RabbitMqFixture>, 
             await _fixture.Broker.PublishAsync(_testQueue, process);
         }
 
-        await _fixture.Consumer.StartConsumingAsync(_testQueue, handler, CancellationToken.None);
+        await _fixture.Consumer.StartConsumingAsync<Process>(_testQueue, Handler, CancellationToken.None);
         var allConsumed = await Task.WhenAny(tcs.Task, Task.Delay(10000)) == tcs.Task;
 
         // Assert
@@ -153,28 +153,27 @@ public class RabbitMqConsumerIntegrationTests : IClassFixture<RabbitMqFixture>, 
     public async Task StartConsumingAsync_Should_PreserveMessageOrder_WithPrefetch()
     {
         // Arrange
-        var receivedMessages = new ConcurrentBag<MessageEnvelope<Process>>();
+        var receivedMessages = new ConcurrentBag<Process>();
         var expectedCount = 5;
         var tcs = new TaskCompletionSource();
 
-        Func<MessageEnvelope<Process>, CancellationToken, Task<MessageHandlingResult>> handler =
-            async (envelope, ct) =>
+        async Task Handler(Process message, MessageContext context)
+        {
+            receivedMessages.Add(message);
+            if (receivedMessages.Count >= expectedCount)
             {
-                receivedMessages.Add(envelope);
-                if (receivedMessages.Count >= expectedCount)
-                {
-                    tcs.TrySetResult(true);
-                }
-                await Task.Delay(100); // Simulate processing
-                return MessageHandlingResult.Acknowledge;
-            };
+                tcs.SetResult();
+            }
+            await Task.Delay(100); // Simulate processing
+            await context.AcknowledgeAsync();
+        }
 
         var processes = Enumerable.Range(0, expectedCount)
             .Select(i => CreateTestProcess() with { ClientProcessId = $"process-{i}" })
             .ToList();
 
         // Act
-        await _fixture.Consumer.StartConsumingAsync(_testQueue, handler, CancellationToken.None);
+        await _fixture.Consumer.StartConsumingAsync<Process>(_testQueue, Handler, CancellationToken.None);
 
         foreach (var process in processes)
         {
@@ -195,19 +194,18 @@ public class RabbitMqConsumerIntegrationTests : IClassFixture<RabbitMqFixture>, 
         var receivedCount = 0;
         var tcs = new TaskCompletionSource();
 
-        Func<MessageEnvelope<Process>, CancellationToken, Task<MessageHandlingResult>> handler =
-            async (envelope, ct) =>
+        async Task Handler(Process message, MessageContext context)
+        {
+            Interlocked.Increment(ref receivedCount);
+            await context.AcknowledgeAsync();
+            if (receivedCount == 1)
             {
-                Interlocked.Increment(ref receivedCount);
-                if (receivedCount == 1)
-                {
-                    tcs.TrySetResult(true);
-                }
-                return await Task.FromResult(MessageHandlingResult.Acknowledge);
-            };
+                tcs.SetResult();
+            }
+        }
 
         await _fixture.Broker.PublishAsync(_testQueue, CreateTestProcess());
-        await _fixture.Consumer.StartConsumingAsync(_testQueue, handler, CancellationToken.None);
+        await _fixture.Consumer.StartConsumingAsync<Process>(_testQueue, Handler, CancellationToken.None);
         await Task.WhenAny(tcs.Task, Task.Delay(5000));
 
         // Act - Stop consuming
