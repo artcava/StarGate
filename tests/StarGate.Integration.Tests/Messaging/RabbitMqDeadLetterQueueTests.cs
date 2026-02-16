@@ -18,7 +18,12 @@ public class RabbitMqDeadLetterQueueTests : IClassFixture<RabbitMqFixture>, IAsy
         _fixture = fixture;
     }
 
-    public Task InitializeAsync() => Task.CompletedTask;
+    public Task InitializeAsync()
+    {
+        // Ensure DLQ is bound to DLX with correct routing key for our test queue
+        _fixture.EnsureDlqBinding(QueueName);
+        return Task.CompletedTask;
+    }
 
     public async Task DisposeAsync()
     {

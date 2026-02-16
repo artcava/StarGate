@@ -100,6 +100,29 @@ public class RabbitMqFixture : IAsyncLifetime
     }
 
     /// <summary>
+    /// Ensures DLQ is bound to DLX with the correct routing key for a specific queue.
+    /// Required because DLX is Direct exchange and doesn't support wildcard routing.
+    /// When a message is rejected from a queue, it's sent to DLX with routing key = queue name.
+    /// </summary>
+    public void EnsureDlqBinding(string queueName)
+    {
+        using var channel = _connection!.CreateModel();
+        try
+        {
+            // Bind DLQ to DLX with routing key matching the source queue name
+            // This ensures rejected messages from 'queueName' are routed to DLQ
+            channel.QueueBind(
+                queue: Options.DeadLetterQueue,
+                exchange: Options.DeadLetterExchange,
+                routingKey: queueName);
+        }
+        catch
+        {
+            // Binding might already exist, ignore
+        }
+    }
+
+    /// <summary>
     /// Purges all messages from a queue.
     /// </summary>
     public void PurgeQueue(string queueName)
