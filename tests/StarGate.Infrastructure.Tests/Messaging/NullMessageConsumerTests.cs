@@ -1,11 +1,11 @@
-namespace StarGate.Infrastructure.Tests.Messaging;
-
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using StarGate.Core.Abstractions;
 using StarGate.Core.Domain;
 using StarGate.Infrastructure.Messaging;
 using Xunit;
+
+namespace StarGate.Infrastructure.Tests.Messaging;
 
 public class NullMessageConsumerTests
 {

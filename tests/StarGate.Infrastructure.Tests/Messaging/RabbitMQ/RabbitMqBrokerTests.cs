@@ -1,5 +1,3 @@
-namespace StarGate.Infrastructure.Tests.Messaging.RabbitMQ;
-
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -11,6 +9,8 @@ using StarGate.Core.Exceptions;
 using StarGate.Infrastructure.Messaging;
 using StarGate.Infrastructure.Messaging.RabbitMQ;
 using Xunit;
+
+namespace StarGate.Infrastructure.Tests.Messaging.RabbitMQ;
 
 public class RabbitMqBrokerTests : IDisposable
 {
