@@ -48,6 +48,9 @@ public static class DependencyInjection
             options.DefaultBackoffStrategy = section[nameof(PolicyProviderOptions.DefaultBackoffStrategy)] ?? "Exponential";
         });
 
+        // Register PolicyResolutionService as singleton (stateless, thread-safe)
+        services.AddSingleton<PolicyResolutionService>();
+
         // Register PolicyProvider as singleton (thread-safe with internal caching)
         services.AddSingleton<IPolicyProvider, PolicyProvider>();
 
