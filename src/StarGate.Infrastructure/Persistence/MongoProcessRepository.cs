@@ -1,4 +1,6 @@
 using Microsoft.Extensions.Logging;
+using MongoDB.Bson.Serialization;
+using MongoDB.Bson.Serialization.Serializers;
 using MongoDB.Driver;
 using StarGate.Core.Abstractions;
 using StarGate.Core.Domain;
@@ -14,6 +16,32 @@ public class MongoProcessRepository : IProcessRepository
 {
     private readonly IMongoCollection<ProcessDocument> _collection;
     private readonly ILogger<MongoProcessRepository> _logger;
+    private static bool _serializersRegistered;
+    private static readonly object _lock = new();
+
+    static MongoProcessRepository()
+    {
+        RegisterSerializers();
+    }
+
+    private static void RegisterSerializers()
+    {
+        if (_serializersRegistered)
+            return;
+
+        lock (_lock)
+        {
+            if (_serializersRegistered)
+                return;
+
+            // Register GuidSerializer with Standard representation
+            // This is required for MongoDB.Driver 2.28.0+ to honor [BsonGuidRepresentation]
+            // Without this, MongoDB uses CSharpLegacy by default, causing query mismatches
+            BsonSerializer.RegisterSerializer(new GuidSerializer(MongoDB.Bson.GuidRepresentation.Standard));
+            
+            _serializersRegistered = true;
+        }
+    }
 
     public MongoProcessRepository(
         IMongoDatabase database,
@@ -22,8 +50,6 @@ public class MongoProcessRepository : IProcessRepository
         ArgumentNullException.ThrowIfNull(database);
         ArgumentNullException.ThrowIfNull(logger);
 
-        // GuidRepresentation is configured via [BsonGuidRepresentation] attribute
-        // on ProcessDocument.ProcessId - no additional configuration needed here
         _collection = database.GetCollection<ProcessDocument>("processes");
         _logger = logger;
     }
