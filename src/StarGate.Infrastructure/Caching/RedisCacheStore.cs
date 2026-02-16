@@ -1,9 +1,9 @@
-namespace StarGate.Infrastructure.Caching;
-
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 using StarGate.Core.Abstractions;
 using System.Text.Json;
+
+namespace StarGate.Infrastructure.Caching;
 
 /// <summary>
 /// Redis implementation of ICacheStore for generic caching.

@@ -19,7 +19,7 @@ public interface ICacheStore
     /// <param name="key">Cache key.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Cached value if found, null otherwise.</returns>
-    Task<T?> GetAsync<T>(string key, CancellationToken ct = default) where T : class;
+    public Task<T?> GetAsync<T>(string key, CancellationToken ct = default) where T : class;
 
     /// <summary>
     /// Stores a value in cache with TTL.
@@ -29,14 +29,14 @@ public interface ICacheStore
     /// <param name="value">Value to cache.</param>
     /// <param name="ttl">Time-to-live for the cached value.</param>
     /// <param name="ct">Cancellation token.</param>
-    Task SetAsync<T>(string key, T value, TimeSpan ttl, CancellationToken ct = default) where T : class;
+    public Task SetAsync<T>(string key, T value, TimeSpan ttl, CancellationToken ct = default) where T : class;
 
     /// <summary>
     /// Deletes a specific key from cache.
     /// </summary>
     /// <param name="key">Cache key to delete.</param>
     /// <param name="ct">Cancellation token.</param>
-    Task DeleteAsync(string key, CancellationToken ct = default);
+    public Task DeleteAsync(string key, CancellationToken ct = default);
 
     /// <summary>
     /// Deletes all keys matching a pattern (e.g., "policy:*").
@@ -47,7 +47,7 @@ public interface ICacheStore
     /// </summary>
     /// <param name="pattern">Key pattern with wildcards.</param>
     /// <param name="ct">Cancellation token.</param>
-    Task DeleteByPatternAsync(string pattern, CancellationToken ct = default);
+    public Task DeleteByPatternAsync(string pattern, CancellationToken ct = default);
 
     /// <summary>
     /// Checks if a key exists in cache without retrieving its value.
@@ -56,5 +56,5 @@ public interface ICacheStore
     /// <param name="key">Cache key.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>True if key exists, false otherwise.</returns>
-    Task<bool> ExistsAsync(string key, CancellationToken ct = default);
+    public Task<bool> ExistsAsync(string key, CancellationToken ct = default);
 }

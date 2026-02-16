@@ -1,10 +1,10 @@
-namespace StarGate.Infrastructure;
-
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using StackExchange.Redis;
 using StarGate.Core.Abstractions;
 using StarGate.Infrastructure.Caching;
+
+namespace StarGate.Infrastructure;
 
 /// <summary>
 /// Dependency injection configuration for Infrastructure layer.

@@ -1,9 +1,9 @@
-namespace StarGate.Application;
-
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using StarGate.Application.Services;
 using StarGate.Core.Abstractions;
+
+namespace StarGate.Application;
 
 /// <summary>
 /// Dependency injection configuration for Application layer.
