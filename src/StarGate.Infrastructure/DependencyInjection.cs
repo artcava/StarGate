@@ -34,13 +34,15 @@ public static partial class DependencyInjection
             // Register RabbitMQ options
             services.AddSingleton(options);
 
-            // Register RabbitMQ broker
+            // Register RabbitMQ broker and consumer
             services.AddSingleton<IMessageBroker, RabbitMqBroker>();
+            services.AddSingleton<IMessageConsumer, RabbitMqConsumer>();
         }
         else
         {
-            // Null object pattern - no-op broker when RabbitMQ is disabled
+            // Null object pattern - no-op broker and consumer when RabbitMQ is disabled
             services.AddSingleton<IMessageBroker, NullMessageBroker>();
+            services.AddSingleton<IMessageConsumer, NullMessageConsumer>();
         }
 
         return services;
