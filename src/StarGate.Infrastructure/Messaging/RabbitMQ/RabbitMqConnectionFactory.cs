@@ -1,14 +1,17 @@
+namespace StarGate.Infrastructure.Messaging.RabbitMQ;
+
+using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
-using Microsoft.Extensions.Logging;
-
-namespace StarGate.Infrastructure.Messaging.RabbitMQ;
+using System.Threading;
 
 /// <summary>
 /// Factory for creating and configuring RabbitMQ connections.
 /// </summary>
 public static class RabbitMqConnectionFactory
 {
+    private static int _recoveryAttempts = 0;
+
     /// <summary>
     /// Creates a RabbitMQ connection with automatic recovery.
     /// </summary>
@@ -32,25 +35,33 @@ public static class RabbitMqConnectionFactory
             Password = options.Password,
             VirtualHost = options.VirtualHost,
             
-            // Automatic recovery settings
+            // Automatic recovery with exponential backoff
             AutomaticRecoveryEnabled = true,
-            NetworkRecoveryInterval = TimeSpan.FromSeconds(10),
+            NetworkRecoveryInterval = TimeSpan.FromSeconds(options.NetworkRecoveryIntervalSeconds),
             TopologyRecoveryEnabled = true,
+            TopologyRecoveryRetryHandler = new TopologyRecoveryRetryHandler
+            {
+                RetryInterval = TimeSpan.FromSeconds(5)
+            },
             
-            // Connection settings
-            RequestedHeartbeat = TimeSpan.FromSeconds(60),
-            RequestedConnectionTimeout = TimeSpan.FromSeconds(30),
+            // Connection timeouts and heartbeats
+            RequestedHeartbeat = TimeSpan.FromSeconds(options.HeartbeatSeconds),
+            RequestedConnectionTimeout = TimeSpan.FromSeconds(options.ConnectionTimeoutSeconds),
+            HandshakeContinuationTimeout = TimeSpan.FromSeconds(10),
+            ContinuationTimeout = TimeSpan.FromSeconds(20),
             
-            // Dispatch settings
+            // Async consumer dispatch
             DispatchConsumersAsync = true,
+            ConsumerDispatchConcurrency = 1,
             
-            // Client properties
+            // Client identification
             ClientProvidedName = "StarGate-API"
         };
 
         var connection = factory.CreateConnection();
 
         RegisterConnectionEvents(connection, logger);
+        RegisterRecoveryEvents(connection, options, logger);
 
         logger.LogInformation(
             "RabbitMQ connection established: {Endpoint}",
@@ -66,9 +77,10 @@ public static class RabbitMqConnectionFactory
         connection.ConnectionShutdown += (sender, args) =>
         {
             logger.LogWarning(
-                "RabbitMQ connection shutdown: {ReplyCode} - {ReplyText}",
+                "RabbitMQ connection shutdown: {ReplyCode} - {ReplyText}, Initiator: {Initiator}",
                 args.ReplyCode,
-                args.ReplyText);
+                args.ReplyText,
+                args.Initiator);
         };
 
         connection.ConnectionBlocked += (sender, args) =>
@@ -83,19 +95,66 @@ public static class RabbitMqConnectionFactory
             logger.LogInformation("RabbitMQ connection unblocked");
         };
 
-        if (connection is IAutorecoveringConnection autoRecovering)
+        connection.CallbackException += (sender, args) =>
         {
-            autoRecovering.RecoverySucceeded += (sender, args) =>
-            {
-                logger.LogInformation("RabbitMQ connection recovery succeeded");
-            };
+            logger.LogError(
+                args.Exception,
+                "RabbitMQ callback exception: {Detail}",
+                args.Detail);
+        };
+    }
 
-            autoRecovering.ConnectionRecoveryError += (sender, args) =>
+    private static void RegisterRecoveryEvents(
+        IConnection connection,
+        RabbitMqOptions options,
+        ILogger logger)
+    {
+        if (connection is not IAutorecoveringConnection autoRecovering)
+        {
+            return;
+        }
+
+        autoRecovering.RecoverySucceeded += (sender, args) =>
+        {
+            Interlocked.Exchange(ref _recoveryAttempts, 0); // Reset counter on success (thread-safe)
+            logger.LogInformation("RabbitMQ connection recovery succeeded");
+        };
+
+        autoRecovering.ConnectionRecoveryError += (sender, args) =>
+        {
+            var attempts = Interlocked.Increment(ref _recoveryAttempts);
+
+            if (attempts >= options.MaxRecoveryAttempts)
+            {
+                logger.LogCritical(
+                    args.Exception,
+                    "RabbitMQ connection recovery failed after {Attempts} attempts. Manual intervention required.",
+                    attempts);
+            }
+            else
             {
                 logger.LogError(
                     args.Exception,
-                    "RabbitMQ connection recovery error");
-            };
-        }
+                    "RabbitMQ connection recovery error (attempt {Attempt}/{MaxAttempts})",
+                    attempts,
+                    options.MaxRecoveryAttempts);
+            }
+        };
+
+        autoRecovering.QueueNameChangedAfterRecovery += (sender, args) =>
+        {
+            logger.LogWarning(
+                "RabbitMQ queue name changed after recovery: {OldName} -> {NewName}",
+                args.OldName,
+                args.NewName);
+        };
+
+        autoRecovering.ConsumerTagChangeAfterRecovery += (sender, args) =>
+        {
+            logger.LogInformation(
+                "RabbitMQ consumer tag changed after recovery: {OldTag} -> {NewTag}",
+                args.OldTag,
+                args.NewTag);
+        };
     }
 }
