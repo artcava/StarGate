@@ -1,9 +1,9 @@
+namespace StarGate.Infrastructure.Messaging.RabbitMQ;
+
 using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System.Threading;
-
-namespace StarGate.Infrastructure.Messaging.RabbitMQ;
 
 /// <summary>
 /// Factory for creating and configuring RabbitMQ connections.
@@ -35,14 +35,10 @@ public static class RabbitMqConnectionFactory
             Password = options.Password,
             VirtualHost = options.VirtualHost,
             
-            // Automatic recovery with exponential backoff
+            // Automatic recovery settings
             AutomaticRecoveryEnabled = true,
             NetworkRecoveryInterval = TimeSpan.FromSeconds(options.NetworkRecoveryIntervalSeconds),
             TopologyRecoveryEnabled = true,
-            TopologyRecoveryRetryHandler = new TopologyRecoveryRetryHandler
-            {
-                RetryInterval = TimeSpan.FromSeconds(5)
-            },
             
             // Connection timeouts and heartbeats
             RequestedHeartbeat = TimeSpan.FromSeconds(options.HeartbeatSeconds),
@@ -141,20 +137,11 @@ public static class RabbitMqConnectionFactory
             }
         };
 
-        autoRecovering.QueueNameChangedAfterRecovery += (sender, args) =>
-        {
-            logger.LogWarning(
-                "RabbitMQ queue name changed after recovery: {OldName} -> {NewName}",
-                args.OldName,
-                args.NewName);
-        };
-
+        // ConsumerTagChangeAfterRecovery is available but with limited properties in some versions
         autoRecovering.ConsumerTagChangeAfterRecovery += (sender, args) =>
         {
             logger.LogInformation(
-                "RabbitMQ consumer tag changed after recovery: {OldTag} -> {NewTag}",
-                args.OldTag,
-                args.NewTag);
+                "RabbitMQ consumer tag changed after recovery for consumer");
         };
     }
 }
