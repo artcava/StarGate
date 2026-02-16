@@ -99,6 +99,7 @@ public sealed class RabbitMqConsumer : IMessageConsumer
                         queueName,
                         args.ReplyCode,
                         args.ReplyText);
+                    return Task.CompletedTask;
                 };
 
                 consumer.Registered += (_, args) =>
@@ -107,6 +108,7 @@ public sealed class RabbitMqConsumer : IMessageConsumer
                         "Consumer registered for queue {Queue}, tag: {ConsumerTag}",
                         queueName,
                         args.ConsumerTags?.FirstOrDefault());
+                    return Task.CompletedTask;
                 };
 
                 consumer.Unregistered += (_, args) =>
@@ -115,6 +117,7 @@ public sealed class RabbitMqConsumer : IMessageConsumer
                         "Consumer unregistered for queue {Queue}, tag: {ConsumerTag}",
                         queueName,
                         args.ConsumerTags?.FirstOrDefault());
+                    return Task.CompletedTask;
                 };
 
                 // Start consuming
@@ -183,9 +186,11 @@ public sealed class RabbitMqConsumer : IMessageConsumer
                 MessageId = messageId,
                 CorrelationId = correlationId,
                 Timestamp = DateTime.UtcNow,
-                DeliveryTag = deliveryTag,
+                DeliveryTag = (long)deliveryTag, // Cast ulong to long
                 DeliveryCount = eventArgs.Redelivered ? 2 : 1, // Simplified delivery count
-                Headers = envelope.Properties?.Headers,
+                Headers = envelope.Metadata != null 
+                    ? new Dictionary<string, object>(envelope.Metadata) 
+                    : null,
                 AcknowledgeAsync = () =>
                 {
                     channel.BasicAck(deliveryTag, multiple: false);
@@ -209,7 +214,7 @@ public sealed class RabbitMqConsumer : IMessageConsumer
                 }
             };
 
-            // Invoke message handler
+            // Invoke message handler with the payload (not the envelope)
             await messageHandler(envelope.Payload, context)
                 .ConfigureAwait(false);
         }
