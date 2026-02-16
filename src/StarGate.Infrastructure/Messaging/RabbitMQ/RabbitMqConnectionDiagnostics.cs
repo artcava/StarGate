@@ -1,8 +1,8 @@
-namespace StarGate.Infrastructure.Messaging.RabbitMQ;
-
 using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
 using System.Text;
+
+namespace StarGate.Infrastructure.Messaging.RabbitMQ;
 
 /// <summary>
 /// Provides diagnostics and monitoring for RabbitMQ connections.
