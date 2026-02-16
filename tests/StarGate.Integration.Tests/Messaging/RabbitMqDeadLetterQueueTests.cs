@@ -141,9 +141,9 @@ public class RabbitMqDeadLetterQueueTests : IClassFixture<RabbitMqFixture>, IAsy
         
         result.Should().NotBeNull("message should be in DLQ");
         
-        // Deserialize message from DLQ - returns Process directly
-        var deserializedProcess = _fixture.Serializer.Deserialize<Process>(result!.Body.ToArray());
-        deserializedProcess.ClientProcessId.Should().Be("POISON-MESSAGE-123");
+        // Deserialize message from DLQ - returns MessageEnvelope<Process>
+        var envelope = _fixture.Serializer.Deserialize<Process>(result!.Body.ToArray());
+        envelope.Payload.ClientProcessId.Should().Be("POISON-MESSAGE-123");
         
         // Clean up - acknowledge the DLQ message
         channel.BasicAck(result.DeliveryTag, false);
