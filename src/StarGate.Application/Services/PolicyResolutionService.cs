@@ -282,10 +282,20 @@ public class PolicyResolutionService
         ArgumentNullException.ThrowIfNull(typeDefault);
         ArgumentNullException.ThrowIfNull(clientOverride);
 
-        return (clientOverride.Timeout.HasValue && clientOverride.Timeout.Value != typeDefault.Timeout) ||
-               (clientOverride.RetryPolicy != null && !AreRetryPoliciesEqual(clientOverride.RetryPolicy, typeDefault.RetryPolicy)) ||
-               (clientOverride.ResultRetention.HasValue && clientOverride.ResultRetention.Value != typeDefault.ResultRetention) ||
-               (clientOverride.MaxConcurrentProcesses.HasValue && clientOverride.MaxConcurrentProcesses.Value != typeDefault.MaxConcurrentProcesses);
+        // Compare nullable TimeSpan? from clientOverride with non-nullable TimeSpan from typeDefault
+        var timeoutChanged = clientOverride.Timeout.HasValue && 
+                            clientOverride.Timeout.Value != typeDefault.Timeout;
+        
+        var retryPolicyChanged = clientOverride.RetryPolicy != null && 
+                                !AreRetryPoliciesEqual(clientOverride.RetryPolicy, typeDefault.RetryPolicy);
+        
+        var retentionChanged = clientOverride.ResultRetention.HasValue && 
+                              clientOverride.ResultRetention.Value != typeDefault.ResultRetention;
+        
+        var concurrencyChanged = clientOverride.MaxConcurrentProcesses.HasValue && 
+                                clientOverride.MaxConcurrentProcesses.Value != typeDefault.MaxConcurrentProcesses;
+
+        return timeoutChanged || retryPolicyChanged || retentionChanged || concurrencyChanged;
     }
 
     /// <summary>
