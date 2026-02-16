@@ -10,12 +10,11 @@ namespace StarGate.Integration.Tests.Messaging;
 public class RabbitMqEndToEndTests : IClassFixture<RabbitMqFixture>, IAsyncLifetime
 {
     private readonly RabbitMqFixture _fixture;
-    private readonly string _testQueue;
+    private readonly string _testQueue = "stargate.process"; // Convention-based queue name for Process type
 
     public RabbitMqEndToEndTests(RabbitMqFixture fixture)
     {
         _fixture = fixture;
-        _testQueue = $"test.queue.{Guid.NewGuid()}";
     }
 
     public Task InitializeAsync() => Task.CompletedTask;
@@ -42,7 +41,7 @@ public class RabbitMqEndToEndTests : IClassFixture<RabbitMqFixture>, IAsyncLifet
         }
 
         // Act
-        await _fixture.Consumer.StartConsumingAsync<Process>(_testQueue, Handler, CancellationToken.None);
+        await _fixture.Consumer.StartConsumingAsync<Process>(Handler, CancellationToken.None);
         await _fixture.Broker.PublishAsync(_testQueue, originalProcess);
 
         var consumed = await Task.WhenAny(tcs.Task, Task.Delay(5000)) == tcs.Task;
@@ -83,7 +82,7 @@ public class RabbitMqEndToEndTests : IClassFixture<RabbitMqFixture>, IAsyncLifet
         }
 
         // Act
-        await _fixture.Consumer.StartConsumingAsync<Process>(_testQueue, Handler, CancellationToken.None);
+        await _fixture.Consumer.StartConsumingAsync<Process>(Handler, CancellationToken.None);
         await _fixture.Broker.PublishAsync(_testQueue, originalProcess);
 
         var consumed = await Task.WhenAny(tcs.Task, Task.Delay(5000)) == tcs.Task;

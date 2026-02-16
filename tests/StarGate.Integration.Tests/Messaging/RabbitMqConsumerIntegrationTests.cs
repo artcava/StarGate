@@ -11,12 +11,11 @@ namespace StarGate.Integration.Tests.Messaging;
 public class RabbitMqConsumerIntegrationTests : IClassFixture<RabbitMqFixture>, IAsyncLifetime
 {
     private readonly RabbitMqFixture _fixture;
-    private readonly string _testQueue;
+    private readonly string _testQueue = "stargate.process"; // Convention-based queue name for Process type
 
     public RabbitMqConsumerIntegrationTests(RabbitMqFixture fixture)
     {
         _fixture = fixture;
-        _testQueue = $"test.queue.{Guid.NewGuid()}";
     }
 
     public Task InitializeAsync() => Task.CompletedTask;
@@ -45,7 +44,7 @@ public class RabbitMqConsumerIntegrationTests : IClassFixture<RabbitMqFixture>, 
 
         // Act
         await _fixture.Broker.PublishAsync(_testQueue, process);
-        await _fixture.Consumer.StartConsumingAsync<Process>(_testQueue, Handler, CancellationToken.None);
+        await _fixture.Consumer.StartConsumingAsync<Process>(Handler, CancellationToken.None);
 
         // Wait for message to be consumed (with timeout)
         var consumed = await Task.WhenAny(tcs.Task, Task.Delay(5000)) == tcs.Task;
@@ -72,7 +71,7 @@ public class RabbitMqConsumerIntegrationTests : IClassFixture<RabbitMqFixture>, 
 
         // Act
         await _fixture.Broker.PublishAsync(_testQueue, process);
-        await _fixture.Consumer.StartConsumingAsync<Process>(_testQueue, Handler, CancellationToken.None);
+        await _fixture.Consumer.StartConsumingAsync<Process>(Handler, CancellationToken.None);
         await Task.WhenAny(tcs.Task, Task.Delay(5000));
 
         // Assert - Message should be removed from queue
@@ -93,7 +92,8 @@ public class RabbitMqConsumerIntegrationTests : IClassFixture<RabbitMqFixture>, 
             attemptCount++;
             if (attemptCount == 1)
             {
-                await context.RejectAsync(requeue: true);
+                // RejectAsync takes bool as positional parameter, not named
+                await context.RejectAsync(true); // requeue = true
             }
             else
             {
@@ -106,7 +106,7 @@ public class RabbitMqConsumerIntegrationTests : IClassFixture<RabbitMqFixture>, 
 
         // Act
         await _fixture.Broker.PublishAsync(_testQueue, process);
-        await _fixture.Consumer.StartConsumingAsync<Process>(_testQueue, Handler, CancellationToken.None);
+        await _fixture.Consumer.StartConsumingAsync<Process>(Handler, CancellationToken.None);
         await Task.WhenAny(tcs.Task, Task.Delay(10000));
 
         // Assert
@@ -141,7 +141,7 @@ public class RabbitMqConsumerIntegrationTests : IClassFixture<RabbitMqFixture>, 
             await _fixture.Broker.PublishAsync(_testQueue, process);
         }
 
-        await _fixture.Consumer.StartConsumingAsync<Process>(_testQueue, Handler, CancellationToken.None);
+        await _fixture.Consumer.StartConsumingAsync<Process>(Handler, CancellationToken.None);
         var allConsumed = await Task.WhenAny(tcs.Task, Task.Delay(10000)) == tcs.Task;
 
         // Assert
@@ -173,7 +173,7 @@ public class RabbitMqConsumerIntegrationTests : IClassFixture<RabbitMqFixture>, 
             .ToList();
 
         // Act
-        await _fixture.Consumer.StartConsumingAsync<Process>(_testQueue, Handler, CancellationToken.None);
+        await _fixture.Consumer.StartConsumingAsync<Process>(Handler, CancellationToken.None);
 
         foreach (var process in processes)
         {
@@ -205,7 +205,7 @@ public class RabbitMqConsumerIntegrationTests : IClassFixture<RabbitMqFixture>, 
         }
 
         await _fixture.Broker.PublishAsync(_testQueue, CreateTestProcess());
-        await _fixture.Consumer.StartConsumingAsync<Process>(_testQueue, Handler, CancellationToken.None);
+        await _fixture.Consumer.StartConsumingAsync<Process>(Handler, CancellationToken.None);
         await Task.WhenAny(tcs.Task, Task.Delay(5000));
 
         // Act - Stop consuming
