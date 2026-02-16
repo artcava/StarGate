@@ -24,9 +24,6 @@ public class MongoProcessRepositoryIntegrationTests : IClassFixture<MongoDbFixtu
         // TEMPORARY DEBUG: Print connection string for MongoDB Compass
         Console.WriteLine($"\n\n=== MONGODB CONNECTION STRING ===");
         Console.WriteLine(_fixture.ConnectionString);
-        Console.WriteLine($"Database: stargate-test");
-        Console.WriteLine($"Collection: processes");
-        Console.WriteLine($"==================================\n\n");
     }
 
     public Task InitializeAsync() => Task.CompletedTask;
@@ -51,8 +48,6 @@ public class MongoProcessRepositoryIntegrationTests : IClassFixture<MongoDbFixtu
         
         // DEBUG: Print ProcessId for manual inspection
         Console.WriteLine($"Created ProcessId: {process.ProcessId}");
-        Console.WriteLine($"Waiting 5 seconds for manual inspection...");
-        await Task.Delay(5000); // Wait to allow manual inspection
 
         // Verify persistence
         var retrieved = await _repository.GetByIdAsync(process.ProcessId);
