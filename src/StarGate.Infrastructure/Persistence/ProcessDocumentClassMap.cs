@@ -28,30 +28,27 @@ public static class ProcessDocumentClassMap
                 return;
             }
 
-            // CRITICAL: Use GuidRepresentation.Unspecified
-            // This matches the behavior of BsonBinaryData created with BsonBinarySubType.UuidStandard
-            // The subType (04) defines the actual binary format, not the GuidRepresentation enum
+            // Register global GuidSerializer with Standard representation (subType 03)
+            // This must match MongoClientSettings.GuidRepresentation
             try
             {
-                BsonSerializer.RegisterSerializer(new GuidSerializer(GuidRepresentation.Unspecified));
+                BsonSerializer.RegisterSerializer(new GuidSerializer(GuidRepresentation.Standard));
             }
             catch (BsonSerializationException)
             {
                 // Already registered - safe to ignore
             }
 
-            // Then register class map for document field serialization
-            // Check if already registered by MongoDB conventions
+            // Register class map for ProcessDocument
             if (!BsonClassMap.IsClassMapRegistered(typeof(ProcessDocument)))
             {
                 BsonClassMap.RegisterClassMap<ProcessDocument>(cm =>
                 {
                     cm.AutoMap();
                     
-                    // Map ProcessId as _id with Unspecified GuidRepresentation
-                    // This allows it to work with any BsonBinarySubType
+                    // Map ProcessId as _id with Standard GuidSerializer (subType 03)
                     cm.MapIdMember(c => c.ProcessId)
-                        .SetSerializer(new GuidSerializer(GuidRepresentation.Unspecified));
+                        .SetSerializer(new GuidSerializer(GuidRepresentation.Standard));
                 });
             }
 
