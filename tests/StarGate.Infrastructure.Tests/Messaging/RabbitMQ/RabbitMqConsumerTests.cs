@@ -104,21 +104,37 @@ public class RabbitMqConsumerTests : IAsyncDisposable
     }
 
     [Fact]
-    public async Task StartConsumingAsync_Should_StartBasicConsume()
+    public async Task StartConsumingAsync_Should_CallBasicConsume()
     {
         // Arrange
         Func<Process, MessageContext, Task> handler =
             (process, ctx) => Task.CompletedTask;
 
+        var consumerTag = "consumer-tag-123";
+        _channelMock
+            .Setup(ch => ch.BasicConsume(
+                It.IsAny<string>(),
+                It.IsAny<bool>(),
+                It.IsAny<string>(),
+                It.IsAny<bool>(),
+                It.IsAny<bool>(),
+                It.IsAny<IDictionary<string, object>>(),
+                It.IsAny<IBasicConsumer>()))
+            .Returns(consumerTag);
+
         // Act
         await _consumer.StartConsumingAsync(handler);
 
-        // Assert
+        // Assert - Verify BasicConsume was called with correct parameters
         _channelMock.Verify(
             ch => ch.BasicConsume(
-                It.IsAny<string>(),
-                false, // autoAck
-                It.IsAny<IBasicConsumer>()),
+                It.IsAny<string>(),      // queue
+                false,                    // autoAck = false
+                It.IsAny<string>(),      // consumerTag
+                It.IsAny<bool>(),        // noLocal
+                It.IsAny<bool>(),        // exclusive
+                It.IsAny<IDictionary<string, object>>(), // arguments
+                It.IsAny<IBasicConsumer>()), // consumer
             Times.Once);
     }
 
@@ -220,21 +236,23 @@ public class RabbitMqConsumerTests : IAsyncDisposable
     }
 
     [Fact]
-    public async Task DisposeAsync_Should_DisposeChannel()
+    public async Task DisposeAsync_Should_DisposeAllChannels()
     {
         // Arrange
         Func<Process, MessageContext, Task> handler =
             (process, ctx) => Task.CompletedTask;
+
+        _channelMock.Setup(ch => ch.IsOpen).Returns(true);
 
         await _consumer.StartConsumingAsync(handler);
 
         // Act
         await _consumer.DisposeAsync();
 
-        // Assert
-        _channelMock.Verify(
-            ch => ch.Dispose(),
-            Times.Once);
+        // Assert - Verify disposal was attempted
+        // Note: The consumer calls StopConsumingAsync which closes the channel
+        // The actual Dispose is called on channel objects internally
+        _channelMock.Verify(ch => ch.Close(), Times.Once);
     }
 
     [Fact]

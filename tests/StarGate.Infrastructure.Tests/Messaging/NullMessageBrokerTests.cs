@@ -1,6 +1,5 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
-using StarGate.Core.Abstractions;
 using StarGate.Core.Domain;
 using StarGate.Infrastructure.Messaging;
 using Xunit;
@@ -78,7 +77,7 @@ public class NullMessageBrokerTests
     }
 
     [Fact]
-    public void CreateConsumer_Should_ThrowNotImplemented()
+    public void CreateConsumer_Should_ThrowNotSupported()
     {
         // Arrange
         var broker = new NullMessageBroker(NullLogger<NullMessageBroker>.Instance);
@@ -87,6 +86,7 @@ public class NullMessageBrokerTests
         Action act = () => broker.CreateConsumer("test.queue");
 
         // Assert
-        act.Should().Throw<NotImplementedException>();
+        act.Should().Throw<NotSupportedException>()
+            .WithMessage("*does not support message consumers*");
     }
 }
