@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluentAssertions;
 using RabbitMQ.Client;
 using StarGate.Core.Abstractions;
@@ -22,29 +23,36 @@ public class RabbitMqDeadLetterQueueTests : IClassFixture<RabbitMqFixture>, IAsy
 
     public async Task DisposeAsync()
     {
-        await _fixture.Consumer.StopConsumingAsync();
+        try
+        {
+            await _fixture.Consumer.StopConsumingAsync();
+        }
+        catch (InvalidOperationException)
+        {
+            // Consumer was not started, ignore
+        }
+        
         _fixture.DeleteQueue(_testQueue);
         _fixture.PurgeQueue(_fixture.Options.DeadLetterQueue);
     }
 
     [Fact]
-    public async Task Consumer_Should_SendToDLQ_WhenHandlerReturnsReject()
+    public async Task Consumer_Should_SendToDLQ_WhenHandlerRejects()
     {
         // Arrange
-        var tcs = new TaskCompletionSource<bool>();
+        var tcs = new TaskCompletionSource();
 
-        Func<MessageEnvelope<Process>, CancellationToken, Task<MessageHandlingResult>> handler = 
-            async (envelope, ct) =>
-            {
-                tcs.TrySetResult(true);
-                return await Task.FromResult(MessageHandlingResult.Reject);
-            };
+        async Task Handler(Process message, MessageContext context)
+        {
+            await context.RejectAsync(false); // requeue = false, send to DLQ
+            tcs.SetResult();
+        }
 
         var process = CreateTestProcess();
 
-        // Act
+        // Act - Publish FIRST to create queue
         await _fixture.Broker.PublishAsync(_testQueue, process);
-        await _fixture.Consumer.StartConsumingAsync(_testQueue, handler, CancellationToken.None);
+        await _fixture.Consumer.StartConsumingAsync<Process>(Handler, CancellationToken.None);
 
         var consumed = await Task.WhenAny(tcs.Task, Task.Delay(5000)) == tcs.Task;
 
@@ -64,26 +72,27 @@ public class RabbitMqDeadLetterQueueTests : IClassFixture<RabbitMqFixture>, IAsy
         // Arrange
         var rejectedCount = 0;
         var expectedRejects = 5;
-        var tcs = new TaskCompletionSource<bool>();
+        var tcs = new TaskCompletionSource();
 
-        Func<MessageEnvelope<Process>, CancellationToken, Task<MessageHandlingResult>> handler = 
-            async (envelope, ct) =>
+        async Task Handler(Process message, MessageContext context)
+        {
+            await context.RejectAsync(false); // requeue = false, send to DLQ
+            if (Interlocked.Increment(ref rejectedCount) >= expectedRejects)
             {
-                if (Interlocked.Increment(ref rejectedCount) >= expectedRejects)
-                {
-                    tcs.TrySetResult(true);
-                }
-                return await Task.FromResult(MessageHandlingResult.Reject);
-            };
+                tcs.SetResult();
+            }
+        }
 
         var processes = Enumerable.Range(0, expectedRejects)
             .Select(_ => CreateTestProcess())
             .ToList();
 
-        // Act
-        await _fixture.Consumer.StartConsumingAsync(_testQueue, handler, CancellationToken.None);
+        // Act - Publish first message to create queue
+        await _fixture.Broker.PublishAsync(_testQueue, processes[0]);
+        await _fixture.Consumer.StartConsumingAsync<Process>(Handler, CancellationToken.None);
 
-        foreach (var process in processes)
+        // Publish remaining messages
+        foreach (var process in processes.Skip(1))
         {
             await _fixture.Broker.PublishAsync(_testQueue, process);
         }
@@ -102,24 +111,23 @@ public class RabbitMqDeadLetterQueueTests : IClassFixture<RabbitMqFixture>, IAsy
     public async Task Consumer_Should_PreserveMessageData_InDLQ()
     {
         // Arrange
-        var tcs = new TaskCompletionSource<bool>();
+        var tcs = new TaskCompletionSource();
 
-        Func<MessageEnvelope<Process>, CancellationToken, Task<MessageHandlingResult>> handler = 
-            async (envelope, ct) =>
-            {
-                tcs.TrySetResult(true);
-                return await Task.FromResult(MessageHandlingResult.Reject);
-            };
+        async Task Handler(Process message, MessageContext context)
+        {
+            await context.RejectAsync(false); // requeue = false, send to DLQ
+            tcs.SetResult();
+        }
 
         var originalProcess = CreateTestProcess() with
         {
             ClientProcessId = "POISON-MESSAGE-123",
-            Data = new { reason = "test rejection" }
+            Data = JsonDocument.Parse("{\"reason\":\"test rejection\"}")
         };
 
-        // Act
+        // Act - Publish FIRST to create queue
         await _fixture.Broker.PublishAsync(_testQueue, originalProcess);
-        await _fixture.Consumer.StartConsumingAsync(_testQueue, handler, CancellationToken.None);
+        await _fixture.Consumer.StartConsumingAsync<Process>(Handler, CancellationToken.None);
 
         var consumed = await Task.WhenAny(tcs.Task, Task.Delay(5000)) == tcs.Task;
 
@@ -133,8 +141,9 @@ public class RabbitMqDeadLetterQueueTests : IClassFixture<RabbitMqFixture>, IAsy
         
         result.Should().NotBeNull("message should be in DLQ");
         
-        var envelope = _fixture.Serializer.DeserializeEnvelope<Process>(result!.Body.ToArray());
-        envelope.Payload.ClientProcessId.Should().Be("POISON-MESSAGE-123");
+        // Deserialize message from DLQ
+        var message = _fixture.Serializer.Deserialize<Process>(result!.Body.ToArray());
+        message.ClientProcessId.Should().Be("POISON-MESSAGE-123");
         
         // Clean up - acknowledge the DLQ message
         channel.BasicAck(result.DeliveryTag, false);
@@ -147,7 +156,7 @@ public class RabbitMqDeadLetterQueueTests : IClassFixture<RabbitMqFixture>, IAsy
         var process = CreateTestProcess();
         var properties = new MessageProperties
         {
-            Expiration = TimeSpan.FromMilliseconds(100)
+            TimeToLive = TimeSpan.FromMilliseconds(100)
         };
 
         // Act - Publish with short TTL but don't consume

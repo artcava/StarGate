@@ -1,8 +1,8 @@
+using System.Collections.Concurrent;
 using FluentAssertions;
 using StarGate.Core.Abstractions;
 using StarGate.Core.Domain;
 using StarGate.Integration.Tests.Fixtures;
-using System.Collections.Concurrent;
 using Xunit;
 
 namespace StarGate.Integration.Tests.Messaging;
@@ -22,37 +22,46 @@ public class RabbitMqRequeueTests : IClassFixture<RabbitMqFixture>, IAsyncLifeti
 
     public async Task DisposeAsync()
     {
-        await _fixture.Consumer.StopConsumingAsync();
+        try
+        {
+            await _fixture.Consumer.StopConsumingAsync();
+        }
+        catch (InvalidOperationException)
+        {
+            // Consumer was not started, ignore
+        }
+        
         _fixture.DeleteQueue(_testQueue);
     }
 
     [Fact]
-    public async Task Consumer_Should_RequeueMessage_WhenHandlerReturnsRequeue()
+    public async Task Consumer_Should_RequeueMessage_WhenHandlerRejectsWithRequeue()
     {
         // Arrange
         var attemptCount = 0;
         var maxAttempts = 3;
-        var tcs = new TaskCompletionSource<bool>();
+        var tcs = new TaskCompletionSource();
 
-        Func<MessageEnvelope<Process>, CancellationToken, Task<MessageHandlingResult>> handler = 
-            async (envelope, ct) =>
+        async Task Handler(Process message, MessageContext context)
+        {
+            attemptCount++;
+            
+            if (attemptCount < maxAttempts)
             {
-                attemptCount++;
-                
-                if (attemptCount < maxAttempts)
-                {
-                    return await Task.FromResult(MessageHandlingResult.Requeue);
-                }
-
-                tcs.TrySetResult(true);
-                return await Task.FromResult(MessageHandlingResult.Acknowledge);
-            };
+                await context.RejectAsync(true); // requeue = true
+            }
+            else
+            {
+                await context.AcknowledgeAsync();
+                tcs.SetResult();
+            }
+        }
 
         var process = CreateTestProcess();
 
-        // Act
+        // Act - Publish FIRST to create queue, THEN start consumer
         await _fixture.Broker.PublishAsync(_testQueue, process);
-        await _fixture.Consumer.StartConsumingAsync(_testQueue, handler, CancellationToken.None);
+        await _fixture.Consumer.StartConsumingAsync<Process>(Handler, CancellationToken.None);
 
         var completed = await Task.WhenAny(tcs.Task, Task.Delay(15000)) == tcs.Task;
 
@@ -68,40 +77,39 @@ public class RabbitMqRequeueTests : IClassFixture<RabbitMqFixture>, IAsyncLifeti
         var receivedMessages = new ConcurrentBag<string>();
         var requeue1 = true;
         var requeue2 = true;
-        var tcs = new TaskCompletionSource<bool>();
+        var tcs = new TaskCompletionSource();
 
-        Func<MessageEnvelope<Process>, CancellationToken, Task<MessageHandlingResult>> handler = 
-            async (envelope, ct) =>
+        async Task Handler(Process message, MessageContext context)
+        {
+            var clientId = message.ClientProcessId;
+            receivedMessages.Add(clientId);
+
+            if (clientId == "process-1" && requeue1)
             {
-                var clientId = envelope.Payload.ClientProcessId;
-                receivedMessages.Add(clientId);
-
-                if (clientId == "process-1" && requeue1)
-                {
-                    requeue1 = false;
-                    return await Task.FromResult(MessageHandlingResult.Requeue);
-                }
-
-                if (clientId == "process-2" && requeue2)
-                {
-                    requeue2 = false;
-                    return await Task.FromResult(MessageHandlingResult.Requeue);
-                }
-
+                requeue1 = false;
+                await context.RejectAsync(true); // requeue = true
+            }
+            else if (clientId == "process-2" && requeue2)
+            {
+                requeue2 = false;
+                await context.RejectAsync(true); // requeue = true
+            }
+            else
+            {
+                await context.AcknowledgeAsync();
                 if (receivedMessages.Count >= 4) // 2 initial + 2 requeued
                 {
-                    tcs.TrySetResult(true);
+                    tcs.SetResult();
                 }
-
-                return await Task.FromResult(MessageHandlingResult.Acknowledge);
-            };
+            }
+        }
 
         var process1 = CreateTestProcess() with { ClientProcessId = "process-1" };
         var process2 = CreateTestProcess() with { ClientProcessId = "process-2" };
 
-        // Act
-        await _fixture.Consumer.StartConsumingAsync(_testQueue, handler, CancellationToken.None);
+        // Act - Publish first message FIRST to create queue
         await _fixture.Broker.PublishAsync(_testQueue, process1);
+        await _fixture.Consumer.StartConsumingAsync<Process>(Handler, CancellationToken.None);
         await _fixture.Broker.PublishAsync(_testQueue, process2);
 
         var completed = await Task.WhenAny(tcs.Task, Task.Delay(15000)) == tcs.Task;
@@ -119,35 +127,37 @@ public class RabbitMqRequeueTests : IClassFixture<RabbitMqFixture>, IAsyncLifeti
         var attemptCounts = new ConcurrentDictionary<Guid, int>();
         var completedCount = 0;
         var totalMessages = 10;
-        var tcs = new TaskCompletionSource<bool>();
+        var tcs = new TaskCompletionSource();
 
-        Func<MessageEnvelope<Process>, CancellationToken, Task<MessageHandlingResult>> handler = 
-            async (envelope, ct) =>
+        async Task Handler(Process message, MessageContext context)
+        {
+            var processId = message.ProcessId;
+            var attempts = attemptCounts.AddOrUpdate(processId, 1, (_, count) => count + 1);
+
+            if (attempts < 2)
             {
-                var processId = envelope.Payload.ProcessId;
-                var attempts = attemptCounts.AddOrUpdate(processId, 1, (_, count) => count + 1);
-
-                if (attempts < 2)
-                {
-                    return await Task.FromResult(MessageHandlingResult.Requeue);
-                }
-
+                await context.RejectAsync(true); // requeue = true
+            }
+            else
+            {
+                await context.AcknowledgeAsync();
                 if (Interlocked.Increment(ref completedCount) >= totalMessages)
                 {
-                    tcs.TrySetResult(true);
+                    tcs.SetResult();
                 }
-
-                return await Task.FromResult(MessageHandlingResult.Acknowledge);
-            };
+            }
+        }
 
         var processes = Enumerable.Range(0, totalMessages)
             .Select(_ => CreateTestProcess())
             .ToList();
 
-        // Act
-        await _fixture.Consumer.StartConsumingAsync(_testQueue, handler, CancellationToken.None);
+        // Act - Publish first message to create queue
+        await _fixture.Broker.PublishAsync(_testQueue, processes[0]);
+        await _fixture.Consumer.StartConsumingAsync<Process>(Handler, CancellationToken.None);
 
-        foreach (var process in processes)
+        // Publish remaining messages
+        foreach (var process in processes.Skip(1))
         {
             await _fixture.Broker.PublishAsync(_testQueue, process);
         }
@@ -165,38 +175,40 @@ public class RabbitMqRequeueTests : IClassFixture<RabbitMqFixture>, IAsyncLifeti
         // Arrange
         var receivedProcessIds = new ConcurrentBag<Guid>();
         var attemptCounts = new ConcurrentDictionary<Guid, int>();
-        var tcs = new TaskCompletionSource<bool>();
+        var tcs = new TaskCompletionSource();
         var messageCount = 5;
 
-        Func<MessageEnvelope<Process>, CancellationToken, Task<MessageHandlingResult>> handler = 
-            async (envelope, ct) =>
+        async Task Handler(Process message, MessageContext context)
+        {
+            var processId = message.ProcessId;
+            var attempts = attemptCounts.AddOrUpdate(processId, 1, (_, count) => count + 1);
+
+            if (attempts < 2)
             {
-                var processId = envelope.Payload.ProcessId;
-                var attempts = attemptCounts.AddOrUpdate(processId, 1, (_, count) => count + 1);
-
-                if (attempts < 2)
-                {
-                    return await Task.FromResult(MessageHandlingResult.Requeue);
-                }
-
+                await context.RejectAsync(true); // requeue = true
+            }
+            else
+            {
                 receivedProcessIds.Add(processId);
+                await context.AcknowledgeAsync();
 
                 if (receivedProcessIds.Count >= messageCount)
                 {
-                    tcs.TrySetResult(true);
+                    tcs.SetResult();
                 }
-
-                return await Task.FromResult(MessageHandlingResult.Acknowledge);
-            };
+            }
+        }
 
         var processes = Enumerable.Range(0, messageCount)
             .Select(_ => CreateTestProcess())
             .ToList();
 
-        // Act
-        await _fixture.Consumer.StartConsumingAsync(_testQueue, handler, CancellationToken.None);
+        // Act - Publish first message to create queue
+        await _fixture.Broker.PublishAsync(_testQueue, processes[0]);
+        await _fixture.Consumer.StartConsumingAsync<Process>(Handler, CancellationToken.None);
 
-        foreach (var process in processes)
+        // Publish remaining messages
+        foreach (var process in processes.Skip(1))
         {
             await _fixture.Broker.PublishAsync(_testQueue, process);
         }
