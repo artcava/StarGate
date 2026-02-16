@@ -1,9 +1,9 @@
-namespace StarGate.Infrastructure.Messaging.RabbitMQ;
-
 using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System.Threading;
+
+namespace StarGate.Infrastructure.Messaging.RabbitMQ;
 
 /// <summary>
 /// Factory for creating and configuring RabbitMQ connections.

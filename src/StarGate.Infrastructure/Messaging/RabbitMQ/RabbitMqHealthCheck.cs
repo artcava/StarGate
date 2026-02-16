@@ -1,8 +1,8 @@
-namespace StarGate.Infrastructure.Messaging.RabbitMQ;
-
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
+
+namespace StarGate.Infrastructure.Messaging.RabbitMQ;
 
 /// <summary>
 /// Health check for RabbitMQ connection.
