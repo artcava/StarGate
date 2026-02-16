@@ -47,7 +47,8 @@ public class RabbitMqErrorHandlingTests : IClassFixture<RabbitMqFixture>, IAsync
 
             if (attemptCount < 2)
             {
-                throw new InvalidOperationException("Simulated processing error");
+                // Use ApplicationException to trigger requeue (not InvalidOperationException)
+                throw new ApplicationException("Simulated processing error");
             }
 
             await context.AcknowledgeAsync();
@@ -118,10 +119,10 @@ public class RabbitMqErrorHandlingTests : IClassFixture<RabbitMqFixture>, IAsync
                 receivedMessages.Add(message.ProcessId);
             }
 
-            // First message throws exception
+            // First message throws exception (will be requeued)
             if (receivedMessages.Count == 1)
             {
-                throw new InvalidOperationException("Simulated error on first message");
+                throw new ApplicationException("Simulated error on first message");
             }
 
             await context.AcknowledgeAsync();
@@ -205,7 +206,8 @@ public class RabbitMqErrorHandlingTests : IClassFixture<RabbitMqFixture>, IAsync
         Task Handler(Process message, MessageContext context)
         {
             Interlocked.Increment(ref attemptCount);
-            throw new InvalidOperationException("Always fails");
+            // Use ApplicationException to trigger requeue behavior
+            throw new ApplicationException("Always fails");
         }
 
         var process = CreateTestProcess();
