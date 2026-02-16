@@ -36,12 +36,19 @@ public class MongoDbFixture : IAsyncLifetime
     public async Task InitializeAsync()
     {
         // CRITICAL: Register serializers BEFORE creating MongoClient
-        // Once MongoClient is created, it captures the current serialization settings
         RegisterSerializers();
 
         await _mongoContainer.StartAsync();
 
-        _mongoClient = new MongoClient(ConnectionString);
+        // CRITICAL: Configure MongoClientSettings with explicit GuidRepresentation
+        // This ensures ALL Guid operations use Standard representation (subType 03)
+        var settings = MongoClientSettings.FromConnectionString(ConnectionString);
+        
+#pragma warning disable CS0618 // GuidRepresentation is obsolete but required for MongoDB.Driver 2.28.0
+        settings.GuidRepresentation = GuidRepresentation.Standard;
+#pragma warning restore CS0618
+
+        _mongoClient = new MongoClient(settings);
         _database = _mongoClient.GetDatabase("stargate-test");
 
         // Ensure indexes are created
@@ -62,11 +69,10 @@ public class MongoDbFixture : IAsyncLifetime
                 return;
             }
 
-            // Register global GuidSerializer with Unspecified representation
-            // This matches BsonBinaryData behavior with BsonBinarySubType.UuidStandard
+            // Register global GuidSerializer with Standard representation (subType 03)
             try
             {
-                BsonSerializer.RegisterSerializer(new GuidSerializer(GuidRepresentation.Unspecified));
+                BsonSerializer.RegisterSerializer(new GuidSerializer(GuidRepresentation.Standard));
             }
             catch (BsonSerializationException)
             {
@@ -80,7 +86,7 @@ public class MongoDbFixture : IAsyncLifetime
                 {
                     cm.AutoMap();
                     cm.MapIdMember(c => c.ProcessId)
-                        .SetSerializer(new GuidSerializer(GuidRepresentation.Unspecified));
+                        .SetSerializer(new GuidSerializer(GuidRepresentation.Standard));
                 });
             }
 
@@ -104,16 +110,9 @@ public class MongoDbFixture : IAsyncLifetime
 
     private async Task CreateIndexesAsync()
     {
-        // _database is guaranteed to be non-null when this method is called
-        // GuidRepresentation is configured via [BsonGuidRepresentation] attribute
         var processCollection = _database!.GetCollection<ProcessDocument>("processes");
 
-        // CRITICAL: MongoDB automatically creates a unique index on _id field.
-        // ProcessDocument.ProcessId is marked with [BsonId], so it IS the _id field.
-        // We must NEVER create an explicit index on _id or ProcessId.
-        
         // Index 1: Composite unique index on ClientId + ClientProcessId (idempotency)
-        // This ensures that a client cannot submit the same process twice
         await processCollection.Indexes.CreateOneAsync(
             new CreateIndexModel<ProcessDocument>(
                 Builders<ProcessDocument>.IndexKeys
@@ -148,15 +147,10 @@ public class MongoDbFixture : IAsyncLifetime
                     .Ascending(p => p.Status),
                 new CreateIndexOptions { Name = "idx_clientId_processType_status" }));
 
-        // Policy collections indexes
-        // Note: ProcessTypePolicyDocument uses ProcessType as _id, so no additional index needed
-        
         // ClientPolicyOverrideDocument indexes
         var clientOverridesCollection = _database!.GetCollection<ClientPolicyOverrideDocument>("clientPolicyOverrides");
         
         // Index 1: Composite index on ClientId + ProcessType for queries
-        // Note: The Id field is already _id (ClientId:ProcessType composite)
-        // This index is for querying by these fields, not for uniqueness
         await clientOverridesCollection.Indexes.CreateOneAsync(
             new CreateIndexModel<ClientPolicyOverrideDocument>(
                 Builders<ClientPolicyOverrideDocument>.IndexKeys
