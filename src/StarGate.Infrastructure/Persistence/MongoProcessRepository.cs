@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using MongoDB.Bson;
 using MongoDB.Driver;
 using StarGate.Core.Abstractions;
 using StarGate.Core.Domain;
@@ -100,10 +101,11 @@ public class MongoProcessRepository : IProcessRepository
     {
         _logger.LogDebug("Retrieving process {ProcessId}", processId);
 
-        // CRITICAL: Use lambda expression instead of string literal
-        // This ensures MongoDB uses the ProcessDocument class map for serialization
-        // which has Standard GuidSerializer configured for ProcessId
-        var filter = Builders<ProcessDocument>.Filter.Eq(p => p.ProcessId, processId);
+        // CRITICAL: Convert Guid to BsonBinaryData with Standard representation
+        // This ensures we search for the exact binary format stored in _id
+        var bsonGuid = new BsonBinaryData(processId, GuidRepresentation.Standard);
+        var filter = Builders<ProcessDocument>.Filter.Eq("_id", bsonGuid);
+        
         var document = await _collection.Find(filter).FirstOrDefaultAsync(ct);
 
         if (document == null)
@@ -174,9 +176,9 @@ public class MongoProcessRepository : IProcessRepository
         {
             var document = ProcessMapper.MapToDocument(process);
             
-            // CRITICAL: Use lambda expression instead of string literal
-            // This ensures MongoDB uses the ProcessDocument class map for serialization
-            var filter = Builders<ProcessDocument>.Filter.Eq(p => p.ProcessId, process.ProcessId);
+            // CRITICAL: Convert Guid to BsonBinaryData with Standard representation
+            var bsonGuid = new BsonBinaryData(process.ProcessId, GuidRepresentation.Standard);
+            var filter = Builders<ProcessDocument>.Filter.Eq("_id", bsonGuid);
 
             var result = await _collection.ReplaceOneAsync(
                 filter,
