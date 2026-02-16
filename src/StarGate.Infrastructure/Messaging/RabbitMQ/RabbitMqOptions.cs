@@ -74,4 +74,24 @@ public class RabbitMqOptions
     /// Time to wait for pending messages to complete before closing channels.
     /// </summary>
     public int ShutdownGracePeriodMs { get; init; } = 1000;
+
+    /// <summary>
+    /// Maximum number of connection recovery attempts before requiring manual intervention.
+    /// </summary>
+    public int MaxRecoveryAttempts { get; init; } = 10;
+
+    /// <summary>
+    /// Network recovery interval in seconds between reconnection attempts.
+    /// </summary>
+    public int NetworkRecoveryIntervalSeconds { get; init; } = 10;
+
+    /// <summary>
+    /// Heartbeat interval in seconds for detecting dead connections.
+    /// </summary>
+    public int HeartbeatSeconds { get; init; } = 60;
+
+    /// <summary>
+    /// Connection timeout in seconds for establishing initial connection.
+    /// </summary>
+    public int ConnectionTimeoutSeconds { get; init; } = 30;
 }
