@@ -9,7 +9,7 @@ namespace StarGate.Integration.Tests.Messaging;
 public class RabbitMqErrorHandlingTests : IClassFixture<RabbitMqFixture>, IAsyncLifetime
 {
     private readonly RabbitMqFixture _fixture;
-    private const string QueueName = "stargate.process"; // Standard queue naming convention
+    private const string _queueName = "stargate.process"; // Standard queue naming convention
 
     public RabbitMqErrorHandlingTests(RabbitMqFixture fixture)
     {
@@ -29,14 +29,14 @@ public class RabbitMqErrorHandlingTests : IClassFixture<RabbitMqFixture>, IAsync
             // Consumer was not started, ignore
         }
         
-        _fixture.PurgeQueue(QueueName);
+        _fixture.PurgeQueue(_queueName);
     }
 
     [Fact]
     public async Task Consumer_Should_RequeueMessage_WhenHandlerThrowsException()
     {
         // Arrange
-        _fixture.PurgeQueue(QueueName);
+        _fixture.PurgeQueue(_queueName);
         
         var attemptCount = 0;
         var tcs = new TaskCompletionSource();
@@ -58,7 +58,7 @@ public class RabbitMqErrorHandlingTests : IClassFixture<RabbitMqFixture>, IAsync
         var process = CreateTestProcess();
 
         // Act
-        await _fixture.Broker.PublishAsync(QueueName, process);
+        await _fixture.Broker.PublishAsync(_queueName, process);
         await _fixture.Consumer.StartConsumingAsync<Process>(Handler, CancellationToken.None);
 
         var completed = await Task.WhenAny(tcs.Task, Task.Delay(10000)) == tcs.Task;
@@ -72,7 +72,7 @@ public class RabbitMqErrorHandlingTests : IClassFixture<RabbitMqFixture>, IAsync
     public async Task Consumer_Should_HandleCancellation_Gracefully()
     {
         // Arrange
-        _fixture.PurgeQueue(QueueName);
+        _fixture.PurgeQueue(_queueName);
         
         var receivedCount = 0;
         var cts = new CancellationTokenSource();
@@ -93,7 +93,7 @@ public class RabbitMqErrorHandlingTests : IClassFixture<RabbitMqFixture>, IAsync
         var process = CreateTestProcess();
 
         // Act
-        await _fixture.Broker.PublishAsync(QueueName, process);
+        await _fixture.Broker.PublishAsync(_queueName, process);
         await _fixture.Consumer.StartConsumingAsync<Process>(Handler, cts.Token);
 
         await Task.Delay(2000);
@@ -106,7 +106,7 @@ public class RabbitMqErrorHandlingTests : IClassFixture<RabbitMqFixture>, IAsync
     public async Task Consumer_Should_ContinueProcessing_AfterNonFatalError()
     {
         // Arrange
-        _fixture.PurgeQueue(QueueName);
+        _fixture.PurgeQueue(_queueName);
         
         var receivedMessages = new List<Guid>();
         var processedCount = 0;
@@ -139,7 +139,7 @@ public class RabbitMqErrorHandlingTests : IClassFixture<RabbitMqFixture>, IAsync
         // Act - Publish all messages
         foreach (var process in processes)
         {
-            await _fixture.Broker.PublishAsync(QueueName, process);
+            await _fixture.Broker.PublishAsync(_queueName, process);
         }
         
         await _fixture.Consumer.StartConsumingAsync<Process>(Handler, CancellationToken.None);
@@ -155,7 +155,7 @@ public class RabbitMqErrorHandlingTests : IClassFixture<RabbitMqFixture>, IAsync
     public async Task Consumer_Should_HandleTimeoutGracefully()
     {
         // Arrange
-        _fixture.PurgeQueue(QueueName);
+        _fixture.PurgeQueue(_queueName);
         
         var attemptCount = 0;
         var tcs = new TaskCompletionSource();
@@ -186,7 +186,7 @@ public class RabbitMqErrorHandlingTests : IClassFixture<RabbitMqFixture>, IAsync
         var process = CreateTestProcess();
 
         // Act
-        await _fixture.Broker.PublishAsync(QueueName, process);
+        await _fixture.Broker.PublishAsync(_queueName, process);
         await _fixture.Consumer.StartConsumingAsync<Process>(Handler, cts.Token);
 
         await Task.Delay(5000);
@@ -199,7 +199,7 @@ public class RabbitMqErrorHandlingTests : IClassFixture<RabbitMqFixture>, IAsync
     public async Task Consumer_Should_NotAcknowledge_WhenProcessingFails()
     {
         // Arrange
-        _fixture.PurgeQueue(QueueName);
+        _fixture.PurgeQueue(_queueName);
         
         var attemptCount = 0;
 
@@ -213,7 +213,7 @@ public class RabbitMqErrorHandlingTests : IClassFixture<RabbitMqFixture>, IAsync
         var process = CreateTestProcess();
 
         // Act
-        await _fixture.Broker.PublishAsync(QueueName, process);
+        await _fixture.Broker.PublishAsync(_queueName, process);
         await _fixture.Consumer.StartConsumingAsync<Process>(Handler, CancellationToken.None);
 
         // Wait for multiple retry attempts
@@ -225,7 +225,7 @@ public class RabbitMqErrorHandlingTests : IClassFixture<RabbitMqFixture>, IAsync
         // Assert
         attemptCount.Should().BeGreaterThan(1, "message should be retried multiple times");
         
-        var messageCount = _fixture.GetMessageCount(QueueName);
+        var messageCount = _fixture.GetMessageCount(_queueName);
         messageCount.Should().BeGreaterOrEqualTo(0, "unprocessed message should remain in queue");
     }
 
