@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using RabbitMQ.Client;
 using StarGate.Infrastructure.Messaging;
@@ -66,9 +67,10 @@ public class RabbitMqFixture : IAsyncLifetime
 
         _serializer = new JsonMessageSerializer(NullLogger<JsonMessageSerializer>.Instance);
 
+        // RabbitMqConnectionFactory is static and requires ILogger (not ILogger<T>)
         _connection = RabbitMqConnectionFactory.CreateConnection(
             Options,
-            NullLogger<RabbitMqConnectionFactory>.Instance);
+            NullLogger.Instance);
 
         _broker = new RabbitMqBroker(
             _connection,
@@ -86,7 +88,13 @@ public class RabbitMqFixture : IAsyncLifetime
     public async Task DisposeAsync()
     {
         _broker?.Dispose();
-        _consumer?.Dispose();
+        
+        // RabbitMqConsumer implements IAsyncDisposable, not IDisposable
+        if (_consumer != null)
+        {
+            await _consumer.DisposeAsync();
+        }
+        
         _connection?.Dispose();
         await _rabbitMqContainer.DisposeAsync();
     }
