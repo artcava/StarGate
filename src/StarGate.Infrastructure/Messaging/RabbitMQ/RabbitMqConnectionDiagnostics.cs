@@ -27,13 +27,14 @@ public class RabbitMqConnectionDiagnostics
     {
         var isAutoRecovering = _connection is IAutorecoveringConnection;
         var isRecoveryInProgress = isAutoRecovering && !_connection.IsOpen;
+        var knownHostsCount = GetKnownHostsCount();
 
         var status = new ConnectionStatus
         {
             IsOpen = _connection.IsOpen,
             Endpoint = _connection.Endpoint?.ToString() ?? "unknown",
             ClientProvidedName = _connection.ClientProvidedName,
-            KnownHosts = _connection.KnownHosts?.Count ?? 0,
+            KnownHosts = knownHostsCount,
             ServerProperties = GetServerProperties(),
             AutomaticRecoveryEnabled = isAutoRecovering,
             RecoveryInProgress = isRecoveryInProgress
@@ -71,6 +72,20 @@ public class RabbitMqConnectionDiagnostics
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting RabbitMQ diagnostics");
+        }
+    }
+
+    private int GetKnownHostsCount()
+    {
+        try
+        {
+            // KnownHosts might be a method or property depending on RabbitMQ.Client version
+            var knownHosts = _connection.KnownHosts;
+            return knownHosts?.Count ?? 0;
+        }
+        catch
+        {
+            return 0;
         }
     }
 
