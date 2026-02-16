@@ -58,17 +58,12 @@ public class MongoDbFixture : IAsyncLifetime
         // _database is guaranteed to be non-null when this method is called
         var processCollection = _database!.GetCollection<ProcessDocument>("processes");
 
-        // NOTE: MongoDB automatically creates a unique index on _id field.
-        // We should NEVER explicitly create an index on _id as it's invalid.
-        // Only create indexes on custom fields.
-
-        // Index 1: Unique index on ProcessId (business key)
-        await processCollection.Indexes.CreateOneAsync(
-            new CreateIndexModel<ProcessDocument>(
-                Builders<ProcessDocument>.IndexKeys.Ascending(p => p.ProcessId),
-                new CreateIndexOptions { Unique = true, Name = "idx_processId" }));
-
-        // Index 2: Composite unique index on ClientId + ClientProcessId (idempotency)
+        // CRITICAL: MongoDB automatically creates a unique index on _id field.
+        // ProcessDocument.ProcessId is marked with [BsonId], so it IS the _id field.
+        // We must NEVER create an explicit index on _id or ProcessId.
+        
+        // Index 1: Composite unique index on ClientId + ClientProcessId (idempotency)
+        // This ensures that a client cannot submit the same process twice
         await processCollection.Indexes.CreateOneAsync(
             new CreateIndexModel<ProcessDocument>(
                 Builders<ProcessDocument>.IndexKeys
@@ -76,25 +71,25 @@ public class MongoDbFixture : IAsyncLifetime
                     .Ascending(p => p.ClientProcessId),
                 new CreateIndexOptions { Unique = true, Name = "idx_clientId_clientProcessId" }));
 
-        // Index 3: Index on Status (query optimization)
+        // Index 2: Index on Status (query optimization for status-based queries)
         await processCollection.Indexes.CreateOneAsync(
             new CreateIndexModel<ProcessDocument>(
                 Builders<ProcessDocument>.IndexKeys.Ascending(p => p.Status),
                 new CreateIndexOptions { Name = "idx_status" }));
 
-        // Index 4: Index on CreatedAt (query optimization)
+        // Index 3: Index on CreatedAt (query optimization for time-based queries)
         await processCollection.Indexes.CreateOneAsync(
             new CreateIndexModel<ProcessDocument>(
                 Builders<ProcessDocument>.IndexKeys.Ascending(p => p.CreatedAt),
                 new CreateIndexOptions { Name = "idx_createdAt" }));
 
-        // Index 5: Unique index on IdempotencyKey (prevent duplicates)
+        // Index 4: Unique index on IdempotencyKey (prevent duplicate submissions)
         await processCollection.Indexes.CreateOneAsync(
             new CreateIndexModel<ProcessDocument>(
                 Builders<ProcessDocument>.IndexKeys.Ascending(p => p.IdempotencyKey),
                 new CreateIndexOptions { Unique = true, Name = "idx_idempotencyKey" }));
 
-        // Index 6: Composite index on ClientId + ProcessType + Status (concurrency queries)
+        // Index 5: Composite index on ClientId + ProcessType + Status (concurrency limit queries)
         await processCollection.Indexes.CreateOneAsync(
             new CreateIndexModel<ProcessDocument>(
                 Builders<ProcessDocument>.IndexKeys
@@ -110,7 +105,8 @@ public class MongoDbFixture : IAsyncLifetime
         var clientOverridesCollection = _database!.GetCollection<ClientPolicyOverrideDocument>("clientPolicyOverrides");
         
         // Index 1: Composite index on ClientId + ProcessType for queries
-        // Note: The Id field is already _id (ClientId:ProcessType composite), but we need this for queries
+        // Note: The Id field is already _id (ClientId:ProcessType composite)
+        // This index is for querying by these fields, not for uniqueness
         await clientOverridesCollection.Indexes.CreateOneAsync(
             new CreateIndexModel<ClientPolicyOverrideDocument>(
                 Builders<ClientPolicyOverrideDocument>.IndexKeys
