@@ -28,22 +28,30 @@ public static class ProcessDocumentClassMap
                 return;
             }
 
-            // Check if already registered by MongoDB conventions
-            if (BsonClassMap.IsClassMapRegistered(typeof(ProcessDocument)))
+            // CRITICAL: Register global GuidSerializer FIRST
+            // This ensures Guid values in filters use Standard format
+            try
             {
-                _isRegistered = true;
-                return;
+                BsonSerializer.RegisterSerializer(new GuidSerializer(GuidRepresentation.Standard));
+            }
+            catch (BsonSerializationException)
+            {
+                // Already registered - safe to ignore
             }
 
-            // Register the class map with explicit Guid serializer
-            BsonClassMap.RegisterClassMap<ProcessDocument>(cm =>
+            // Then register class map for document field serialization
+            // Check if already registered by MongoDB conventions
+            if (!BsonClassMap.IsClassMapRegistered(typeof(ProcessDocument)))
             {
-                cm.AutoMap();
-                
-                // Explicitly map ProcessId as _id with Standard GuidSerializer
-                cm.MapIdMember(c => c.ProcessId)
-                    .SetSerializer(new GuidSerializer(GuidRepresentation.Standard));
-            });
+                BsonClassMap.RegisterClassMap<ProcessDocument>(cm =>
+                {
+                    cm.AutoMap();
+                    
+                    // Explicitly map ProcessId as _id with Standard GuidSerializer
+                    cm.MapIdMember(c => c.ProcessId)
+                        .SetSerializer(new GuidSerializer(GuidRepresentation.Standard));
+                });
+            }
 
             _isRegistered = true;
         }
