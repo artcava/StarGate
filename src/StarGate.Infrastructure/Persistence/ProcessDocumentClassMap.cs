@@ -28,11 +28,12 @@ public static class ProcessDocumentClassMap
                 return;
             }
 
-            // CRITICAL: Register global GuidSerializer FIRST
-            // This ensures Guid values in filters use Standard format
+            // CRITICAL: Use GuidRepresentation.Unspecified
+            // This matches the behavior of BsonBinaryData created with BsonBinarySubType.UuidStandard
+            // The subType (04) defines the actual binary format, not the GuidRepresentation enum
             try
             {
-                BsonSerializer.RegisterSerializer(new GuidSerializer(GuidRepresentation.Standard));
+                BsonSerializer.RegisterSerializer(new GuidSerializer(GuidRepresentation.Unspecified));
             }
             catch (BsonSerializationException)
             {
@@ -47,9 +48,10 @@ public static class ProcessDocumentClassMap
                 {
                     cm.AutoMap();
                     
-                    // Explicitly map ProcessId as _id with Standard GuidSerializer
+                    // Map ProcessId as _id with Unspecified GuidRepresentation
+                    // This allows it to work with any BsonBinarySubType
                     cm.MapIdMember(c => c.ProcessId)
-                        .SetSerializer(new GuidSerializer(GuidRepresentation.Standard));
+                        .SetSerializer(new GuidSerializer(GuidRepresentation.Unspecified));
                 });
             }
 
