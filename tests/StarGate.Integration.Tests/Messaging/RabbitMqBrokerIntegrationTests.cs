@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluentAssertions;
 using RabbitMQ.Client;
 using StarGate.Core.Abstractions;
@@ -153,7 +154,7 @@ public class RabbitMqBrokerIntegrationTests : IClassFixture<RabbitMqFixture>, IA
         var process = CreateTestProcess();
         var properties = new MessageProperties
         {
-            Expiration = TimeSpan.FromMilliseconds(100)
+            TimeToLive = TimeSpan.FromMilliseconds(100)
         };
 
         // Act
@@ -202,7 +203,11 @@ public class RabbitMqBrokerIntegrationTests : IClassFixture<RabbitMqFixture>, IA
             }
         };
 
-        var process = CreateTestProcess() with { Data = complexData };
+        // Convert anonymous type to JsonDocument
+        var jsonString = JsonSerializer.Serialize(complexData);
+        var jsonDocument = JsonDocument.Parse(jsonString);
+
+        var process = CreateTestProcess() with { Data = jsonDocument };
 
         // Act
         await _fixture.Broker.PublishAsync(_testQueue, process);
