@@ -219,6 +219,13 @@ public class RabbitMqBrokerTests : IDisposable
         var queueName = "test.queue";
         var process = CreateTestProcess();
 
+        // Create AlreadyClosedException instance with required parameters
+        var shutdownArgs = new ShutdownEventArgs(
+            ShutdownInitiator.Application,
+            320,
+            "Channel closed");
+        var exception = new AlreadyClosedException(shutdownArgs);
+
         _channelMock
             .Setup(ch => ch.QueueDeclare(
                 It.IsAny<string>(),
@@ -226,7 +233,7 @@ public class RabbitMqBrokerTests : IDisposable
                 It.IsAny<bool>(),
                 It.IsAny<bool>(),
                 It.IsAny<IDictionary<string, object>>()))
-            .Throws<AlreadyClosedException>();
+            .Throws(exception);
 
         // Act
         Func<Task> act = async () => await _broker.PublishAsync(queueName, process);
