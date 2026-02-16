@@ -1,11 +1,11 @@
-namespace StarGate.Integration.Tests.Messaging;
-
 using FluentAssertions;
 using StarGate.Core.Abstractions;
 using StarGate.Core.Domain;
 using StarGate.Integration.Tests.Fixtures;
 using System.Collections.Concurrent;
 using Xunit;
+
+namespace StarGate.Integration.Tests.Messaging;
 
 public class RabbitMqConsumerIntegrationTests : IClassFixture<RabbitMqFixture>, IAsyncLifetime
 {
