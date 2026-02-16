@@ -171,19 +171,41 @@ public class PolicyProviderTests
     }
 
     [Theory]
-    [InlineData(null, "order")]
-    [InlineData("", "order")]
-    [InlineData(" ", "order")]
-    [InlineData("client-123", null)]
-    [InlineData("client-123", "")]
-    [InlineData("client-123", " ")]
-    public async Task GetTimeoutAsync_WithInvalidParameters_ThrowsArgumentException(
-        string? clientId,
-        string? processType)
+    [InlineData(null)]
+    public async Task GetTimeoutAsync_WithNullClientId_ThrowsArgumentNullException(string? clientId)
+    {
+        // Act & Assert
+        await Assert.ThrowsAsync<ArgumentNullException>(
+            () => _sut.GetTimeoutAsync(clientId!, "order"));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    public async Task GetTimeoutAsync_WithNullProcessType_ThrowsArgumentNullException(string? processType)
+    {
+        // Act & Assert
+        await Assert.ThrowsAsync<ArgumentNullException>(
+            () => _sut.GetTimeoutAsync("client-123", processType!));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    public async Task GetTimeoutAsync_WithEmptyClientId_ThrowsArgumentException(string clientId)
     {
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(
-            () => _sut.GetTimeoutAsync(clientId!, processType!));
+            () => _sut.GetTimeoutAsync(clientId, "order"));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    public async Task GetTimeoutAsync_WithEmptyProcessType_ThrowsArgumentException(string processType)
+    {
+        // Act & Assert
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => _sut.GetTimeoutAsync("client-123", processType));
     }
 
     private static ProcessTypePolicy CreateDefaultPolicy(string processType)
