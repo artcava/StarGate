@@ -41,27 +41,20 @@ public class MongoProcessRepository : IProcessRepository
 
             try
             {
-                // Check if a serializer is already registered for Guid
-                // This can happen when running multiple test classes in sequence
-                var existingSerializer = BsonSerializer.LookupSerializer<Guid>();
-                
-                // If the existing serializer is already using Standard representation, we're done
-                if (existingSerializer is GuidSerializer guidSerializer)
-                {
-                    // Serializer already registered, mark as complete
-                    _serializersRegistered = true;
-                    return;
-                }
-                
-                // Register GuidSerializer with Standard representation
-                // This is required for MongoDB.Driver 2.28.0+ to honor [BsonGuidRepresentation]
-                // Without this, MongoDB uses CSharpLegacy by default, causing query mismatches
+                // ALWAYS attempt to register the GuidSerializer with Standard representation
+                // This is critical for MongoDB.Driver 2.28.0+ to honor [BsonGuidRepresentation]
+                // 
+                // If already registered (multi-test scenarios), BsonSerializationException is thrown
+                // which we catch and ignore - making this operation idempotent
+                //
+                // Note: LookupSerializer always returns a serializer (default CSharpLegacy),
+                // so we can't use it to check if OUR Standard serializer is registered
                 BsonSerializer.RegisterSerializer(new GuidSerializer(GuidRepresentation.Standard));
             }
             catch (BsonSerializationException)
             {
-                // Serializer already registered by another instance/thread
-                // This is safe to ignore
+                // Serializer already registered - this is expected in multi-test scenarios
+                // Safe to ignore
             }
             
             _serializersRegistered = true;
@@ -193,6 +186,7 @@ public class MongoProcessRepository : IProcessRepository
                 clientProcessId);
             return null;
         }
+
         var process = ProcessMapper.MapToDomain(document);
         _logger.LogDebug(
             "Process {ProcessId} found for client {ClientId}",
