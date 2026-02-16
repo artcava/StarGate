@@ -1,4 +1,3 @@
-using MongoDB.Bson;
 using MongoDB.Driver;
 using StarGate.Infrastructure.Persistence;
 using Testcontainers.MongoDb;
@@ -15,13 +14,6 @@ public class MongoDbFixture : IAsyncLifetime
     private readonly MongoDbContainer _mongoContainer;
     private IMongoClient? _mongoClient;
     private IMongoDatabase? _database;
-
-    static MongoDbFixture()
-    {
-        // Configure MongoDB to use Standard GUID representation globally
-        // This must match the configuration in MongoProcessRepository
-        BsonDefaults.GuidRepresentationMode = GuidRepresentationMode.V3;
-    }
 
     public MongoDbFixture()
     {
@@ -64,13 +56,8 @@ public class MongoDbFixture : IAsyncLifetime
     private async Task CreateIndexesAsync()
     {
         // _database is guaranteed to be non-null when this method is called
-        // Get collection with explicit GuidRepresentation configuration
-        var settings = new MongoCollectionSettings
-        {
-            GuidRepresentation = GuidRepresentation.Standard
-        };
-        
-        var processCollection = _database!.GetCollection<ProcessDocument>("processes", settings);
+        // GuidRepresentation is configured via [BsonGuidRepresentation] attribute
+        var processCollection = _database!.GetCollection<ProcessDocument>("processes");
 
         // CRITICAL: MongoDB automatically creates a unique index on _id field.
         // ProcessDocument.ProcessId is marked with [BsonId], so it IS the _id field.
