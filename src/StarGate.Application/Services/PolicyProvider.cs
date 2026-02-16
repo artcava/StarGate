@@ -150,9 +150,13 @@ public class PolicyProvider : IPolicyProvider
 
         // Cache miss: Load from repository
         _logger.LogDebug("Type policy cache miss, loading from repository: {ProcessType}", processType);
-        var policy = await _policyRepository.GetByProcessTypeAsync(processType, ct);
-
-        if (policy == null)
+        
+        ProcessTypePolicy policy;
+        try
+        {
+            policy = await _policyRepository.GetProcessTypePolicyAsync(processType, ct);
+        }
+        catch (KeyNotFoundException)
         {
             _logger.LogWarning(
                 "Process type policy not found, using fallback defaults: {ProcessType}",
@@ -264,9 +268,11 @@ public class PolicyProvider : IPolicyProvider
             Timeout = TimeSpan.FromSeconds(_options.DefaultTimeoutSeconds),
             RetryPolicy = new RetryPolicy
             {
+                Enabled = true,
                 MaxAttempts = _options.DefaultMaxRetryAttempts,
                 InitialDelay = TimeSpan.FromSeconds(_options.DefaultRetryDelaySeconds),
-                BackoffStrategy = backoffStrategy
+                BackoffStrategy = backoffStrategy,
+                MaxDelay = TimeSpan.FromMinutes(5)
             },
             ResultRetention = TimeSpan.FromDays(_options.DefaultRetentionDays),
             MaxConcurrentProcesses = _options.DefaultMaxConcurrentProcesses,

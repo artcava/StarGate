@@ -1,11 +1,11 @@
-namespace StarGate.Application.Tests.Services;
-
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using StarGate.Application.Services;
 using StarGate.Core.Abstractions;
 using StarGate.Core.Domain.Configuration;
+
+namespace StarGate.Application.Tests.Services;
 
 /// <summary>
 /// Unit tests for PolicyProvider service.
@@ -55,7 +55,7 @@ public class PolicyProviderTests
             .ReturnsAsync((ProcessTypePolicy?)null);
 
         _repositoryMock
-            .Setup(x => x.GetByProcessTypeAsync(processType, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetProcessTypePolicyAsync(processType, It.IsAny<CancellationToken>()))
             .ReturnsAsync(expectedPolicy);
 
         _repositoryMock
@@ -82,7 +82,7 @@ public class PolicyProviderTests
             .ReturnsAsync((ProcessTypePolicy?)null);
 
         _repositoryMock
-            .Setup(x => x.GetByProcessTypeAsync(processType, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetProcessTypePolicyAsync(processType, It.IsAny<CancellationToken>()))
             .ReturnsAsync(expectedPolicy);
 
         _repositoryMock
@@ -126,7 +126,7 @@ public class PolicyProviderTests
             .ReturnsAsync((ClientPolicyOverride?)null);
 
         _repositoryMock
-            .Setup(x => x.GetByProcessTypeAsync(processType, It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetProcessTypePolicyAsync(processType, It.IsAny<CancellationToken>()))
             .ReturnsAsync(typePolicy);
 
         _repositoryMock
@@ -154,8 +154,8 @@ public class PolicyProviderTests
             .ReturnsAsync((ProcessTypePolicy?)null);
 
         _repositoryMock
-            .Setup(x => x.GetByProcessTypeAsync(processType, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((ProcessTypePolicy?)null);
+            .Setup(x => x.GetProcessTypePolicyAsync(processType, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new KeyNotFoundException());
 
         _repositoryMock
             .Setup(x => x.GetClientOverrideAsync(clientId, processType, It.IsAny<CancellationToken>()))
@@ -194,9 +194,11 @@ public class PolicyProviderTests
             Timeout = TimeSpan.FromMinutes(5),
             RetryPolicy = new RetryPolicy
             {
+                Enabled = true,
                 MaxAttempts = 3,
                 InitialDelay = TimeSpan.FromSeconds(5),
-                BackoffStrategy = BackoffStrategy.Exponential
+                BackoffStrategy = BackoffStrategy.Exponential,
+                MaxDelay = TimeSpan.FromMinutes(5)
             },
             ResultRetention = TimeSpan.FromDays(30),
             MaxConcurrentProcesses = 10,
