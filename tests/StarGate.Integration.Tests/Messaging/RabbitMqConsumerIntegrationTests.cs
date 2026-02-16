@@ -22,7 +22,15 @@ public class RabbitMqConsumerIntegrationTests : IClassFixture<RabbitMqFixture>, 
 
     public async Task DisposeAsync()
     {
-        await _fixture.Consumer.StopConsumingAsync();
+        try
+        {
+            await _fixture.Consumer.StopConsumingAsync();
+        }
+        catch (InvalidOperationException)
+        {
+            // Consumer was not started, ignore
+        }
+        
         _fixture.DeleteQueue(_testQueue);
     }
 
@@ -42,7 +50,7 @@ public class RabbitMqConsumerIntegrationTests : IClassFixture<RabbitMqFixture>, 
 
         var process = CreateTestProcess();
 
-        // Act
+        // Act - Publish FIRST to create queue, THEN start consumer
         await _fixture.Broker.PublishAsync(_testQueue, process);
         await _fixture.Consumer.StartConsumingAsync<Process>(Handler, CancellationToken.None);
 
@@ -69,7 +77,7 @@ public class RabbitMqConsumerIntegrationTests : IClassFixture<RabbitMqFixture>, 
 
         var process = CreateTestProcess();
 
-        // Act
+        // Act - Publish FIRST to create queue
         await _fixture.Broker.PublishAsync(_testQueue, process);
         await _fixture.Consumer.StartConsumingAsync<Process>(Handler, CancellationToken.None);
         await Task.WhenAny(tcs.Task, Task.Delay(5000));
@@ -104,7 +112,7 @@ public class RabbitMqConsumerIntegrationTests : IClassFixture<RabbitMqFixture>, 
 
         var process = CreateTestProcess();
 
-        // Act
+        // Act - Publish FIRST to create queue
         await _fixture.Broker.PublishAsync(_testQueue, process);
         await _fixture.Consumer.StartConsumingAsync<Process>(Handler, CancellationToken.None);
         await Task.WhenAny(tcs.Task, Task.Delay(10000));
@@ -135,13 +143,16 @@ public class RabbitMqConsumerIntegrationTests : IClassFixture<RabbitMqFixture>, 
             .Select(_ => CreateTestProcess())
             .ToList();
 
-        // Act
-        foreach (var process in processes)
+        // Act - Publish at least one message FIRST to create queue
+        await _fixture.Broker.PublishAsync(_testQueue, processes[0]);
+        await _fixture.Consumer.StartConsumingAsync<Process>(Handler, CancellationToken.None);
+        
+        // Publish remaining messages
+        foreach (var process in processes.Skip(1))
         {
             await _fixture.Broker.PublishAsync(_testQueue, process);
         }
 
-        await _fixture.Consumer.StartConsumingAsync<Process>(Handler, CancellationToken.None);
         var allConsumed = await Task.WhenAny(tcs.Task, Task.Delay(10000)) == tcs.Task;
 
         // Assert
@@ -172,10 +183,12 @@ public class RabbitMqConsumerIntegrationTests : IClassFixture<RabbitMqFixture>, 
             .Select(i => CreateTestProcess() with { ClientProcessId = $"process-{i}" })
             .ToList();
 
-        // Act
+        // Act - Publish first message to create queue, then start consumer
+        await _fixture.Broker.PublishAsync(_testQueue, processes[0]);
         await _fixture.Consumer.StartConsumingAsync<Process>(Handler, CancellationToken.None);
 
-        foreach (var process in processes)
+        // Publish remaining messages
+        foreach (var process in processes.Skip(1))
         {
             await _fixture.Broker.PublishAsync(_testQueue, process);
         }
@@ -204,6 +217,7 @@ public class RabbitMqConsumerIntegrationTests : IClassFixture<RabbitMqFixture>, 
             }
         }
 
+        // Publish and start consuming
         await _fixture.Broker.PublishAsync(_testQueue, CreateTestProcess());
         await _fixture.Consumer.StartConsumingAsync<Process>(Handler, CancellationToken.None);
         await Task.WhenAny(tcs.Task, Task.Delay(5000));

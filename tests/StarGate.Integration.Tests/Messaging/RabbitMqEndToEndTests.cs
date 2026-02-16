@@ -21,7 +21,15 @@ public class RabbitMqEndToEndTests : IClassFixture<RabbitMqFixture>, IAsyncLifet
 
     public async Task DisposeAsync()
     {
-        await _fixture.Consumer.StopConsumingAsync();
+        try
+        {
+            await _fixture.Consumer.StopConsumingAsync();
+        }
+        catch (InvalidOperationException)
+        {
+            // Consumer was not started, ignore
+        }
+        
         _fixture.DeleteQueue(_testQueue);
     }
 
@@ -40,9 +48,9 @@ public class RabbitMqEndToEndTests : IClassFixture<RabbitMqFixture>, IAsyncLifet
             tcs.SetResult();
         }
 
-        // Act
-        await _fixture.Consumer.StartConsumingAsync<Process>(Handler, CancellationToken.None);
+        // Act - Publish FIRST to create queue, THEN start consumer
         await _fixture.Broker.PublishAsync(_testQueue, originalProcess);
+        await _fixture.Consumer.StartConsumingAsync<Process>(Handler, CancellationToken.None);
 
         var consumed = await Task.WhenAny(tcs.Task, Task.Delay(5000)) == tcs.Task;
 
@@ -81,9 +89,9 @@ public class RabbitMqEndToEndTests : IClassFixture<RabbitMqFixture>, IAsyncLifet
             tcs.SetResult();
         }
 
-        // Act
-        await _fixture.Consumer.StartConsumingAsync<Process>(Handler, CancellationToken.None);
+        // Act - Publish FIRST to create queue, THEN start consumer
         await _fixture.Broker.PublishAsync(_testQueue, originalProcess);
+        await _fixture.Consumer.StartConsumingAsync<Process>(Handler, CancellationToken.None);
 
         var consumed = await Task.WhenAny(tcs.Task, Task.Delay(5000)) == tcs.Task;
 
