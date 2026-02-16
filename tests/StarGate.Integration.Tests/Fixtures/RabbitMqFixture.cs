@@ -1,11 +1,11 @@
-namespace StarGate.Integration.Tests.Fixtures;
-
 using Microsoft.Extensions.Logging.Abstractions;
 using RabbitMQ.Client;
 using StarGate.Infrastructure.Messaging;
 using StarGate.Infrastructure.Messaging.RabbitMQ;
 using Testcontainers.RabbitMq;
 using Xunit;
+
+namespace StarGate.Integration.Tests.Fixtures;
 
 /// <summary>
 /// Provides a RabbitMQ test container for integration tests.
