@@ -1,3 +1,6 @@
+using MongoDB.Bson;
+using MongoDB.Bson.Serialization;
+using MongoDB.Bson.Serialization.Serializers;
 using MongoDB.Driver;
 using StarGate.Infrastructure.Persistence;
 using Testcontainers.MongoDb;
@@ -14,6 +17,8 @@ public class MongoDbFixture : IAsyncLifetime
     private readonly MongoDbContainer _mongoContainer;
     private IMongoClient? _mongoClient;
     private IMongoDatabase? _database;
+    private static bool _serializersRegistered;
+    private static readonly object _lock = new();
 
     public MongoDbFixture()
     {
@@ -30,6 +35,10 @@ public class MongoDbFixture : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
+        // CRITICAL: Register serializers BEFORE creating MongoClient
+        // Once MongoClient is created, it captures the current serialization settings
+        RegisterSerializers();
+
         await _mongoContainer.StartAsync();
 
         _mongoClient = new MongoClient(ConnectionString);
@@ -37,6 +46,46 @@ public class MongoDbFixture : IAsyncLifetime
 
         // Ensure indexes are created
         await CreateIndexesAsync();
+    }
+
+    private static void RegisterSerializers()
+    {
+        if (_serializersRegistered)
+        {
+            return;
+        }
+
+        lock (_lock)
+        {
+            if (_serializersRegistered)
+            {
+                return;
+            }
+
+            // Register global GuidSerializer with Standard representation
+            // This must happen before any MongoClient is created
+            try
+            {
+                BsonSerializer.RegisterSerializer(new GuidSerializer(GuidRepresentation.Standard));
+            }
+            catch (BsonSerializationException)
+            {
+                // Already registered - safe to ignore
+            }
+
+            // Register ProcessDocument class map
+            if (!BsonClassMap.IsClassMapRegistered(typeof(ProcessDocument)))
+            {
+                BsonClassMap.RegisterClassMap<ProcessDocument>(cm =>
+                {
+                    cm.AutoMap();
+                    cm.MapIdMember(c => c.ProcessId)
+                        .SetSerializer(new GuidSerializer(GuidRepresentation.Standard));
+                });
+            }
+
+            _serializersRegistered = true;
+        }
     }
 
     public async Task DisposeAsync()
