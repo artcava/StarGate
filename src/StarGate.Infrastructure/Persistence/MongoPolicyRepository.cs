@@ -218,68 +218,30 @@ public class MongoPolicyRepository : IPolicyRepository
     }
 
     /// <inheritdoc/>
-    public async Task<IReadOnlyList<ClientPolicyOverride>> GetClientOverridesAsync(
-        string? clientId = null,
-        string? processType = null,
+    public async Task<IReadOnlyList<ProcessTypePolicy>> GetAllTypeDefaultsAsync(
         CancellationToken ct = default)
     {
-        // Build filter dynamically based on provided parameters
-        FilterDefinition<ClientPolicyOverrideDocument> filter = Builders<ClientPolicyOverrideDocument>.Filter.Empty;
-
-        if (!string.IsNullOrWhiteSpace(clientId))
-        {
-            filter &= Builders<ClientPolicyOverrideDocument>.Filter.Eq(o => o.ClientId, clientId);
-            _logger.LogDebug("Filtering client overrides by ClientId={ClientId}", clientId);
-        }
-
-        if (!string.IsNullOrWhiteSpace(processType))
-        {
-            filter &= Builders<ClientPolicyOverrideDocument>.Filter.Eq(o => o.ProcessType, processType);
-            _logger.LogDebug("Filtering client overrides by ProcessType={ProcessType}", processType);
-        }
-
-        List<ClientPolicyOverrideDocument> documents = await _clientOverrides
-            .Find(filter)
+        List<ProcessTypePolicyDocument> documents = await _processTypePolicies
+            .Find(_ => true)
             .ToListAsync(ct);
 
         _logger.LogDebug(
-            "Retrieved {Count} client overrides with filters: ClientId={ClientId}, ProcessType={ProcessType}",
-            documents.Count,
-            clientId ?? "(all)",
-            processType ?? "(all)");
+            "Retrieved {Count} type default policies for cache warming",
+            documents.Count);
 
         return documents.Select(PolicyMapper.MapToDomain).ToList();
     }
 
     /// <inheritdoc/>
-    public async Task<IReadOnlyList<ProcessTypePolicy>> GetProcessTypePoliciesAsync(
-        IEnumerable<string>? processTypes = null,
+    public async Task<IReadOnlyList<ClientPolicyOverride>> GetAllClientOverridesAsync(
         CancellationToken ct = default)
     {
-        FilterDefinition<ProcessTypePolicyDocument> filter;
-
-        if (processTypes != null && processTypes.Any())
-        {
-            // Filter by the specified process types
-            var typesList = processTypes.ToList();
-            filter = Builders<ProcessTypePolicyDocument>.Filter.In(p => p.ProcessType, typesList);
-            _logger.LogDebug(
-                "Filtering process type policies by ProcessTypes={ProcessTypes}",
-                string.Join(", ", typesList));
-        }
-        else
-        {
-            // Return all policies if no filter is provided
-            filter = Builders<ProcessTypePolicyDocument>.Filter.Empty;
-            _logger.LogDebug("Retrieving all process type policies (no filter)");
-        }
-
-        List<ProcessTypePolicyDocument> documents = await _processTypePolicies
-            .Find(filter)
+        List<ClientPolicyOverrideDocument> documents = await _clientOverrides
+            .Find(_ => true)
             .ToListAsync(ct);
 
         _logger.LogDebug(
-            "Retrieved {Count} process type policies",
+            "Retrieved {Count} client overrides for cache warming",
             documents.Count);
 
         return documents.Select(PolicyMapper.MapToDomain).ToList();

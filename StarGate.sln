@@ -51,6 +51,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "scripts", "scripts", "{CFF6
 		scripts\reset-dev.sh = scripts\reset-dev.sh
 		scripts\start-dev.sh = scripts\start-dev.sh
 		scripts\stop-dev.sh = scripts\stop-dev.sh
+		scripts\Test-PolicyCacheEndpoints.ps1 = scripts\Test-PolicyCacheEndpoints.ps1
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "examples", "examples", "{CD5F81FE-020B-4007-AA67-11BBA61EDE44}"
