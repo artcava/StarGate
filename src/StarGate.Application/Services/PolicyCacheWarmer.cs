@@ -1,8 +1,8 @@
-namespace StarGate.Application.Services;
-
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using StarGate.Core.Abstractions;
+
+namespace StarGate.Application.Services;
 
 /// <summary>
 /// Background service that warms up the policy cache on startup.

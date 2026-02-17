@@ -1,6 +1,6 @@
-namespace StarGate.Application.Services;
-
 using System.Collections.Concurrent;
+
+namespace StarGate.Application.Services;
 
 /// <summary>
 /// Tracks cache hit/miss statistics for policy caching.

@@ -1,8 +1,8 @@
-namespace StarGate.Api.Endpoints;
-
 using Microsoft.AspNetCore.Mvc;
 using StarGate.Application.Services;
 using StarGate.Core.Abstractions;
+
+namespace StarGate.Api.Endpoints;
 
 /// <summary>
 /// Endpoints for policy cache management and monitoring.
