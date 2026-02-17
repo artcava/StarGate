@@ -45,10 +45,20 @@ public class InMemoryPolicyRepository : IPolicyRepository
     {
         ArgumentNullException.ThrowIfNull(policy);
         
-        policy.UpdatedAt = DateTime.UtcNow;
-        _typePolicies[policy.ProcessType] = policy;
+        // Create new instance with updated timestamp (UpdatedAt is init-only)
+        var updatedPolicy = new ProcessTypePolicy
+        {
+            ProcessType = policy.ProcessType,
+            Timeout = policy.Timeout,
+            RetryPolicy = policy.RetryPolicy,
+            ResultRetention = policy.ResultRetention,
+            MaxConcurrentProcesses = policy.MaxConcurrentProcesses,
+            UpdatedAt = DateTime.UtcNow
+        };
         
-        return Task.FromResult(policy);
+        _typePolicies[updatedPolicy.ProcessType] = updatedPolicy;
+        
+        return Task.FromResult(updatedPolicy);
     }
 
     public Task<ClientPolicyOverride> SaveClientOverrideAsync(
@@ -57,11 +67,22 @@ public class InMemoryPolicyRepository : IPolicyRepository
     {
         ArgumentNullException.ThrowIfNull(@override);
         
-        @override.UpdatedAt = DateTime.UtcNow;
-        var key = $"{@override.ClientId}:{@override.ProcessType}";
-        _clientOverrides[key] = @override;
+        // Create new instance with updated timestamp (UpdatedAt is init-only)
+        var updatedOverride = new ClientPolicyOverride
+        {
+            ClientId = @override.ClientId,
+            ProcessType = @override.ProcessType,
+            Timeout = @override.Timeout,
+            RetryPolicy = @override.RetryPolicy,
+            ResultRetention = @override.ResultRetention,
+            MaxConcurrentProcesses = @override.MaxConcurrentProcesses,
+            UpdatedAt = DateTime.UtcNow
+        };
         
-        return Task.FromResult(@override);
+        var key = $"{updatedOverride.ClientId}:{updatedOverride.ProcessType}";
+        _clientOverrides[key] = updatedOverride;
+        
+        return Task.FromResult(updatedOverride);
     }
 
     public Task<bool> DeleteClientOverrideAsync(
