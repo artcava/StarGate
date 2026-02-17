@@ -20,6 +20,7 @@ public static class PolicyCacheEndpoints
             .RequireAuthorization();
 
         // Get cache statistics
+        // Returns cache hit/miss statistics and per-key metrics for policy caching.
         group.MapGet("/statistics", async (
             [FromServices] IPolicyProvider policyProvider) =>
         {
@@ -40,14 +41,10 @@ public static class PolicyCacheEndpoints
             return Results.Ok(new { message = "Statistics not available" });
         })
         .WithName("GetPolicyCacheStatistics")
-        .WithOpenApi(operation =>
-        {
-            operation.Summary = "Get cache statistics";
-            operation.Description = "Returns cache hit/miss statistics and per-key metrics for policy caching.";
-            return operation;
-        });
+        .Produces<object>(StatusCodes.Status200OK);
 
         // Refresh all policies
+        // Clears all cached policies. Policies will be reloaded on next access.
         group.MapPost("/refresh", async (
             [FromServices] IPolicyProvider policyProvider,
             CancellationToken cancellationToken) =>
@@ -61,14 +58,13 @@ public static class PolicyCacheEndpoints
             return Results.BadRequest(new { message = "Cache refresh not supported by current provider" });
         })
         .WithName("RefreshPolicyCache")
-        .WithOpenApi(operation =>
-        {
-            operation.Summary = "Refresh policy cache";
-            operation.Description = "Clears all cached policies. Policies will be reloaded on next access.";
-            return operation;
-        });
+        .Produces<object>(StatusCodes.Status200OK)
+        .Produces<object>(StatusCodes.Status400BadRequest);
 
         // Invalidate specific policy
+        // Removes a specific policy from cache.
+        // If clientId is not provided, invalidates the type default policy.
+        // If clientId is provided, invalidates the client override policy.
         group.MapDelete("/{processType}", async (
             string processType,
             [FromQuery] string? clientId,
@@ -89,13 +85,7 @@ public static class PolicyCacheEndpoints
             return Results.BadRequest(new { message = "Cache invalidation not supported by current provider" });
         })
         .WithName("InvalidatePolicy")
-        .WithOpenApi(operation =>
-        {
-            operation.Summary = "Invalidate specific policy";
-            operation.Description = "Removes a specific policy from cache. " +
-                "If clientId is not provided, invalidates the type default policy. " +
-                "If clientId is provided, invalidates the client override policy.";
-            return operation;
-        });
+        .Produces<object>(StatusCodes.Status200OK)
+        .Produces<object>(StatusCodes.Status400BadRequest);
     }
 }
