@@ -51,11 +51,11 @@ public static class DependencyInjection
             options.CacheRefreshIntervalMinutes = int.TryParse(section[nameof(PolicyProviderOptions.CacheRefreshIntervalMinutes)], out var refreshInterval) 
                 ? refreshInterval : 30;
             
-            options.EnableCacheWarmup = bool.TryParse(section[nameof(PolicyProviderOptions.EnableCacheWarmup)], out var enableWarmup) 
-                ? enableWarmup : true;
+            options.EnableCacheWarmup = !bool.TryParse(section[nameof(PolicyProviderOptions.EnableCacheWarmup)], out var enableWarmup) 
+                || enableWarmup;
             
-            options.EnableBackgroundRefresh = bool.TryParse(section[nameof(PolicyProviderOptions.EnableBackgroundRefresh)], out var enableRefresh) 
-                ? enableRefresh : true;
+            options.EnableBackgroundRefresh = !bool.TryParse(section[nameof(PolicyProviderOptions.EnableBackgroundRefresh)], out var enableRefresh) 
+                || enableRefresh;
             
             options.MaxMemoryCacheSize = int.TryParse(section[nameof(PolicyProviderOptions.MaxMemoryCacheSize)], out var maxCacheSize) 
                 ? maxCacheSize : 1000;
