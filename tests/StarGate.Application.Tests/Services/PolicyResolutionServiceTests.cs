@@ -94,7 +94,7 @@ public class PolicyResolutionServiceTests
             Enabled = false,
             MaxAttempts = 0,
             InitialDelay = TimeSpan.Zero,
-            BackoffStrategy = BackoffStrategy.None,
+            BackoffStrategy = BackoffStrategy.Linear,
             MaxDelay = TimeSpan.Zero
         };
         var clientOverride = new ClientPolicyOverride
