@@ -216,4 +216,34 @@ public class MongoPolicyRepository : IPolicyRepository
 
         return documents.Select(PolicyMapper.MapToDomain).ToList();
     }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<ProcessTypePolicy>> GetAllTypeDefaultsAsync(
+        CancellationToken ct = default)
+    {
+        List<ProcessTypePolicyDocument> documents = await _processTypePolicies
+            .Find(_ => true)
+            .ToListAsync(ct);
+
+        _logger.LogDebug(
+            "Retrieved {Count} type default policies for cache warming",
+            documents.Count);
+
+        return documents.Select(PolicyMapper.MapToDomain).ToList();
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<ClientPolicyOverride>> GetAllClientOverridesAsync(
+        CancellationToken ct = default)
+    {
+        List<ClientPolicyOverrideDocument> documents = await _clientOverrides
+            .Find(_ => true)
+            .ToListAsync(ct);
+
+        _logger.LogDebug(
+            "Retrieved {Count} client overrides for cache warming",
+            documents.Count);
+
+        return documents.Select(PolicyMapper.MapToDomain).ToList();
+    }
 }
