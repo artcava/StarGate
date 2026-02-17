@@ -53,4 +53,30 @@ public class PolicyProviderOptions
     /// Default: Exponential.
     /// </summary>
     public string DefaultBackoffStrategy { get; set; } = "Exponential";
+
+    /// <summary>
+    /// Interval in minutes for background cache refresh.
+    /// Default: 30 minutes.
+    /// </summary>
+    public int CacheRefreshIntervalMinutes { get; set; } = 30;
+
+    /// <summary>
+    /// Enable cache warm-up on application startup.
+    /// When enabled, preloads all type defaults and client overrides into cache.
+    /// Default: true.
+    /// </summary>
+    public bool EnableCacheWarmup { get; set; } = true;
+
+    /// <summary>
+    /// Enable background cache refresh.
+    /// When enabled, periodically refreshes the cache at the interval specified by CacheRefreshIntervalMinutes.
+    /// Default: true.
+    /// </summary>
+    public bool EnableBackgroundRefresh { get; set; } = true;
+
+    /// <summary>
+    /// Maximum number of entries in memory cache (LRU eviction).
+    /// Default: 1000 entries.
+    /// </summary>
+    public int MaxMemoryCacheSize { get; set; } = 1000;
 }
