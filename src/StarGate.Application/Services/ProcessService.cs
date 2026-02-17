@@ -77,17 +77,17 @@ public class ProcessService
             "Applied policy for ProcessType={ProcessType}, ClientId={ClientId}: Timeout={TimeoutSeconds}s, MaxRetries={MaxRetryAttempts}, RetryDelay={RetryDelaySeconds}s, MaxConcurrent={MaxConcurrentExecutions}",
             processType,
             clientId,
-            policy.TimeoutSeconds,
-            policy.MaxRetryAttempts,
-            policy.RetryDelaySeconds,
-            policy.MaxConcurrentExecutions);
+            policy.Timeout.TotalSeconds,
+            policy.RetryPolicy.MaxAttempts,
+            policy.RetryPolicy.InitialDelay.TotalSeconds,
+            policy.MaxConcurrentProcesses ?? int.MaxValue);
 
         // Check for idempotency (duplicate)
         var existingProcess = await _processRepository.GetByIdempotencyKeyAsync(
             idempotencyKey,
             cancellationToken);
 
-        if (existingProcess != null)
+        if (existingProcess is not null)
         {
             _logger.LogInformation(
                 "Process with IdempotencyKey={IdempotencyKey} already exists: {ProcessId}",
@@ -97,22 +97,23 @@ public class ProcessService
         }
 
         // Check concurrent execution limit
+        var maxConcurrent = policy.MaxConcurrentProcesses ?? int.MaxValue;
         var runningProcessesCount = await _processRepository.CountRunningProcessesByTypeAsync(
             processType,
             clientId,
             cancellationToken);
 
-        if (runningProcessesCount >= policy.MaxConcurrentExecutions)
+        if (runningProcessesCount >= maxConcurrent)
         {
             _logger.LogWarning(
                 "Max concurrent executions reached for ProcessType={ProcessType}, ClientId={ClientId}: {Count}/{Max}",
                 processType,
                 clientId,
                 runningProcessesCount,
-                policy.MaxConcurrentExecutions);
+                maxConcurrent);
 
             throw new PolicyViolationException(
-                $"Maximum concurrent executions limit reached: {runningProcessesCount}/{policy.MaxConcurrentExecutions}");
+                $"Maximum concurrent executions limit reached: {runningProcessesCount}/{maxConcurrent}");
         }
 
         // Create process with policy-driven configuration
@@ -126,15 +127,15 @@ public class ProcessService
             IdempotencyKey = idempotencyKey,
             Status = ProcessStatus.Accepted,
             Progress = 0,
-            Retryable = policy.MaxRetryAttempts > 0,
+            Retryable = policy.RetryPolicy.MaxAttempts > 0,
             CreatedAt = now,
             UpdatedAt = now,
             
             // Policy-driven fields
-            TimeoutAt = now.AddSeconds(policy.TimeoutSeconds),
+            TimeoutAt = now.Add(policy.Timeout),
             RetryCount = 0,
-            MaxRetries = policy.MaxRetryAttempts,
-            RetentionExpiresAt = now.AddDays(policy.RetentionDays)
+            MaxRetries = policy.RetryPolicy.MaxAttempts,
+            RetentionExpiresAt = now.Add(policy.ResultRetention)
         };
 
         // Save to repository
@@ -168,7 +169,7 @@ public class ProcessService
 
         var process = await _processRepository.GetByIdAsync(processId, cancellationToken);
 
-        if (process == null)
+        if (process is null)
         {
             throw new InvalidOperationException($"Process with ID '{processId}' not found");
         }
@@ -203,7 +204,7 @@ public class ProcessService
             clientProcessId,
             cancellationToken);
 
-        if (process == null)
+        if (process is null)
         {
             throw new InvalidOperationException(
                 $"Process with ClientId '{clientId}' and ClientProcessId '{clientProcessId}' not found");
@@ -232,7 +233,7 @@ public class ProcessService
             cancellationToken);
 
         var shouldRetry = process.Retryable &&
-                         process.RetryCount < policy.MaxRetryAttempts &&
+                         process.RetryCount < policy.RetryPolicy.MaxAttempts &&
                          process.Status == ProcessStatus.Failed;
 
         _logger.LogDebug(
@@ -240,7 +241,7 @@ public class ProcessService
             processId,
             shouldRetry,
             process.RetryCount,
-            policy.MaxRetryAttempts);
+            policy.RetryPolicy.MaxAttempts);
 
         return shouldRetry;
     }
@@ -262,12 +263,12 @@ public class ProcessService
             clientId,
             cancellationToken);
 
-        return policy.RetryDelaySeconds;
+        return (int)policy.RetryPolicy.InitialDelay.TotalSeconds;
     }
 
     /// <summary>
     /// Checks if a process has timed out based on its TimeoutAt timestamp.
-    /// Only applies to processes in Accepted or Running status.
+    /// Only applies to processes in Accepted or Processing status.
     /// </summary>
     /// <param name="processId">Process identifier.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -284,7 +285,7 @@ public class ProcessService
         }
 
         var isTimedOut = DateTime.UtcNow > process.TimeoutAt.Value &&
-                        (process.Status == ProcessStatus.Running ||
+                        (process.Status == ProcessStatus.Processing ||
                          process.Status == ProcessStatus.Accepted);
 
         if (isTimedOut)
@@ -301,7 +302,7 @@ public class ProcessService
 
     /// <summary>
     /// Gets processes that have expired based on their retention policy.
-    /// Returns processes in terminal states (Completed, Failed, Cancelled) where
+    /// Returns processes in terminal states (Completed, Failed) where
     /// RetentionExpiresAt is less than or equal to the current time.
     /// </summary>
     /// <param name="cancellationToken">Cancellation token.</param>
