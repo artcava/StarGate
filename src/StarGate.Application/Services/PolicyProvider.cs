@@ -18,6 +18,7 @@ public class PolicyProvider : IPolicyProvider
     private readonly ILogger<PolicyProvider> _logger;
     private readonly PolicyProviderOptions _options;
     private readonly PolicyResolutionService _resolutionService;
+    private readonly PolicyCacheStatistics _cacheStatistics;
     private readonly ConcurrentDictionary<string, ProcessTypePolicy> _memoryCache;
     private readonly ConcurrentDictionary<string, ClientPolicyOverride> _overrideCache;
     private readonly SemaphoreSlim _refreshLock;
@@ -27,12 +28,14 @@ public class PolicyProvider : IPolicyProvider
         ICacheStore cacheStore,
         IOptions<PolicyProviderOptions> options,
         PolicyResolutionService resolutionService,
+        PolicyCacheStatistics cacheStatistics,
         ILogger<PolicyProvider> logger)
     {
         _policyRepository = policyRepository ?? throw new ArgumentNullException(nameof(policyRepository));
         _cacheStore = cacheStore ?? throw new ArgumentNullException(nameof(cacheStore));
         _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
         _resolutionService = resolutionService ?? throw new ArgumentNullException(nameof(resolutionService));
+        _cacheStatistics = cacheStatistics ?? throw new ArgumentNullException(nameof(cacheStatistics));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _memoryCache = new ConcurrentDictionary<string, ProcessTypePolicy>();
         _overrideCache = new ConcurrentDictionary<string, ClientPolicyOverride>();
@@ -127,6 +130,147 @@ public class PolicyProvider : IPolicyProvider
     }
 
     /// <summary>
+    /// Gets default policy for a process type (without client override).
+    /// Used by cache warmer to preload type defaults.
+    /// </summary>
+    /// <param name="processType">The process type.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The type default policy.</returns>
+    public async Task<ProcessTypePolicy> GetDefaultPolicyAsync(
+        string processType,
+        CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(processType, nameof(processType));
+        return await GetTypePolicyAsync(processType, ct);
+    }
+
+    /// <summary>
+    /// Gets effective policy for a client and process type.
+    /// Unified access method for warm-up and regular operations.
+    /// </summary>
+    /// <param name="processType">The process type.</param>
+    /// <param name="clientId">The client identifier.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The effective policy.</returns>
+    public async Task<EffectivePolicy> GetPolicyAsync(
+        string processType,
+        string? clientId = null,
+        CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(processType, nameof(processType));
+
+        if (string.IsNullOrWhiteSpace(clientId))
+        {
+            // No client specified, return type default as effective policy
+            var typePolicy = await GetTypePolicyAsync(processType, ct);
+            return new EffectivePolicy
+            {
+                ProcessType = typePolicy.ProcessType,
+                ClientId = "default",
+                Timeout = typePolicy.Timeout,
+                RetryPolicy = typePolicy.RetryPolicy,
+                ResultRetention = typePolicy.ResultRetention,
+                MaxConcurrentProcesses = typePolicy.MaxConcurrentProcesses,
+                Source = new PolicySource
+                {
+                    TimeoutFromOverride = false,
+                    RetryPolicyFromOverride = false,
+                    ResultRetentionFromOverride = false,
+                    ConcurrencyLimitFromOverride = false
+                }
+            };
+        }
+
+        return await GetEffectivePolicyAsync(clientId, processType, ct);
+    }
+
+    /// <summary>
+    /// Refreshes all policies by clearing caches.
+    /// Policies will be reloaded on next access (lazy loading).
+    /// </summary>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    public async Task RefreshPoliciesAsync(CancellationToken ct = default)
+    {
+        await _refreshLock.WaitAsync(ct);
+        try
+        {
+            _logger.LogInformation("Starting policy cache refresh...");
+
+            // Clear L1 cache (memory)
+            var memoryCount = _memoryCache.Count + _overrideCache.Count;
+            _memoryCache.Clear();
+            _overrideCache.Clear();
+
+            // Clear L2 cache (Redis) - pattern matching
+            // Note: Requires implementation in ICacheStore for pattern-based deletion
+            // For now, we rely on TTL expiration
+            
+            _logger.LogInformation(
+                "Policy cache refresh completed. Cleared {Count} memory cache entries",
+                memoryCount);
+        }
+        finally
+        {
+            _refreshLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// Invalidates a specific policy from cache.
+    /// </summary>
+    /// <param name="processType">The process type.</param>
+    /// <param name="clientId">Optional client identifier for client override invalidation.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    public async Task InvalidatePolicyAsync(
+        string processType,
+        string? clientId = null,
+        CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(processType, nameof(processType));
+
+        if (string.IsNullOrWhiteSpace(clientId))
+        {
+            // Invalidate type default
+            var cacheKey = $"type:{processType}";
+            var redisCacheKey = $"policy:{cacheKey}";
+
+            _memoryCache.TryRemove(cacheKey, out _);
+            _cacheStatistics.RecordEviction();
+            
+            // Note: Redis deletion would require ICacheStore enhancement
+            await Task.CompletedTask;
+
+            _logger.LogInformation(
+                "Invalidated type default policy: ProcessType={ProcessType}",
+                processType);
+        }
+        else
+        {
+            // Invalidate client override
+            var cacheKey = $"override:{clientId}:{processType}";
+            var redisCacheKey = $"policy:{cacheKey}";
+
+            _overrideCache.TryRemove(cacheKey, out _);
+            _cacheStatistics.RecordEviction();
+
+            await Task.CompletedTask;
+
+            _logger.LogInformation(
+                "Invalidated client override policy: ClientId={ClientId}, ProcessType={ProcessType}",
+                clientId,
+                processType);
+        }
+    }
+
+    /// <summary>
+    /// Gets cache statistics for monitoring and diagnostics.
+    /// </summary>
+    /// <returns>Current cache statistics.</returns>
+    public PolicyCacheStatistics GetCacheStatistics() => _cacheStatistics;
+
+    /// <summary>
     /// Retrieves process type policy with two-tier caching.
     /// </summary>
     private async Task<ProcessTypePolicy> GetTypePolicyAsync(
@@ -137,6 +281,7 @@ public class PolicyProvider : IPolicyProvider
         var cacheKey = $"type:{processType}";
         if (_memoryCache.TryGetValue(cacheKey, out var cachedPolicy))
         {
+            _cacheStatistics.RecordHit(cacheKey);
             _logger.LogDebug("Type policy cache hit (memory): {CacheKey}", cacheKey);
             return cachedPolicy;
         }
@@ -146,12 +291,14 @@ public class PolicyProvider : IPolicyProvider
         var redisPolicy = await _cacheStore.GetAsync<ProcessTypePolicy>(redisCacheKey, ct);
         if (redisPolicy != null)
         {
+            _cacheStatistics.RecordHit(redisCacheKey);
             _logger.LogDebug("Type policy cache hit (Redis): {CacheKey}", cacheKey);
             _memoryCache.TryAdd(cacheKey, redisPolicy);
             return redisPolicy;
         }
 
-        // Cache miss: Load from repository
+        // Cache miss
+        _cacheStatistics.RecordMiss(cacheKey);
         _logger.LogDebug("Type policy cache miss, loading from repository: {ProcessType}", processType);
         
         ProcessTypePolicy policy;
@@ -185,6 +332,7 @@ public class PolicyProvider : IPolicyProvider
         var cacheKey = $"override:{clientId}:{processType}";
         if (_overrideCache.TryGetValue(cacheKey, out var cachedOverride))
         {
+            _cacheStatistics.RecordHit(cacheKey);
             _logger.LogDebug("Client override cache hit (memory): {CacheKey}", cacheKey);
             return cachedOverride;
         }
@@ -194,12 +342,13 @@ public class PolicyProvider : IPolicyProvider
         var redisOverride = await _cacheStore.GetAsync<ClientPolicyOverride>(redisCacheKey, ct);
         if (redisOverride != null)
         {
+            _cacheStatistics.RecordHit(redisCacheKey);
             _logger.LogDebug("Client override cache hit (Redis): {CacheKey}", cacheKey);
             _overrideCache.TryAdd(cacheKey, redisOverride);
             return redisOverride;
         }
 
-        // Cache miss: Load from repository
+        // Cache miss (not recording as miss since null is valid - no override exists)
         _logger.LogDebug(
             "Client override cache miss, loading from repository: ClientId={ClientId}, ProcessType={ProcessType}",
             clientId,
