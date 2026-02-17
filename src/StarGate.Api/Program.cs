@@ -1,9 +1,17 @@
 using StarGate.Api.Endpoints;
+using StarGate.Application;
 
-WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
+var builder = WebApplication.CreateBuilder(args);
 
-WebApplication app = builder.Build();
+// Add services to the container
+builder.Services.AddApplicationServices(builder.Configuration);
 
+// TODO: Add Infrastructure services when available
+// builder.Services.AddInfrastructureServices(builder.Configuration);
+
+var app = builder.Build();
+
+// Configure middleware
 app.MapGet("/health/live", () => Results.Ok(new { status = "healthy" }));
 
 // Map policy cache management endpoints
