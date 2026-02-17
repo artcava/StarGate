@@ -239,7 +239,7 @@ public class PolicyCacheStatisticsTests
     }
 
     [Fact]
-    public void Statistics_Should_BeThreadSafe_WhenAccessedConcurrently()
+    public async Task Statistics_Should_BeThreadSafe_WhenAccessedConcurrently()
     {
         // Arrange
         var stats = new PolicyCacheStatistics();
@@ -272,7 +272,7 @@ public class PolicyCacheStatisticsTests
             }));
         }
 
-        Task.WaitAll(tasks.ToArray());
+        await Task.WhenAll(tasks);
 
         // Assert
         stats.Hits.Should().Be(numberOfTasks * iterationsPerTask / 2);
