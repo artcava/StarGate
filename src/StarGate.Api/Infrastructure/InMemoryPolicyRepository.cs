@@ -19,7 +19,7 @@ public class InMemoryPolicyRepository : IPolicyRepository
         SeedSampleData();
     }
 
-    public Task<ProcessTypePolicy> GetProcessTypePolicyAsync(string processType, CancellationToken cancellationToken = default)
+    public Task<ProcessTypePolicy> GetProcessTypePolicyAsync(string processType, CancellationToken ct = default)
     {
         if (_typePolicies.TryGetValue(processType, out var policy))
         {
@@ -32,11 +32,77 @@ public class InMemoryPolicyRepository : IPolicyRepository
     public Task<ClientPolicyOverride?> GetClientOverrideAsync(
         string clientId,
         string processType,
-        CancellationToken cancellationToken = default)
+        CancellationToken ct = default)
     {
         var key = $"{clientId}:{processType}";
         _clientOverrides.TryGetValue(key, out var clientOverride);
         return Task.FromResult(clientOverride);
+    }
+
+    public Task<ProcessTypePolicy> SaveProcessTypePolicyAsync(
+        ProcessTypePolicy policy,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(policy);
+        
+        policy.UpdatedAt = DateTime.UtcNow;
+        _typePolicies[policy.ProcessType] = policy;
+        
+        return Task.FromResult(policy);
+    }
+
+    public Task<ClientPolicyOverride> SaveClientOverrideAsync(
+        ClientPolicyOverride @override,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(@override);
+        
+        @override.UpdatedAt = DateTime.UtcNow;
+        var key = $"{@override.ClientId}:{@override.ProcessType}";
+        _clientOverrides[key] = @override;
+        
+        return Task.FromResult(@override);
+    }
+
+    public Task<bool> DeleteClientOverrideAsync(
+        string clientId,
+        string processType,
+        CancellationToken ct = default)
+    {
+        var key = $"{clientId}:{processType}";
+        var removed = _clientOverrides.TryRemove(key, out _);
+        return Task.FromResult(removed);
+    }
+
+    public Task<IReadOnlyList<ProcessTypePolicy>> ListProcessTypePoliciesAsync(
+        CancellationToken ct = default)
+    {
+        var policies = _typePolicies.Values.ToList();
+        return Task.FromResult<IReadOnlyList<ProcessTypePolicy>>(policies);
+    }
+
+    public Task<IReadOnlyList<ClientPolicyOverride>> ListClientOverridesAsync(
+        string clientId,
+        CancellationToken ct = default)
+    {
+        var overrides = _clientOverrides.Values
+            .Where(o => o.ClientId == clientId)
+            .ToList();
+        return Task.FromResult<IReadOnlyList<ClientPolicyOverride>>(overrides);
+    }
+
+    public Task<IReadOnlyList<ProcessTypePolicy>> GetAllTypeDefaultsAsync(
+        CancellationToken ct = default)
+    {
+        var policies = _typePolicies.Values.ToList();
+        return Task.FromResult<IReadOnlyList<ProcessTypePolicy>>(policies);
+    }
+
+    public Task<IReadOnlyList<ClientPolicyOverride>> GetAllClientOverridesAsync(
+        CancellationToken ct = default)
+    {
+        var overrides = _clientOverrides.Values.ToList();
+        return Task.FromResult<IReadOnlyList<ClientPolicyOverride>>(overrides);
     }
 
     private void SeedSampleData()
@@ -96,7 +162,7 @@ public class InMemoryCacheStore : ICacheStore
 {
     private readonly ConcurrentDictionary<string, (object Value, DateTime Expiry)> _cache = new();
 
-    public Task<T?> GetAsync<T>(string key, CancellationToken cancellationToken = default) where T : class
+    public Task<T?> GetAsync<T>(string key, CancellationToken ct = default) where T : class
     {
         if (_cache.TryGetValue(key, out var entry))
         {
@@ -115,24 +181,35 @@ public class InMemoryCacheStore : ICacheStore
     public Task SetAsync<T>(
         string key,
         T value,
-        TimeSpan? expiration = null,
-        CancellationToken cancellationToken = default) where T : class
+        TimeSpan ttl,
+        CancellationToken ct = default) where T : class
     {
-        var expiry = expiration.HasValue
-            ? DateTime.UtcNow.Add(expiration.Value)
-            : DateTime.UtcNow.AddHours(1); // Default 1 hour
-
+        var expiry = DateTime.UtcNow.Add(ttl);
         _cache[key] = (value, expiry);
         return Task.CompletedTask;
     }
 
-    public Task<bool> RemoveAsync(string key, CancellationToken cancellationToken = default)
+    public Task DeleteAsync(string key, CancellationToken ct = default)
     {
-        var removed = _cache.TryRemove(key, out _);
-        return Task.FromResult(removed);
+        _cache.TryRemove(key, out _);
+        return Task.CompletedTask;
     }
 
-    public Task<bool> ExistsAsync(string key, CancellationToken cancellationToken = default)
+    public Task DeleteByPatternAsync(string pattern, CancellationToken ct = default)
+    {
+        // Simple pattern matching: support "prefix:*" patterns
+        var prefix = pattern.Replace("*", "");
+        var keysToRemove = _cache.Keys.Where(k => k.StartsWith(prefix)).ToList();
+        
+        foreach (var key in keysToRemove)
+        {
+            _cache.TryRemove(key, out _);
+        }
+        
+        return Task.CompletedTask;
+    }
+
+    public Task<bool> ExistsAsync(string key, CancellationToken ct = default)
     {
         if (_cache.TryGetValue(key, out var entry))
         {
