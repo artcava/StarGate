@@ -1,13 +1,17 @@
 using StarGate.Api.Endpoints;
+using StarGate.Api.Infrastructure;
 using StarGate.Application;
+using StarGate.Core.Abstractions;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container
-builder.Services.AddApplicationServices(builder.Configuration);
+// Register Infrastructure services (in-memory implementations for testing)
+// TODO: Replace with actual Infrastructure layer services when available
+builder.Services.AddSingleton<IPolicyRepository, InMemoryPolicyRepository>();
+builder.Services.AddSingleton<ICacheStore, InMemoryCacheStore>();
 
-// TODO: Add Infrastructure services when available
-// builder.Services.AddInfrastructureServices(builder.Configuration);
+// Add Application layer services
+builder.Services.AddApplicationServices(builder.Configuration);
 
 var app = builder.Build();
 
