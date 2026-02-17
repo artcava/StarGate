@@ -16,7 +16,7 @@ public class PolicyProviderTests : IAsyncDisposable
 {
     private readonly Mock<IPolicyRepository> _repositoryMock;
     private readonly Mock<ICacheStore> _cacheStoreMock;
-    private readonly Mock<PolicyResolutionService> _resolutionServiceMock;
+    private readonly PolicyResolutionService _resolutionService;
     private readonly PolicyCacheStatistics _cacheStatistics;
     private readonly PolicyProviderOptions _options;
     private readonly PolicyProvider _sut;
@@ -26,8 +26,8 @@ public class PolicyProviderTests : IAsyncDisposable
         _repositoryMock = new Mock<IPolicyRepository>();
         _cacheStoreMock = new Mock<ICacheStore>();
         
-        // Create mock for PolicyResolutionService
-        _resolutionServiceMock = new Mock<PolicyResolutionService>(
+        // Use real PolicyResolutionService (no external dependencies)
+        _resolutionService = new PolicyResolutionService(
             NullLogger<PolicyResolutionService>.Instance);
         
         _cacheStatistics = new PolicyCacheStatistics();
@@ -47,7 +47,7 @@ public class PolicyProviderTests : IAsyncDisposable
             _repositoryMock.Object,
             _cacheStoreMock.Object,
             Options.Create(_options),
-            _resolutionServiceMock.Object,
+            _resolutionService,
             _cacheStatistics,
             NullLogger<PolicyProvider>.Instance);
     }
@@ -78,10 +78,6 @@ public class PolicyProviderTests : IAsyncDisposable
         _repositoryMock
             .Setup(x => x.GetClientOverrideAsync(clientId, processType, It.IsAny<CancellationToken>()))
             .ReturnsAsync((ClientPolicyOverride?)null);
-
-        _resolutionServiceMock
-            .Setup(x => x.ValidatePolicy(It.IsAny<ProcessTypePolicy>()))
-            .Returns(new PolicyValidationResult { IsValid = true, Errors = new List<string>() });
 
         // First call to populate memory cache
         await _sut.GetEffectivePolicyAsync(clientId, processType);
@@ -124,10 +120,6 @@ public class PolicyProviderTests : IAsyncDisposable
             .Setup(x => x.GetClientOverrideAsync(clientId, processType, It.IsAny<CancellationToken>()))
             .ReturnsAsync((ClientPolicyOverride?)null);
 
-        _resolutionServiceMock
-            .Setup(x => x.ValidatePolicy(It.IsAny<ProcessTypePolicy>()))
-            .Returns(new PolicyValidationResult { IsValid = true, Errors = new List<string>() });
-
         // Act
         var result = await _sut.GetEffectivePolicyAsync(clientId, processType);
 
@@ -159,7 +151,6 @@ public class PolicyProviderTests : IAsyncDisposable
             Timeout = customTimeout,
             UpdatedAt = DateTime.UtcNow
         };
-        var resolvedPolicy = typeDefault with { Timeout = customTimeout };
 
         _cacheStoreMock
             .Setup(x => x.GetAsync<ProcessTypePolicy>(It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -177,27 +168,12 @@ public class PolicyProviderTests : IAsyncDisposable
             .Setup(x => x.GetClientOverrideAsync(clientId, processType, It.IsAny<CancellationToken>()))
             .ReturnsAsync(clientOverride);
 
-        _resolutionServiceMock
-            .Setup(x => x.ValidateClientOverride(clientOverride))
-            .Returns(new PolicyValidationResult { IsValid = true, Errors = new List<string>() });
-
-        _resolutionServiceMock
-            .Setup(x => x.ResolvePolicy(typeDefault, clientOverride))
-            .Returns(resolvedPolicy);
-
-        _resolutionServiceMock
-            .Setup(x => x.ValidatePolicy(resolvedPolicy))
-            .Returns(new PolicyValidationResult { IsValid = true, Errors = new List<string>() });
-
         // Act
         var result = await _sut.GetEffectivePolicyAsync(clientId, processType);
 
         // Assert
         result.Timeout.Should().Be(customTimeout);
         result.Source.TimeoutFromOverride.Should().BeTrue();
-        _resolutionServiceMock.Verify(
-            x => x.ResolvePolicy(typeDefault, clientOverride),
-            Times.Once);
     }
 
     [Fact]
@@ -223,10 +199,6 @@ public class PolicyProviderTests : IAsyncDisposable
         _repositoryMock
             .Setup(x => x.GetClientOverrideAsync(clientId, processType, It.IsAny<CancellationToken>()))
             .ReturnsAsync((ClientPolicyOverride?)null);
-
-        _resolutionServiceMock
-            .Setup(x => x.ValidatePolicy(It.IsAny<ProcessTypePolicy>()))
-            .Returns(new PolicyValidationResult { IsValid = true, Errors = new List<string>() });
 
         // Act
         var result = await _sut.GetEffectivePolicyAsync(clientId, processType);
@@ -266,10 +238,6 @@ public class PolicyProviderTests : IAsyncDisposable
             .Setup(x => x.GetClientOverrideAsync(clientId, processType, It.IsAny<CancellationToken>()))
             .ReturnsAsync((ClientPolicyOverride?)null);
 
-        _resolutionServiceMock
-            .Setup(x => x.ValidatePolicy(It.IsAny<ProcessTypePolicy>()))
-            .Returns(new PolicyValidationResult { IsValid = true, Errors = new List<string>() });
-
         // Act
         var result = await _sut.GetEffectivePolicyAsync(clientId, processType);
 
@@ -307,10 +275,6 @@ public class PolicyProviderTests : IAsyncDisposable
         _repositoryMock
             .Setup(x => x.GetClientOverrideAsync(clientId, processType, It.IsAny<CancellationToken>()))
             .ReturnsAsync((ClientPolicyOverride?)null);
-
-        _resolutionServiceMock
-            .Setup(x => x.ValidatePolicy(It.IsAny<ProcessTypePolicy>()))
-            .Returns(new PolicyValidationResult { IsValid = true, Errors = new List<string>() });
 
         // Populate cache
         await _sut.GetEffectivePolicyAsync(clientId, processType);
@@ -351,10 +315,6 @@ public class PolicyProviderTests : IAsyncDisposable
         _repositoryMock
             .Setup(x => x.GetClientOverrideAsync(clientId, processType, It.IsAny<CancellationToken>()))
             .ReturnsAsync((ClientPolicyOverride?)null);
-
-        _resolutionServiceMock
-            .Setup(x => x.ValidatePolicy(It.IsAny<ProcessTypePolicy>()))
-            .Returns(new PolicyValidationResult { IsValid = true, Errors = new List<string>() });
 
         // Populate cache
         await _sut.GetEffectivePolicyAsync(clientId, processType);
@@ -401,26 +361,12 @@ public class PolicyProviderTests : IAsyncDisposable
             .Setup(x => x.GetClientOverrideAsync(clientId, processType, It.IsAny<CancellationToken>()))
             .ReturnsAsync(invalidOverride);
 
-        _resolutionServiceMock
-            .Setup(x => x.ValidateClientOverride(invalidOverride))
-            .Returns(new PolicyValidationResult
-            {
-                IsValid = false,
-                Errors = new List<string> { "Timeout must be positive" }
-            });
-
-        _resolutionServiceMock
-            .Setup(x => x.ValidatePolicy(typeDefault))
-            .Returns(new PolicyValidationResult { IsValid = true, Errors = new List<string>() });
-
         // Act
         var result = await _sut.GetEffectivePolicyAsync(clientId, processType);
 
         // Assert
         result.Timeout.Should().Be(typeDefault.Timeout); // Should use type default
-        _resolutionServiceMock.Verify(
-            x => x.ResolvePolicy(It.IsAny<ProcessTypePolicy>(), It.IsAny<ClientPolicyOverride>()),
-            Times.Never);
+        result.Source.TimeoutFromOverride.Should().BeFalse(); // Invalid override not applied
     }
 
     #endregion
@@ -471,10 +417,6 @@ public class PolicyProviderTests : IAsyncDisposable
             .Setup(x => x.GetClientOverrideAsync(clientId, processType, It.IsAny<CancellationToken>()))
             .ReturnsAsync((ClientPolicyOverride?)null);
 
-        _resolutionServiceMock
-            .Setup(x => x.ValidatePolicy(It.IsAny<ProcessTypePolicy>()))
-            .Returns(new PolicyValidationResult { IsValid = true, Errors = new List<string>() });
-
         // Act
         var result = await _sut.GetTimeoutAsync(clientId, processType);
 
@@ -505,10 +447,6 @@ public class PolicyProviderTests : IAsyncDisposable
         _repositoryMock
             .Setup(x => x.GetClientOverrideAsync(clientId, processType, It.IsAny<CancellationToken>()))
             .ReturnsAsync((ClientPolicyOverride?)null);
-
-        _resolutionServiceMock
-            .Setup(x => x.ValidatePolicy(It.IsAny<ProcessTypePolicy>()))
-            .Returns(new PolicyValidationResult { IsValid = true, Errors = new List<string>() });
 
         // Act
         var result = await _sut.GetRetryPolicyAsync(clientId, processType);
