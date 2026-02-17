@@ -216,4 +216,72 @@ public class MongoPolicyRepository : IPolicyRepository
 
         return documents.Select(PolicyMapper.MapToDomain).ToList();
     }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<ClientPolicyOverride>> GetClientOverridesAsync(
+        string? clientId = null,
+        string? processType = null,
+        CancellationToken ct = default)
+    {
+        // Build filter dynamically based on provided parameters
+        FilterDefinition<ClientPolicyOverrideDocument> filter = Builders<ClientPolicyOverrideDocument>.Filter.Empty;
+
+        if (!string.IsNullOrWhiteSpace(clientId))
+        {
+            filter &= Builders<ClientPolicyOverrideDocument>.Filter.Eq(o => o.ClientId, clientId);
+            _logger.LogDebug("Filtering client overrides by ClientId={ClientId}", clientId);
+        }
+
+        if (!string.IsNullOrWhiteSpace(processType))
+        {
+            filter &= Builders<ClientPolicyOverrideDocument>.Filter.Eq(o => o.ProcessType, processType);
+            _logger.LogDebug("Filtering client overrides by ProcessType={ProcessType}", processType);
+        }
+
+        List<ClientPolicyOverrideDocument> documents = await _clientOverrides
+            .Find(filter)
+            .ToListAsync(ct);
+
+        _logger.LogDebug(
+            "Retrieved {Count} client overrides with filters: ClientId={ClientId}, ProcessType={ProcessType}",
+            documents.Count,
+            clientId ?? "(all)",
+            processType ?? "(all)");
+
+        return documents.Select(PolicyMapper.MapToDomain).ToList();
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<ProcessTypePolicy>> GetProcessTypePoliciesAsync(
+        IEnumerable<string>? processTypes = null,
+        CancellationToken ct = default)
+    {
+        FilterDefinition<ProcessTypePolicyDocument> filter;
+
+        if (processTypes != null && processTypes.Any())
+        {
+            // Filter by the specified process types
+            var typesList = processTypes.ToList();
+            filter = Builders<ProcessTypePolicyDocument>.Filter.In(p => p.ProcessType, typesList);
+            _logger.LogDebug(
+                "Filtering process type policies by ProcessTypes={ProcessTypes}",
+                string.Join(", ", typesList));
+        }
+        else
+        {
+            // Return all policies if no filter is provided
+            filter = Builders<ProcessTypePolicyDocument>.Filter.Empty;
+            _logger.LogDebug("Retrieving all process type policies (no filter)");
+        }
+
+        List<ProcessTypePolicyDocument> documents = await _processTypePolicies
+            .Find(filter)
+            .ToListAsync(ct);
+
+        _logger.LogDebug(
+            "Retrieved {Count} process type policies",
+            documents.Count);
+
+        return documents.Select(PolicyMapper.MapToDomain).ToList();
+    }
 }
