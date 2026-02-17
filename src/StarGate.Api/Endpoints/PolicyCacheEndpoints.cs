@@ -16,8 +16,18 @@ public static class PolicyCacheEndpoints
     public static void MapPolicyCacheEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/policies/cache")
-            .WithTags("Policy Cache Management")
-            .RequireAuthorization();
+            .WithTags("Policy Cache Management");
+            // TODO: Enable authorization when authentication is configured in Program.cs
+            // To enable:
+            // 1. Add authentication services in Program.cs:
+            //    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+            //        .AddJwtBearer(options => { /* configure JWT */ });
+            //    builder.Services.AddAuthorization();
+            // 2. Add middleware in Program.cs:
+            //    app.UseAuthentication();
+            //    app.UseAuthorization();
+            // 3. Uncomment the line below:
+            // .RequireAuthorization();
 
         // Get cache statistics
         // Returns cache hit/miss statistics and per-key metrics for policy caching.
