@@ -2,6 +2,24 @@
 
 ---
 
+## Quick Start
+
+To get started with StarGate development:
+
+1. **Prerequisites**: Docker, Docker Compose, .NET 8 SDK
+2. **Start Environment**:
+   ```bash
+   ./scripts/start-dev.sh
+   ```
+3. **Run Tests**:
+   ```bash
+   dotnet test
+   ```
+
+📚 **Full setup guide**: [Local Development Setup](docs/LOCAL-DEVELOPMENT.md)
+
+---
+
 ## TABLE OF CONTENTS
 
 1. [The Problem](#section-1-the-problem)
@@ -168,7 +186,7 @@ sequenceDiagram
 ```
 
 ### Polling Strategy (Intelligent Adaptive)
-The **StarGate Client** implements an intelligent polling strategy designed to balance responsiveness with resource efficiency:
+The **StarGate Client** implements an intelligent polling strategy designed to balance responsiveness with resource efficiency:
 ```
 POLLING STRATEGY TIMELINE:
 
@@ -482,7 +500,7 @@ The architecture supports adding new processes:
 - OAuth 2.0 integration with `processType` scoping
 - State store (Redis cache + MongoDB)
 - First process type (e.g., orders)
-- StarGate client with intelligent polling strategy (30s → 60s adaptive)
+- StarGate client with intelligent polling strategy (30s → 60s adaptive)
 - Single pilot customer
 
 **Phase 2: Stabilization**
@@ -759,7 +777,7 @@ Authorization: Bearer {token}
   * **Phase 2 (2+ minutes)**: Every 60 seconds (conservative)
   * **Maximum Timeout**: 10 minutes (default, configurable per process type)
 - **Polling Backoff on Failures**:
-  * **Transient Poll Failures** (network timeout, 503): Exponential backoff
+  * **Transient Poll Failures** (network timeout, 503): Exponential backoff
   * Attempt 1: Retry after 5 seconds
   * Attempt 2: Retry after 10 seconds
   * Attempt 3: Retry after 20 seconds
@@ -826,9 +844,9 @@ Authorization: Bearer {token}
 - Queue backlog exceeding 1000 items
 - Database connection exhaustion
 - Cache eviction rate spikes
-- Repeated polling failures per customer (>3 consecutive failures per process)
-- Polling timeout rate exceeding 0.5% (processes not completing within 10 minutes)
-- Polling interval anomalies (stuck in Phase 1 beyond expected completion times)
+- Repeated polling failures per customer (>3 consecutive failures per process)
+- Polling timeout rate exceeding 0.5% (processes not completing within 10 minutes)
+- Polling interval anomalies (stuck in Phase 1 beyond expected completion times)
 
 ### Health Checks
 

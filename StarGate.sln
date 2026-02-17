@@ -1,0 +1,137 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{F6F2E1D0-8B3A-4C9D-9E5F-1A2B3C4D5E6F}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StarGate.Core", "src\StarGate.Core\StarGate.Core.csproj", "{11111111-1111-1111-1111-111111111111}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StarGate.Infrastructure", "src\StarGate.Infrastructure\StarGate.Infrastructure.csproj", "{22222222-2222-2222-2222-222222222222}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StarGate.Contracts", "src\StarGate.Contracts\StarGate.Contracts.csproj", "{33333333-3333-3333-3333-333333333333}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StarGate.Api", "src\StarGate.Api\StarGate.Api.csproj", "{44444444-4444-4444-4444-444444444444}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StarGate.Server", "src\StarGate.Server\StarGate.Server.csproj", "{55555555-5555-5555-5555-555555555555}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StarGate.Application", "src\StarGate.Application\StarGate.Application.csproj", "{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StarGate.Core.Tests", "tests\StarGate.Core.Tests\StarGate.Core.Tests.csproj", "{66666666-6666-6666-6666-666666666666}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StarGate.Infrastructure.Tests", "tests\StarGate.Infrastructure.Tests\StarGate.Infrastructure.Tests.csproj", "{77777777-7777-7777-7777-777777777777}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StarGate.Api.Tests", "tests\StarGate.Api.Tests\StarGate.Api.Tests.csproj", "{88888888-8888-8888-8888-888888888888}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StarGate.Server.Tests", "tests\StarGate.Server.Tests\StarGate.Server.Tests.csproj", "{99999999-9999-9999-9999-999999999999}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StarGate.Application.Tests", "tests\StarGate.Application.Tests\StarGate.Application.Tests.csproj", "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StarGate.Integration.Tests", "tests\StarGate.Integration.Tests\StarGate.Integration.Tests.csproj", "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docs", "docs", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
+	ProjectSection(SolutionItems) = preProject
+		docs\CACHE-INVALIDATION.md = docs\CACHE-INVALIDATION.md
+		docs\CLIENT-TECHNICAL-ANALYSIS.md = docs\CLIENT-TECHNICAL-ANALYSIS.md
+		docs\CODING-CONVENTIONS.md = docs\CODING-CONVENTIONS.md
+		docs\GIT-FLOW.md = docs\GIT-FLOW.md
+		docs\LOCAL-DEVELOPMENT.md = docs\LOCAL-DEVELOPMENT.md
+		docs\PULL-REQUEST-PROCESS.md = docs\PULL-REQUEST-PROCESS.md
+		docs\REDIS-CONNECTION-POOLING.md = docs\REDIS-CONNECTION-POOLING.md
+		docs\RELEASE-PROCESS.md = docs\RELEASE-PROCESS.md
+		docs\TECHNICAL-ANALYSIS.md = docs\TECHNICAL-ANALYSIS.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "scripts", "scripts", "{CFF6CD27-E36B-4867-9FD5-6B6EFFE8B5A5}"
+	ProjectSection(SolutionItems) = preProject
+		scripts\mongo-init.js = scripts\mongo-init.js
+		scripts\rabbitmq-definitions.json = scripts\rabbitmq-definitions.json
+		scripts\rabbitmq.conf = scripts\rabbitmq.conf
+		scripts\reset-dev.sh = scripts\reset-dev.sh
+		scripts\start-dev.sh = scripts\start-dev.sh
+		scripts\stop-dev.sh = scripts\stop-dev.sh
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "examples", "examples", "{CD5F81FE-020B-4007-AA67-11BBA61EDE44}"
+	ProjectSection(SolutionItems) = preProject
+		docs\examples\appsettings.mongodb.json = docs\examples\appsettings.mongodb.json
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{11111111-1111-1111-1111-111111111111}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{11111111-1111-1111-1111-111111111111}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{11111111-1111-1111-1111-111111111111}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{11111111-1111-1111-1111-111111111111}.Release|Any CPU.Build.0 = Release|Any CPU
+		{22222222-2222-2222-2222-222222222222}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{22222222-2222-2222-2222-222222222222}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{22222222-2222-2222-2222-222222222222}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{22222222-2222-2222-2222-222222222222}.Release|Any CPU.Build.0 = Release|Any CPU
+		{33333333-3333-3333-3333-333333333333}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{33333333-3333-3333-3333-333333333333}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{33333333-3333-3333-3333-333333333333}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{33333333-3333-3333-3333-333333333333}.Release|Any CPU.Build.0 = Release|Any CPU
+		{44444444-4444-4444-4444-444444444444}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{44444444-4444-4444-4444-444444444444}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{44444444-4444-4444-4444-444444444444}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{44444444-4444-4444-4444-444444444444}.Release|Any CPU.Build.0 = Release|Any CPU
+		{55555555-5555-5555-5555-555555555555}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{55555555-5555-5555-5555-555555555555}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{55555555-5555-5555-5555-555555555555}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{55555555-5555-5555-5555-555555555555}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{66666666-6666-6666-6666-666666666666}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{66666666-6666-6666-6666-666666666666}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{66666666-6666-6666-6666-666666666666}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{66666666-6666-6666-6666-666666666666}.Release|Any CPU.Build.0 = Release|Any CPU
+		{77777777-7777-7777-7777-777777777777}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{77777777-7777-7777-7777-777777777777}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{77777777-7777-7777-7777-777777777777}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{77777777-7777-7777-7777-777777777777}.Release|Any CPU.Build.0 = Release|Any CPU
+		{88888888-8888-8888-8888-888888888888}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{88888888-8888-8888-8888-888888888888}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{88888888-8888-8888-8888-888888888888}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{88888888-8888-8888-8888-888888888888}.Release|Any CPU.Build.0 = Release|Any CPU
+		{99999999-9999-9999-9999-999999999999}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{99999999-9999-9999-9999-999999999999}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{99999999-9999-9999-9999-999999999999}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{99999999-9999-9999-9999-999999999999}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{11111111-1111-1111-1111-111111111111} = {F6F2E1D0-8B3A-4C9D-9E5F-1A2B3C4D5E6F}
+		{22222222-2222-2222-2222-222222222222} = {F6F2E1D0-8B3A-4C9D-9E5F-1A2B3C4D5E6F}
+		{33333333-3333-3333-3333-333333333333} = {F6F2E1D0-8B3A-4C9D-9E5F-1A2B3C4D5E6F}
+		{44444444-4444-4444-4444-444444444444} = {F6F2E1D0-8B3A-4C9D-9E5F-1A2B3C4D5E6F}
+		{55555555-5555-5555-5555-555555555555} = {F6F2E1D0-8B3A-4C9D-9E5F-1A2B3C4D5E6F}
+		{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB} = {F6F2E1D0-8B3A-4C9D-9E5F-1A2B3C4D5E6F}
+		{66666666-6666-6666-6666-666666666666} = {A1B2C3D4-E5F6-7890-ABCD-EF1234567890}
+		{77777777-7777-7777-7777-777777777777} = {A1B2C3D4-E5F6-7890-ABCD-EF1234567890}
+		{88888888-8888-8888-8888-888888888888} = {A1B2C3D4-E5F6-7890-ABCD-EF1234567890}
+		{99999999-9999-9999-9999-999999999999} = {A1B2C3D4-E5F6-7890-ABCD-EF1234567890}
+		{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC} = {A1B2C3D4-E5F6-7890-ABCD-EF1234567890}
+		{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} = {A1B2C3D4-E5F6-7890-ABCD-EF1234567890}
+		{CD5F81FE-020B-4007-AA67-11BBA61EDE44} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {92916746-D740-4EEC-80B2-B88328A7064F}
+	EndGlobalSection
+EndGlobal

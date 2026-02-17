@@ -1,0 +1,139 @@
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: stargate-mongodb
+    restart: unless-stopped
+    ports:
+      - "27018:27017"  # Changed to 27018 to avoid conflicts
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: stargate_admin
+      MONGO_INITDB_ROOT_PASSWORD: stargate_password_dev
+      MONGO_INITDB_DATABASE: stargate
+    volumes:
+      - mongodb_data:/data/db
+      - ./scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    networks:
+      - stargate-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/stargate --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  # Redis Cache
+  redis:
+    image: redis:7.2-alpine
+    container_name: stargate-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --requirepass stargate_redis_password_dev
+    volumes:
+      - redis_data:/data
+    networks:
+      - stargate-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "stargate_redis_password_dev", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # RabbitMQ Message Broker
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: stargate-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"   # AMQP port
+      - "15672:15672" # Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: stargate
+      RABBITMQ_DEFAULT_PASS: stargate_rabbitmq_password_dev
+      RABBITMQ_DEFAULT_VHOST: stargate
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - ./scripts/rabbitmq-definitions.json:/etc/rabbitmq/definitions.json:ro
+      - ./scripts/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+    networks:
+      - stargate-network
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  # StarGate API Gateway
+  stargate-api:
+    build:
+      context: .
+      dockerfile: src/StarGate.Api/Dockerfile
+    container_name: stargate-api
+    restart: unless-stopped
+    ports:
+      - "5000:8080"
+      - "5001:8081"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080;https://+:8081
+      - ConnectionStrings__MongoDB=mongodb://stargate_admin:stargate_password_dev@mongodb:27017/stargate?authSource=admin
+      - ConnectionStrings__Redis=redis:6379,password=stargate_redis_password_dev
+      - RabbitMQ__HostName=rabbitmq
+      - RabbitMQ__Port=5672
+      - RabbitMQ__UserName=stargate
+      - RabbitMQ__Password=stargate_rabbitmq_password_dev
+      - RabbitMQ__VirtualHost=stargate
+      - Auth__Authority=https://your-identity-provider.com
+      - Auth__Audience=stargate-api
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - stargate-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # StarGate Background Server
+  stargate-server:
+    build:
+      context: .
+      dockerfile: src/StarGate.Server/Dockerfile
+    container_name: stargate-server
+    restart: unless-stopped
+    environment:
+      - DOTNET_ENVIRONMENT=Development
+      - ConnectionStrings__MongoDB=mongodb://stargate_admin:stargate_password_dev@mongodb:27017/stargate?authSource=admin
+      - ConnectionStrings__Redis=redis:6379,password=stargate_redis_password_dev
+      - RabbitMQ__HostName=rabbitmq
+      - RabbitMQ__Port=5672
+      - RabbitMQ__UserName=stargate
+      - RabbitMQ__Password=stargate_rabbitmq_password_dev
+      - RabbitMQ__VirtualHost=stargate
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - stargate-network
+
+networks:
+  stargate-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:
+  redis_data:
+  rabbitmq_data:
