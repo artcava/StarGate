@@ -112,7 +112,7 @@ public class PolicyProvider : IPolicyProvider
         var typePolicy = await GetTypePolicyAsync(processType, ct);
 
         // Get client override (with caching)
-        var clientOverride = await GetClientOverrideAsync(clientId, processType, ct);
+        var clientOverride = await GetClientOverrideInternalAsync(clientId, processType, ct);
 
         // Merge and create effective policy using resolution service
         var effectivePolicy = MergePolicies(typePolicy, clientOverride, clientId);
@@ -129,68 +129,49 @@ public class PolicyProvider : IPolicyProvider
         return effectivePolicy;
     }
 
-    /// <summary>
-    /// Gets default policy for a process type (without client override).
-    /// Used by cache warmer to preload type defaults.
-    /// </summary>
-    /// <param name="processType">The process type.</param>
-    /// <param name="ct">Cancellation token.</param>
-    /// <returns>The type default policy.</returns>
-    public async Task<ProcessTypePolicy> GetDefaultPolicyAsync(
+    /// <inheritdoc/>
+    public async Task<EffectivePolicy> GetDefaultPolicyAsync(
         string processType,
         CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(processType, nameof(processType));
-        return await GetTypePolicyAsync(processType, ct);
+        
+        var typePolicy = await GetTypePolicyAsync(processType, ct);
+        
+        // Return type default as effective policy (no client override)
+        return new EffectivePolicy
+        {
+            ProcessType = typePolicy.ProcessType,
+            ClientId = "default",
+            Timeout = typePolicy.Timeout,
+            RetryPolicy = typePolicy.RetryPolicy,
+            ResultRetention = typePolicy.ResultRetention,
+            MaxConcurrentProcesses = typePolicy.MaxConcurrentProcesses,
+            Source = new PolicySource
+            {
+                TimeoutFromOverride = false,
+                RetryPolicyFromOverride = false,
+                ResultRetentionFromOverride = false,
+                ConcurrencyLimitFromOverride = false
+            }
+        };
     }
 
-    /// <summary>
-    /// Gets effective policy for a client and process type.
-    /// Unified access method for warm-up and regular operations.
-    /// </summary>
-    /// <param name="processType">The process type.</param>
-    /// <param name="clientId">The client identifier.</param>
-    /// <param name="ct">Cancellation token.</param>
-    /// <returns>The effective policy.</returns>
+    /// <inheritdoc/>
     public async Task<EffectivePolicy> GetPolicyAsync(
+        string clientId,
         string processType,
-        string? clientId = null,
         CancellationToken ct = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(clientId, nameof(clientId));
         ArgumentException.ThrowIfNullOrWhiteSpace(processType, nameof(processType));
 
-        if (string.IsNullOrWhiteSpace(clientId))
-        {
-            // No client specified, return type default as effective policy
-            var typePolicy = await GetTypePolicyAsync(processType, ct);
-            return new EffectivePolicy
-            {
-                ProcessType = typePolicy.ProcessType,
-                ClientId = "default",
-                Timeout = typePolicy.Timeout,
-                RetryPolicy = typePolicy.RetryPolicy,
-                ResultRetention = typePolicy.ResultRetention,
-                MaxConcurrentProcesses = typePolicy.MaxConcurrentProcesses,
-                Source = new PolicySource
-                {
-                    TimeoutFromOverride = false,
-                    RetryPolicyFromOverride = false,
-                    ResultRetentionFromOverride = false,
-                    ConcurrencyLimitFromOverride = false
-                }
-            };
-        }
-
+        // Delegate to GetEffectivePolicyAsync for client-specific policy
         return await GetEffectivePolicyAsync(clientId, processType, ct);
     }
 
-    /// <summary>
-    /// Refreshes all policies by clearing caches.
-    /// Policies will be reloaded on next access (lazy loading).
-    /// </summary>
-    /// <param name="ct">Cancellation token.</param>
-    /// <returns>A task representing the asynchronous operation.</returns>
-    public async Task RefreshPoliciesAsync(CancellationToken ct = default)
+    /// <inheritdoc/>
+    public async Task<int> RefreshPoliciesAsync(CancellationToken ct = default)
     {
         await _refreshLock.WaitAsync(ct);
         try
@@ -209,6 +190,8 @@ public class PolicyProvider : IPolicyProvider
             _logger.LogInformation(
                 "Policy cache refresh completed. Cleared {Count} memory cache entries",
                 memoryCount);
+
+            return memoryCount;
         }
         finally
         {
@@ -323,7 +306,7 @@ public class PolicyProvider : IPolicyProvider
     /// <summary>
     /// Retrieves client override with two-tier caching.
     /// </summary>
-    private async Task<ClientPolicyOverride?> GetClientOverrideAsync(
+    private async Task<ClientPolicyOverride?> GetClientOverrideInternalAsync(
         string clientId,
         string processType,
         CancellationToken ct)
