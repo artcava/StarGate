@@ -16,7 +16,8 @@ public class PolicyProviderTests
     private readonly Mock<IPolicyRepository> _repositoryMock;
     private readonly Mock<ICacheStore> _cacheStoreMock;
     private readonly Mock<ILogger<PolicyProvider>> _loggerMock;
-    private readonly Mock<PolicyResolutionService> _resolutionServiceMock;
+    private readonly PolicyResolutionService _resolutionService;
+    private readonly PolicyCacheStatistics _cacheStatistics;
     private readonly PolicyProviderOptions _options;
     private readonly PolicyProvider _sut;
 
@@ -26,9 +27,12 @@ public class PolicyProviderTests
         _cacheStoreMock = new Mock<ICacheStore>();
         _loggerMock = new Mock<ILogger<PolicyProvider>>();
         
-        // Create mock for PolicyResolutionService with its logger dependency
+        // Create real PolicyResolutionService with its logger dependency
         var resolutionLoggerMock = new Mock<ILogger<PolicyResolutionService>>();
-        _resolutionServiceMock = new Mock<PolicyResolutionService>(resolutionLoggerMock.Object);
+        _resolutionService = new PolicyResolutionService(resolutionLoggerMock.Object);
+        
+        // Create real PolicyCacheStatistics (thread-safe, no external dependencies)
+        _cacheStatistics = new PolicyCacheStatistics();
         
         _options = new PolicyProviderOptions
         {
@@ -45,7 +49,8 @@ public class PolicyProviderTests
             _repositoryMock.Object,
             _cacheStoreMock.Object,
             Options.Create(_options),
-            _resolutionServiceMock.Object,
+            _resolutionService,
+            _cacheStatistics,
             _loggerMock.Object);
     }
 
