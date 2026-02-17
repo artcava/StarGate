@@ -1,5 +1,5 @@
 using FluentAssertions;
-using Microsoft.Extensions.Logging.Nulls;
+using Microsoft.Extensions.Logging.Abstractions;
 using StarGate.Application.Services;
 using StarGate.Core.Domain.Configuration;
 
