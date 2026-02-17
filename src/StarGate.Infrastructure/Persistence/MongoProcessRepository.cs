@@ -394,7 +394,7 @@ public class MongoProcessRepository : IProcessRepository
             Builders<ProcessDocument>.Filter.Eq(p => p.ClientId, clientId),
             Builders<ProcessDocument>.Filter.In(
                 p => p.Status,
-                new[] { "Accepted", "Running" }));
+                new[] { "Accepted", "Processing" }));
 
         var count = await _collection.CountDocumentsAsync(filter, cancellationToken: ct);
 
@@ -422,7 +422,7 @@ public class MongoProcessRepository : IProcessRepository
                 expirationDate),
             Builders<ProcessDocument>.Filter.In(
                 p => p.Status,
-                new[] { "Completed", "Failed", "Cancelled" }));
+                new[] { "Completed", "Failed" }));
 
         var documents = await _collection
             .Find(filter)
