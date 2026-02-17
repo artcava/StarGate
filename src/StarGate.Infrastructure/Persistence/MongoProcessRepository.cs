@@ -123,6 +123,40 @@ public class MongoProcessRepository : IProcessRepository
     }
 
     /// <inheritdoc />
+    public async Task<Process?> GetByIdempotencyKeyAsync(
+        string idempotencyKey,
+        CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(idempotencyKey);
+
+        _logger.LogDebug(
+            "Retrieving process by idempotency key {IdempotencyKey}",
+            idempotencyKey);
+
+        var filter = Builders<ProcessDocument>.Filter.Eq(
+            p => p.IdempotencyKey,
+            idempotencyKey);
+
+        var document = await _collection.Find(filter).FirstOrDefaultAsync(ct);
+
+        if (document == null)
+        {
+            _logger.LogDebug(
+                "Process not found for idempotency key {IdempotencyKey}",
+                idempotencyKey);
+            return null;
+        }
+
+        var process = ProcessMapper.MapToDomain(document);
+        _logger.LogDebug(
+            "Process {ProcessId} found for idempotency key {IdempotencyKey}",
+            process.ProcessId,
+            idempotencyKey);
+
+        return process;
+    }
+
+    /// <inheritdoc />
     public async Task<Process?> GetByClientProcessIdAsync(
         string clientId,
         string clientProcessId,
@@ -339,5 +373,70 @@ public class MongoProcessRepository : IProcessRepository
             processType);
 
         return (int)count;
+    }
+
+    /// <inheritdoc />
+    public async Task<int> CountRunningProcessesByTypeAsync(
+        string processType,
+        string clientId,
+        CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(processType);
+        ArgumentException.ThrowIfNullOrWhiteSpace(clientId);
+
+        _logger.LogDebug(
+            "Counting running processes for type {ProcessType} and client {ClientId}",
+            processType,
+            clientId);
+
+        var filter = Builders<ProcessDocument>.Filter.And(
+            Builders<ProcessDocument>.Filter.Eq(p => p.ProcessType, processType),
+            Builders<ProcessDocument>.Filter.Eq(p => p.ClientId, clientId),
+            Builders<ProcessDocument>.Filter.In(
+                p => p.Status,
+                new[] { "Accepted", "Running" }));
+
+        var count = await _collection.CountDocumentsAsync(filter, cancellationToken: ct);
+
+        _logger.LogDebug(
+            "Found {Count} running processes for type {ProcessType} and client {ClientId}",
+            count,
+            processType,
+            clientId);
+
+        return (int)count;
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<Process>> GetExpiredProcessesAsync(
+        DateTime expirationDate,
+        CancellationToken ct = default)
+    {
+        _logger.LogDebug(
+            "Retrieving expired processes (expirationDate: {ExpirationDate})",
+            expirationDate);
+
+        var filter = Builders<ProcessDocument>.Filter.And(
+            Builders<ProcessDocument>.Filter.Lte(
+                p => p.RetentionExpiresAt,
+                expirationDate),
+            Builders<ProcessDocument>.Filter.In(
+                p => p.Status,
+                new[] { "Completed", "Failed", "Cancelled" }));
+
+        var documents = await _collection
+            .Find(filter)
+            .Limit(1000) // Limit batch size to prevent excessive memory usage
+            .ToListAsync(ct);
+
+        var processes = documents
+            .Select(ProcessMapper.MapToDomain)
+            .ToList();
+
+        _logger.LogInformation(
+            "Found {Count} expired processes ready for cleanup",
+            processes.Count);
+
+        return processes;
     }
 }
