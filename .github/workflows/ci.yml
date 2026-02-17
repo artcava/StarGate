@@ -59,7 +59,7 @@ jobs:
           retention-days: 1
 
   # ============================================
-  # TEST JOB - Run unit tests with coverage
+  # TEST JOB - Run unit and integration tests
   # ============================================
   test:
     name: Test
@@ -123,6 +123,36 @@ jobs:
         with:
           name: coverage-report
           path: ./coverage/report
+          retention-days: 7
+      
+      # ============================================
+      # INTEGRATION TESTS - Run with Docker/MongoDB
+      # ============================================
+      - name: Verify Docker environment
+        run: |
+          echo "Verifying Docker is available for Testcontainers..."
+          docker --version
+          docker info --format '{{.ServerVersion}}'
+          echo "✅ Docker is ready for integration tests"
+      
+      - name: Run integration tests
+        run: |
+          echo "Running integration tests with MongoDB Testcontainers..."
+          dotnet test ${{ env.SOLUTION_PATH }} \
+            --configuration ${{ env.BUILD_CONFIGURATION }} \
+            --no-restore \
+            --verbosity normal \
+            --filter "Category=Integration" \
+            --logger "console;verbosity=detailed"
+        timeout-minutes: 15
+      
+      - name: Upload integration test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-results
+          path: |
+            **/TestResults/**
           retention-days: 7
 
   # ============================================
