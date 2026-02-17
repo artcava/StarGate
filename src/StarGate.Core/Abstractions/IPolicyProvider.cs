@@ -85,6 +85,45 @@ public interface IPolicyProvider
         string clientId,
         string processType,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Gets the default policy for a specific process type.
+    /// Used by cache warming to preload type defaults.
+    /// Returns process type policy without client-specific overrides.
+    /// </summary>
+    /// <param name="processType">Process type.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Default effective policy for the process type.</returns>
+    /// <exception cref="ArgumentNullException">If processType is null.</exception>
+    /// <exception cref="InvalidOperationException">If process type not found.</exception>
+    public Task<EffectivePolicy> GetDefaultPolicyAsync(
+        string processType,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Gets the effective policy for a specific client and process type.
+    /// Used by cache warming to preload client overrides.
+    /// Equivalent to GetEffectivePolicyAsync but optimized for batch operations.
+    /// </summary>
+    /// <param name="clientId">Client identifier.</param>
+    /// <param name="processType">Process type.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Effective policy with client overrides applied.</returns>
+    /// <exception cref="ArgumentNullException">If clientId or processType is null.</exception>
+    /// <exception cref="InvalidOperationException">If process type not found.</exception>
+    public Task<EffectivePolicy> GetPolicyAsync(
+        string clientId,
+        string processType,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Refreshes all cached policies from the repository.
+    /// Used by background refresh service to keep cache up-to-date.
+    /// Clears existing cache and reloads from database/Redis.
+    /// </summary>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Number of policies refreshed.</returns>
+    public Task<int> RefreshPoliciesAsync(CancellationToken ct = default);
 }
 
 /// <summary>
