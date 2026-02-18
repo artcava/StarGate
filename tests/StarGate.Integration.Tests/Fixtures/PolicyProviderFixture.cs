@@ -6,9 +6,7 @@ using MongoDB.Driver;
 using StarGate.Application.Services;
 using StarGate.Core.Abstractions;
 using StarGate.Core.Domain.Configuration;
-using StarGate.Infrastructure.Caching;
-using StarGate.Infrastructure.Data.Configuration;
-using StarGate.Infrastructure.Persistence.Repositories;
+using StarGate.Infrastructure.Persistence;
 using StarGate.Infrastructure.Services;
 using StarGate.Infrastructure.Validation;
 using Xunit;
@@ -22,7 +20,6 @@ namespace StarGate.Integration.Tests.Fixtures;
 public sealed class PolicyProviderFixture : IAsyncLifetime
 {
     private const string TestDatabaseName = "stargate_policy_provider_integration_tests";
-    private const string RedisConnectionString = "localhost:6379";
     
     private ServiceProvider? _serviceProvider;
     private MongoClient? _mongoClient;
@@ -74,11 +71,6 @@ public sealed class PolicyProviderFixture : IAsyncLifetime
         
         // MongoDB
         services.AddSingleton(_database);
-        services.Configure<MongoDbOptions>(options =>
-        {
-            options.ConnectionString = "mongodb://localhost:27017";
-            options.DatabaseName = TestDatabaseName;
-        });
         
         // Redis Cache (in-memory for testing)
         services.AddMemoryCache();
@@ -101,9 +93,9 @@ public sealed class PolicyProviderFixture : IAsyncLifetime
         // Policy Provider Options
         services.Configure<PolicyProviderOptions>(options =>
         {
-            options.EnableCaching = true;
             options.CacheTtlMinutes = 30;
-            options.WarmupOnStartup = false; // Manual warmup in tests
+            options.EnableCacheWarmup = false; // Manual warmup in tests
+            options.EnableBackgroundRefresh = false; // No background refresh in tests
             options.DefaultTimeoutSeconds = 300;
             options.DefaultMaxRetryAttempts = 3;
             options.DefaultRetryDelaySeconds = 5;
@@ -249,8 +241,10 @@ public sealed class PolicyProviderFixture : IAsyncLifetime
     
     private T GetRequiredService<T>() where T : notnull
     {
-        return _serviceProvider?.GetRequiredService<T>()
-            ?? throw new InvalidOperationException("Service provider not initialized");
+        if (_serviceProvider == null)
+            throw new InvalidOperationException("Service provider not initialized");
+            
+        return _serviceProvider.GetRequiredService<T>();
     }
 }
 
@@ -273,22 +267,28 @@ public class InMemoryCacheStore : ICacheStore
         return Task.FromResult(value);
     }
     
-    public Task SetAsync<T>(string key, T value, TimeSpan? expiration = null, CancellationToken ct = default) where T : class
+    public Task SetAsync<T>(string key, T value, TimeSpan ttl, CancellationToken ct = default) where T : class
     {
-        var options = new MemoryCacheEntryOptions();
-        if (expiration.HasValue)
+        var options = new MemoryCacheEntryOptions
         {
-            options.AbsoluteExpirationRelativeToNow = expiration.Value;
-        }
+            AbsoluteExpirationRelativeToNow = ttl
+        };
         
         _cache.Set(key, value, options);
         return Task.CompletedTask;
     }
     
-    public Task<bool> RemoveAsync(string key, CancellationToken ct = default)
+    public Task DeleteAsync(string key, CancellationToken ct = default)
     {
         _cache.Remove(key);
-        return Task.FromResult(true);
+        return Task.CompletedTask;
+    }
+    
+    public Task DeleteByPatternAsync(string pattern, CancellationToken ct = default)
+    {
+        // Simple in-memory implementation doesn't support pattern deletion
+        // In production, this would use Redis SCAN + DEL
+        return Task.CompletedTask;
     }
     
     public Task<bool> ExistsAsync(string key, CancellationToken ct = default)
