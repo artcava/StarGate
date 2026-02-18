@@ -1,8 +1,7 @@
 using MongoDB.Driver;
 using StarGate.Core.Abstractions;
 using StarGate.Core.Domain.Configuration;
-using StarGate.Infrastructure.Data.Configuration;
-using StarGate.Infrastructure.Persistence.Repositories;
+using StarGate.Infrastructure.Persistence;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace StarGate.Integration.Tests.Fixtures;
@@ -44,13 +43,6 @@ public sealed class PolicyRepositoryFixture : IAsyncLifetime
         
         // Create fresh database
         _database = _mongoClient.GetDatabase(TestDatabaseName);
-        
-        // Configure MongoDB options
-        var mongoOptions = new MongoDbOptions
-        {
-            ConnectionString = "mongodb://localhost:27017",
-            DatabaseName = TestDatabaseName
-        };
         
         // Create repository instance
         PolicyRepository = new MongoPolicyRepository(
