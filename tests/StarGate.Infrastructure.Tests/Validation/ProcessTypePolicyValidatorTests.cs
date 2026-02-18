@@ -73,11 +73,7 @@ public class ProcessTypePolicyValidatorTests
         // Arrange
         var policy = CreateValidPolicy() with 
         { 
-            RetryPolicy = new RetryPolicy 
-            { 
-                MaxAttempts = maxRetry, 
-                BackoffStrategy = BackoffStrategy.Exponential 
-            } 
+            RetryPolicy = CreateValidRetryPolicy() with { MaxAttempts = maxRetry }
         };
 
         // Act
@@ -97,11 +93,7 @@ public class ProcessTypePolicyValidatorTests
         // Arrange
         var policy = CreateValidPolicy() with 
         { 
-            RetryPolicy = new RetryPolicy 
-            { 
-                MaxAttempts = maxRetry, 
-                BackoffStrategy = BackoffStrategy.Exponential 
-            } 
+            RetryPolicy = CreateValidRetryPolicy() with { MaxAttempts = maxRetry }
         };
 
         // Act
@@ -253,13 +245,18 @@ public class ProcessTypePolicyValidatorTests
     {
         ProcessType = "order",
         Timeout = TimeSpan.FromMinutes(5),
-        RetryPolicy = new RetryPolicy
-        {
-            MaxAttempts = 3,
-            BackoffStrategy = BackoffStrategy.Exponential
-        },
+        RetryPolicy = CreateValidRetryPolicy(),
         ResultRetention = TimeSpan.FromDays(30),
         MaxConcurrentProcesses = 10,
         UpdatedAt = DateTime.UtcNow
+    };
+
+    private static RetryPolicy CreateValidRetryPolicy() => new()
+    {
+        Enabled = true,
+        MaxAttempts = 3,
+        InitialDelay = TimeSpan.FromSeconds(5),
+        BackoffStrategy = BackoffStrategy.Exponential,
+        MaxDelay = TimeSpan.FromMinutes(5)
     };
 }
