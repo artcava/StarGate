@@ -222,7 +222,7 @@ public class ProcessWorker : BackgroundService
                 timeoutCts.CancelAfter(TimeSpan.FromSeconds(policy.TimeoutSeconds));
 
                 // Update process status
-                process.Status = ProcessStatus.Running;
+                process.Status = ProcessStatus.Processing;
                 process.RetryCount = attempt;
                 process.UpdatedAt = DateTime.UtcNow;
                 await _repository.UpdateAsync(process);
@@ -254,7 +254,7 @@ public class ProcessWorker : BackgroundService
                     "Process {ProcessId} execution cancelled due to worker shutdown",
                     process.ProcessId);
 
-                process.Status = ProcessStatus.Pending;
+                process.Status = ProcessStatus.Accepted;
                 process.UpdatedAt = DateTime.UtcNow;
                 await _repository.UpdateAsync(process);
                 throw;
