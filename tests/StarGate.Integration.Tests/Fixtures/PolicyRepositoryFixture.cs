@@ -3,19 +3,17 @@ using StarGate.Core.Abstractions;
 using StarGate.Core.Domain.Configuration;
 using StarGate.Infrastructure.Persistence;
 using Microsoft.Extensions.Logging.Abstractions;
+using Xunit;
 
 namespace StarGate.Integration.Tests.Fixtures;
 
 /// <summary>
 /// Integration test fixture for policy repository testing.
-/// Provides MongoDB test environment with cleanup.
+/// Uses Testcontainers for MongoDB via MongoDbFixture.
 /// </summary>
 public sealed class PolicyRepositoryFixture : IAsyncLifetime
 {
-    private const string _testDatabaseName = "stargate_policy_integration_tests";
-    
-    private MongoClient? _mongoClient;
-    private IMongoDatabase? _database;
+    private readonly MongoDbFixture _mongoFixture;
     
     public IPolicyRepository PolicyRepository { get; private set; } = null!;
     
@@ -24,29 +22,20 @@ public sealed class PolicyRepositoryFixture : IAsyncLifetime
     /// </summary>
     public ProcessTypePolicy OrderPolicy { get; private set; } = null!;
     public ProcessTypePolicy ShippingPolicy { get; private set; } = null!;
+
+    public PolicyRepositoryFixture()
+    {
+        _mongoFixture = new MongoDbFixture();
+    }
     
     public async Task InitializeAsync()
     {
-        // Connect to MongoDB (using default local connection)
-        var mongoSettings = new MongoClientSettings
-        {
-            Server = new MongoServerAddress("localhost", 27017),
-            ConnectTimeout = TimeSpan.FromSeconds(10),
-            ServerSelectionTimeout = TimeSpan.FromSeconds(10)
-        };
+        // Initialize Testcontainers MongoDB
+        await _mongoFixture.InitializeAsync();
         
-        _mongoClient = new MongoClient(mongoSettings);
-        _database = _mongoClient.GetDatabase(_testDatabaseName);
-        
-        // Clean up database from previous runs
-        await _mongoClient.DropDatabaseAsync(_testDatabaseName);
-        
-        // Create fresh database
-        _database = _mongoClient.GetDatabase(_testDatabaseName);
-        
-        // Create repository instance
+        // Create repository instance using Testcontainers database
         PolicyRepository = new MongoPolicyRepository(
-            _database,
+            _mongoFixture.Database,
             NullLogger<MongoPolicyRepository>.Instance);
         
         // Seed test data
@@ -98,10 +87,7 @@ public sealed class PolicyRepositoryFixture : IAsyncLifetime
     
     public async Task DisposeAsync()
     {
-        if (_mongoClient != null && _database != null)
-        {
-            await _mongoClient.DropDatabaseAsync(_testDatabaseName);
-        }
+        await _mongoFixture.DisposeAsync();
     }
     
     /// <summary>
@@ -109,11 +95,7 @@ public sealed class PolicyRepositoryFixture : IAsyncLifetime
     /// </summary>
     public async Task ResetDatabaseAsync()
     {
-        if (_mongoClient != null)
-        {
-            await _mongoClient.DropDatabaseAsync(_testDatabaseName);
-            _database = _mongoClient.GetDatabase(_testDatabaseName);
-            await SeedTestDataAsync();
-        }
+        await _mongoFixture.ResetDatabaseAsync();
+        await SeedTestDataAsync();
     }
 }
