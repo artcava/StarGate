@@ -1,9 +1,9 @@
-namespace StarGate.Infrastructure.Services;
-
 using FluentValidation;
 using Microsoft.Extensions.Logging;
 using StarGate.Core.Domain;
 using StarGate.Core.Domain.Configuration;
+
+namespace StarGate.Infrastructure.Services;
 
 /// <summary>
 /// Service for validating policy configurations.
@@ -16,14 +16,14 @@ public interface IPolicyValidator
     /// </summary>
     /// <param name="policy">The policy to validate.</param>
     /// <returns>Validation result with detailed error information if validation fails.</returns>
-    PolicyValidationResult ValidateTypePolicy(ProcessTypePolicy policy);
+    public PolicyValidationResult ValidateTypePolicy(ProcessTypePolicy policy);
 
     /// <summary>
     /// Validates a client policy override.
     /// </summary>
     /// <param name="clientOverride">The client override to validate.</param>
     /// <returns>Validation result with detailed error information if validation fails.</returns>
-    PolicyValidationResult ValidateClientOverride(ClientPolicyOverride clientOverride);
+    public PolicyValidationResult ValidateClientOverride(ClientPolicyOverride clientOverride);
 }
 
 /// <summary>

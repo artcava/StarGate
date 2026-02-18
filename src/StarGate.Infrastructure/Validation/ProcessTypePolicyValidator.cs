@@ -1,7 +1,7 @@
-namespace StarGate.Infrastructure.Validation;
-
 using FluentValidation;
 using StarGate.Core.Domain.Configuration;
+
+namespace StarGate.Infrastructure.Validation;
 
 /// <summary>
 /// Validator for ProcessTypePolicy entities.
@@ -10,10 +10,10 @@ using StarGate.Core.Domain.Configuration;
 public class ProcessTypePolicyValidator : AbstractValidator<ProcessTypePolicy>
 {
     // Policy constraints - operational limits
-    private static readonly TimeSpan MinTimeout = TimeSpan.FromSeconds(1);
-    private static readonly TimeSpan MaxTimeout = TimeSpan.FromHours(1); // 3600 seconds
-    private const int MinConcurrentProcesses = 1;
-    private const int MaxConcurrentProcesses = 100;
+    private static readonly TimeSpan _minTimeout = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan _maxTimeout = TimeSpan.FromHours(1); // 3600 seconds
+    private const int _minConcurrentProcesses = 1;
+    private const int _maxConcurrentProcesses = 100;
 
     public ProcessTypePolicyValidator()
     {
@@ -26,9 +26,9 @@ public class ProcessTypePolicyValidator : AbstractValidator<ProcessTypePolicy>
             .WithMessage("Process type must not exceed 100 characters");
 
         RuleFor(p => p.Timeout)
-            .Must(t => t >= MinTimeout && t <= MaxTimeout)
+            .Must(t => t >= _minTimeout && t <= _maxTimeout)
             .WithErrorCode("TIMEOUT_OUT_OF_RANGE")
-            .WithMessage($"Timeout must be between {MinTimeout.TotalSeconds} and {MaxTimeout.TotalSeconds} seconds");
+            .WithMessage($"Timeout must be between {_minTimeout.TotalSeconds} and {_maxTimeout.TotalSeconds} seconds");
 
         RuleFor(p => p.RetryPolicy)
             .NotNull()
@@ -51,9 +51,9 @@ public class ProcessTypePolicyValidator : AbstractValidator<ProcessTypePolicy>
         When(p => p.MaxConcurrentProcesses.HasValue, () =>
         {
             RuleFor(p => p.MaxConcurrentProcesses!.Value)
-                .InclusiveBetween(MinConcurrentProcesses, MaxConcurrentProcesses)
+                .InclusiveBetween(_minConcurrentProcesses, _maxConcurrentProcesses)
                 .WithErrorCode("MAX_CONCURRENCY_OUT_OF_RANGE")
-                .WithMessage($"Max concurrent processes must be between {MinConcurrentProcesses} and {MaxConcurrentProcesses}");
+                .WithMessage($"Max concurrent processes must be between {_minConcurrentProcesses} and {_maxConcurrentProcesses}");
         });
 
         RuleFor(p => p.UpdatedAt)

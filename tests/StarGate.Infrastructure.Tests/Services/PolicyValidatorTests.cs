@@ -1,14 +1,13 @@
-namespace StarGate.Infrastructure.Tests.Services;
-
 using FluentAssertions;
 using FluentValidation;
 using FluentValidation.Results;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
-using StarGate.Core.Domain;
 using StarGate.Core.Domain.Configuration;
 using StarGate.Infrastructure.Services;
 using Xunit;
+
+namespace StarGate.Infrastructure.Tests.Services;
 
 /// <summary>
 /// Tests for PolicyValidator service.

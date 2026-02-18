@@ -1,9 +1,9 @@
-namespace StarGate.Infrastructure.Tests.Validation;
-
 using FluentAssertions;
 using StarGate.Core.Domain.Configuration;
 using StarGate.Infrastructure.Validation;
 using Xunit;
+
+namespace StarGate.Infrastructure.Tests.Validation;
 
 /// <summary>
 /// Tests for ProcessTypePolicyValidator.
