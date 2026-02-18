@@ -151,11 +151,7 @@ public class ClientPolicyOverrideValidatorTests
         // Arrange
         var clientOverride = CreateValidOverride() with 
         { 
-            RetryPolicy = new RetryPolicy 
-            { 
-                MaxAttempts = maxRetry, 
-                BackoffStrategy = BackoffStrategy.Exponential 
-            } 
+            RetryPolicy = CreateValidRetryPolicy() with { MaxAttempts = maxRetry }
         };
 
         // Act
@@ -175,11 +171,7 @@ public class ClientPolicyOverrideValidatorTests
         // Arrange
         var clientOverride = CreateValidOverride() with 
         { 
-            RetryPolicy = new RetryPolicy 
-            { 
-                MaxAttempts = maxRetry, 
-                BackoffStrategy = BackoffStrategy.Exponential 
-            } 
+            RetryPolicy = CreateValidRetryPolicy() with { MaxAttempts = maxRetry }
         };
 
         // Act
@@ -315,13 +307,18 @@ public class ClientPolicyOverrideValidatorTests
         ClientId = "client-123",
         ProcessType = "order",
         Timeout = TimeSpan.FromMinutes(10),
-        RetryPolicy = new RetryPolicy
-        {
-            MaxAttempts = 5,
-            BackoffStrategy = BackoffStrategy.Linear
-        },
+        RetryPolicy = CreateValidRetryPolicy(),
         ResultRetention = TimeSpan.FromDays(60),
         MaxConcurrentProcesses = 20,
         UpdatedAt = DateTime.UtcNow
+    };
+
+    private static RetryPolicy CreateValidRetryPolicy() => new()
+    {
+        Enabled = true,
+        MaxAttempts = 5,
+        InitialDelay = TimeSpan.FromSeconds(5),
+        BackoffStrategy = BackoffStrategy.Linear,
+        MaxDelay = TimeSpan.FromMinutes(5)
     };
 }
