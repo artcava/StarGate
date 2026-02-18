@@ -230,9 +230,10 @@ public class PolicyProviderTests : IAsyncDisposable
             .Setup(x => x.GetAsync<ClientPolicyOverride>(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((ClientPolicyOverride?)null);
 
+        // Repository throws InvalidOperationException when policy not found (not KeyNotFoundException)
         _repositoryMock
             .Setup(x => x.GetProcessTypePolicyAsync(processType, It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new KeyNotFoundException());
+            .ThrowsAsync(new InvalidOperationException($"Process type policy '{processType}' not found"));
 
         _repositoryMock
             .Setup(x => x.GetClientOverrideAsync(clientId, processType, It.IsAny<CancellationToken>()))
