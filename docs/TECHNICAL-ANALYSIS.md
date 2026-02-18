@@ -120,9 +120,9 @@ This document outlines the technical analysis and development plan for the StarG
 - [x] Write unit tests for policy resolution
 
 #### Sprint 4.2: Policy Integration
-- [ ] Integrate policies into ProcessService
-- [ ] Integrate policies into ProcessWorker
-- [ ] Add policy validation and constraints
+- [x] Integrate policies into ProcessService
+- [x] Integrate policies into ProcessWorker
+- [x] Add policy validation and constraints
 - [ ] Integration tests for policy enforcement
 
 ### Phase 5: API Gateway (Week 6-7)
