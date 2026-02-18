@@ -12,7 +12,7 @@ namespace StarGate.Integration.Tests.Fixtures;
 /// </summary>
 public sealed class PolicyRepositoryFixture : IAsyncLifetime
 {
-    private const string TestDatabaseName = "stargate_policy_integration_tests";
+    private const string _testDatabaseName = "stargate_policy_integration_tests";
     
     private MongoClient? _mongoClient;
     private IMongoDatabase? _database;
@@ -36,13 +36,13 @@ public sealed class PolicyRepositoryFixture : IAsyncLifetime
         };
         
         _mongoClient = new MongoClient(mongoSettings);
-        _database = _mongoClient.GetDatabase(TestDatabaseName);
+        _database = _mongoClient.GetDatabase(_testDatabaseName);
         
         // Clean up database from previous runs
-        await _mongoClient.DropDatabaseAsync(TestDatabaseName);
+        await _mongoClient.DropDatabaseAsync(_testDatabaseName);
         
         // Create fresh database
-        _database = _mongoClient.GetDatabase(TestDatabaseName);
+        _database = _mongoClient.GetDatabase(_testDatabaseName);
         
         // Create repository instance
         PolicyRepository = new MongoPolicyRepository(
@@ -100,7 +100,7 @@ public sealed class PolicyRepositoryFixture : IAsyncLifetime
     {
         if (_mongoClient != null && _database != null)
         {
-            await _mongoClient.DropDatabaseAsync(TestDatabaseName);
+            await _mongoClient.DropDatabaseAsync(_testDatabaseName);
         }
     }
     
@@ -111,8 +111,8 @@ public sealed class PolicyRepositoryFixture : IAsyncLifetime
     {
         if (_mongoClient != null)
         {
-            await _mongoClient.DropDatabaseAsync(TestDatabaseName);
-            _database = _mongoClient.GetDatabase(TestDatabaseName);
+            await _mongoClient.DropDatabaseAsync(_testDatabaseName);
+            _database = _mongoClient.GetDatabase(_testDatabaseName);
             await SeedTestDataAsync();
         }
     }

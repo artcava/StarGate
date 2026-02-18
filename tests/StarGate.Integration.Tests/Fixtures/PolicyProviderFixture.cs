@@ -19,7 +19,7 @@ namespace StarGate.Integration.Tests.Fixtures;
 /// </summary>
 public sealed class PolicyProviderFixture : IAsyncLifetime
 {
-    private const string TestDatabaseName = "stargate_policy_provider_integration_tests";
+    private const string _testDatabaseName = "stargate_policy_provider_integration_tests";
     
     private ServiceProvider? _serviceProvider;
     private MongoClient? _mongoClient;
@@ -55,11 +55,11 @@ public sealed class PolicyProviderFixture : IAsyncLifetime
         };
         
         _mongoClient = new MongoClient(mongoSettings);
-        _database = _mongoClient.GetDatabase(TestDatabaseName);
+        _database = _mongoClient.GetDatabase(_testDatabaseName);
         
         // Clean up database from previous runs
-        await _mongoClient.DropDatabaseAsync(TestDatabaseName);
-        _database = _mongoClient.GetDatabase(TestDatabaseName);
+        await _mongoClient.DropDatabaseAsync(_testDatabaseName);
+        _database = _mongoClient.GetDatabase(_testDatabaseName);
         
         // Configure services
         var services = new ServiceCollection();
@@ -211,7 +211,7 @@ public sealed class PolicyProviderFixture : IAsyncLifetime
     {
         if (_mongoClient != null && _database != null)
         {
-            await _mongoClient.DropDatabaseAsync(TestDatabaseName);
+            await _mongoClient.DropDatabaseAsync(_testDatabaseName);
         }
         
         _serviceProvider?.Dispose();
@@ -233,18 +233,17 @@ public sealed class PolicyProviderFixture : IAsyncLifetime
     {
         if (_mongoClient != null)
         {
-            await _mongoClient.DropDatabaseAsync(TestDatabaseName);
-            _database = _mongoClient.GetDatabase(TestDatabaseName);
+            await _mongoClient.DropDatabaseAsync(_testDatabaseName);
+            _database = _mongoClient.GetDatabase(_testDatabaseName);
             await SeedTestDataAsync();
         }
     }
     
     private T GetRequiredService<T>() where T : notnull
     {
-        if (_serviceProvider == null)
-            throw new InvalidOperationException("Service provider not initialized");
-            
-        return _serviceProvider.GetRequiredService<T>();
+        return _serviceProvider == null
+            ? throw new InvalidOperationException("Service provider not initialized")
+            : _serviceProvider.GetRequiredService<T>();
     }
 }
 
