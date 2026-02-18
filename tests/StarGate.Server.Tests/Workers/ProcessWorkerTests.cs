@@ -1,5 +1,3 @@
-namespace StarGate.Server.Tests.Workers;
-
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -9,6 +7,8 @@ using StarGate.Core.Domain.Configuration;
 using StarGate.Core.Exceptions;
 using StarGate.Server.Workers;
 using Xunit;
+
+namespace StarGate.Server.Tests.Workers;
 
 public class ProcessWorkerTests
 {
