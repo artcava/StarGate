@@ -99,4 +99,33 @@ public record Process
     /// Determined by process type policies and error classification.
     /// </summary>
     public bool Retryable { get; init; }
+
+    /// <summary>
+    /// Timestamp when the process times out (calculated from policy).
+    /// Derived from CreatedAt + policy.TimeoutSeconds.
+    /// Used to identify processes that have exceeded their execution time limit.
+    /// </summary>
+    public DateTime? TimeoutAt { get; init; }
+
+    /// <summary>
+    /// Current retry count.
+    /// Tracks how many times this process has been retried after failure.
+    /// Used to enforce MaxRetries policy constraint.
+    /// </summary>
+    public int RetryCount { get; init; }
+
+    /// <summary>
+    /// Maximum retry attempts (from policy at creation time).
+    /// Snapshot of the policy value when the process was created.
+    /// Ensures consistent retry behavior even if policy changes later.
+    /// </summary>
+    public int MaxRetries { get; init; }
+
+    /// <summary>
+    /// Timestamp when the process expires and can be deleted (calculated from retention policy).
+    /// Derived from CreatedAt + policy.RetentionDays.
+    /// Used by cleanup jobs to identify processes eligible for deletion.
+    /// Only applies to terminal states: Completed, Failed, Cancelled.
+    /// </summary>
+    public DateTime? RetentionExpiresAt { get; init; }
 }

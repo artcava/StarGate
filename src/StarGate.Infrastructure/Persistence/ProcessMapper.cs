@@ -41,7 +41,11 @@ public static class ProcessMapper
             UpdatedAt = process.UpdatedAt,
             CompletedAt = process.CompletedAt,
             IdempotencyKey = process.IdempotencyKey,
-            Retryable = process.Retryable
+            Retryable = process.Retryable,
+            TimeoutAt = process.TimeoutAt,
+            RetryCount = process.RetryCount,
+            MaxRetries = process.MaxRetries,
+            RetentionExpiresAt = process.RetentionExpiresAt
         };
     }
 
@@ -75,7 +79,11 @@ public static class ProcessMapper
             UpdatedAt = document.UpdatedAt,
             CompletedAt = document.CompletedAt,
             IdempotencyKey = document.IdempotencyKey,
-            Retryable = document.Retryable
+            Retryable = document.Retryable,
+            TimeoutAt = document.TimeoutAt,
+            RetryCount = document.RetryCount,
+            MaxRetries = document.MaxRetries,
+            RetentionExpiresAt = document.RetentionExpiresAt
         };
     }
 

@@ -46,13 +46,44 @@ public static class DependencyInjection
                 : int.TryParse(concurrentStr, out var concurrent) ? concurrent : 10;
             
             options.DefaultBackoffStrategy = section[nameof(PolicyProviderOptions.DefaultBackoffStrategy)] ?? "Exponential";
+            
+            // Cache management options
+            options.CacheRefreshIntervalMinutes = int.TryParse(section[nameof(PolicyProviderOptions.CacheRefreshIntervalMinutes)], out var refreshInterval) 
+                ? refreshInterval : 30;
+            
+            options.EnableCacheWarmup = !bool.TryParse(section[nameof(PolicyProviderOptions.EnableCacheWarmup)], out var enableWarmup) 
+                || enableWarmup;
+            
+            options.EnableBackgroundRefresh = !bool.TryParse(section[nameof(PolicyProviderOptions.EnableBackgroundRefresh)], out var enableRefresh) 
+                || enableRefresh;
+            
+            options.MaxMemoryCacheSize = int.TryParse(section[nameof(PolicyProviderOptions.MaxMemoryCacheSize)], out var maxCacheSize) 
+                ? maxCacheSize : 1000;
         });
+
+        // Register cache statistics service as singleton (thread-safe)
+        services.AddSingleton<PolicyCacheStatistics>();
 
         // Register PolicyResolutionService as singleton (stateless, thread-safe)
         services.AddSingleton<PolicyResolutionService>();
 
         // Register PolicyProvider as singleton (thread-safe with internal caching)
         services.AddSingleton<IPolicyProvider, PolicyProvider>();
+
+        // Register background services based on configuration
+        var options = configuration
+            .GetSection(PolicyProviderOptions.SectionName)
+            .Get<PolicyProviderOptions>() ?? new PolicyProviderOptions();
+
+        if (options.EnableCacheWarmup)
+        {
+            services.AddHostedService<PolicyCacheWarmer>();
+        }
+
+        if (options.EnableBackgroundRefresh)
+        {
+            services.AddHostedService<PolicyCacheRefreshService>();
+        }
 
         return services;
     }

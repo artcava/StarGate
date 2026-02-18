@@ -94,4 +94,24 @@ public interface IPolicyRepository
     public Task<IReadOnlyList<ClientPolicyOverride>> ListClientOverridesAsync(
         string clientId,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Retrieves all process type policy defaults.
+    /// Used by cache warming to preload all type defaults at startup.
+    /// Returns complete list of all configured process type policies.
+    /// </summary>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>List of all process type policies with metadata.</returns>
+    public Task<IReadOnlyList<ProcessTypePolicy>> GetAllTypeDefaultsAsync(
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Retrieves all client-specific policy overrides.
+    /// Used by cache warming to preload all client overrides at startup.
+    /// Returns complete list of all client override configurations.
+    /// </summary>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>List of all client policy overrides.</returns>
+    public Task<IReadOnlyList<ClientPolicyOverride>> GetAllClientOverridesAsync(
+        CancellationToken ct = default);
 }

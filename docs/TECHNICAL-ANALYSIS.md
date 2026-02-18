@@ -56,7 +56,194 @@ This document outlines the technical analysis and development plan for the StarG
 
 ---
 
-[... resto del contenuto invariato fino a Development Roadmap ...]
+## Software Architecture
+
+### High-Level Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  StarGate Solution (.NET 8)                                 │
+│                                                             │
+│  ┌────────────────────┐      ┌─────────────────────┐        │
+│  │  StarGate.Api      │      │  StarGate.Server    │        │
+│  │  (Public Gateway)  │      │  (Process Engine)   │        │
+│  │  - Minimal APIs    │      │  - BackgroundService│        │
+│  │  - Auth/AuthZ      │      │  - Process Handlers │        │
+│  │  - Rate Limiting   │      │  - Business Logic   │        │
+│  └──────┬─────────────┘      └─────────┬───────────┘        │
+│         │                              │                    │
+│         │    ┌─────────────────────┐   │                    │
+│         └────│  StarGate.Core      │───┘                    │
+│              │  - Domain Entities  │                        │
+│              │  - Interfaces       │                        │
+│              │  - Business Services│                        │
+│              └──────┬──────────────┘                        │
+│                     │                                       │
+│              ┌──────┴─────────────────┐                     │
+│              │ StarGate.Infrastructure│                     │
+│              │  - MongoDB Repository  │                     │
+│              │  - Redis Cache         │                     │
+│              │  - Message Broker      │                     │
+│              │    * RabbitMQ          │                     │
+│              │    * Abstraction       │                     │
+│              └────────────────────────┘                     │
+│                                                             │
+│  ┌────────────────────┐                                     │
+│  │ StarGate.Contracts │                                     │
+│  │  - DTOs            │                                     │
+│  │  - Public APIs     │                                     │
+│  └────────────────────┘                                     │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Technology Stack
+
+| Component | Technology | Version |
+|-----------|-----------|------------|
+| Runtime | .NET | 8.0 |
+| API Framework | ASP.NET Core Minimal APIs | 8.0 |
+| Cache | StackExchange.Redis | 2.x |
+| Database | MongoDB.Driver | 2.x |
+| Message Broker | RabbitMQ.Client | 6.x |
+| Authentication | Microsoft.AspNetCore.Authentication.JwtBearer | 8.0 |
+| Resilience | Polly | 8.x |
+| Logging | Serilog | 3.x |
+| Testing | xUnit + FluentAssertions + Moq | Latest |
+| Containerization | Docker | Latest |
+
+### Architecture Decisions
+
+#### Database: MongoDB
+- **Decision:** Use existing MongoDB instance
+- **Rationale:** MongoDB instance already available in infrastructure, reduces complexity and costs
+- **Benefits:** No additional provisioning required, team familiarity, contained costs
+
+#### Message Broker: RabbitMQ with Abstraction
+- **Decision:** RabbitMQ as primary implementation with broker-agnostic interface
+- **Rationale:** Reliability, maturity, support for complex patterns; abstraction enables future replacement
+- **Benefits:** Scalability, message durability, easy monitoring, flexibility for future changes
+- **Alternative:** Can be replaced with Azure Service Bus, Amazon SQS, or other brokers without core changes
+
+#### Configuration Model: Hierarchical Process Policies
+- **Decision:** Two-tier configuration system (process type defaults + per-client overrides)
+- **Rationale:** Balance between operational simplicity and client-specific customization needs
+- **Benefits:** Easy global policy updates, flexibility for special client requirements, clear precedence rules
+- **Scope:** Applies to timeout, retry strategy, result retention, and concurrency limits
+
+---
+
+## Solution Structure
+
+### Project Organization
+
+```
+StarGate/
+├── src/
+│   ├── StarGate.Api/                    # Public API Gateway
+│   │   ├── Endpoints/                   # Minimal API endpoints
+│   │   │   ├── ProcessEndpoints.cs
+│   │   │   └── HealthCheckEndpoints.cs
+│   │   ├── Middleware/                  # Custom middleware
+│   │   │   ├── GlobalExceptionHandler.cs
+│   │   │   └── RequestLoggingMiddleware.cs
+│   │   ├── Authorization/               # Authorization handlers
+│   │   │   └── ProcessTypeAuthorizationHandler.cs
+│   │   ├── Program.cs                   # Application entry point
+│   │   ├── appsettings.json
+│   │   └── Dockerfile
+│   │
+│   ├── StarGate.Core/                   # Business Logic & Domain
+│   │   ├── Domain/                      # Domain entities
+│   │   │   ├── Process.cs
+│   │   │   ├── ProcessStatus.cs
+│   │   │   ├── ProcessError.cs
+│   │   │   └── Configuration/           # Configuration entities
+│   │   │       ├── ProcessTypePolicy.cs
+│   │   │       └── ClientPolicyOverride.cs
+│   │   ├── Abstractions/                # Interfaces
+│   │   │   ├── IProcessRepository.cs
+│   │   │   ├── IStateStore.cs
+│   │   │   ├── IProcessService.cs
+│   │   │   ├── IProcessHandler.cs
+│   │   │   ├── IPolicyProvider.cs       # Policy resolution
+│   │   │   ├── IMessageBroker.cs        # Broker abstraction
+│   │   │   └── IMessageConsumer.cs      # Consumer abstraction
+│   │   ├── Services/                    # Business services
+│   │   │   ├── ProcessService.cs
+│   │   │   └── PolicyProvider.cs        # Configuration resolver
+│   │   ├── Exceptions/                  # Custom exceptions
+│   │   │   ├── ProcessNotFoundException.cs
+│   │   │   └── DuplicateProcessException.cs
+│   │   └── Telemetry/                   # Metrics and tracing
+│   │       └── ProcessMetrics.cs
+│   │
+│   ├── StarGate.Infrastructure/         # Infrastructure concerns
+│   │   ├── Persistence/                 # Database implementations
+│   │   │   ├── MongoProcessRepository.cs
+│   │   │   ├── MongoPolicyRepository.cs # Policy storage
+│   │   │   ├── ProcessDocument.cs
+│   │   │   └── MongoDbContext.cs
+│   │   ├── Caching/                     # Cache implementations
+│   │   │   ├── RedisStateStore.cs
+│   │   │   └── CacheKeys.cs
+│   │   ├── Messaging/                   # Message broker implementations
+│   │   │   ├── RabbitMQ/                # RabbitMQ specific
+│   │   │   │   ├── RabbitMqBroker.cs
+│   │   │   │   ├── RabbitMqConsumer.cs
+│   │   │   │   ├── RabbitMqConnection.cs
+│   │   │   │   └── RabbitMqOptions.cs
+│   │   │   ├── ProcessMessage.cs        # Message models
+│   │   │   └── MessageSerializers.cs
+│   │   └── Resilience/                  # Polly policies
+│   │       └── ResiliencePolicies.cs
+│   │
+│   ├── StarGate.Server/                 # Background Process Engine
+│   │   ├── Workers/                     # Background workers
+│   │   │   └── ProcessWorker.cs
+│   │   ├── Handlers/                    # Process type handlers
+│   │   │   ├── IProcessHandlerFactory.cs
+│   │   │   ├── ProcessHandlerFactory.cs
+│   │   │   ├── OrderProcessHandler.cs
+│   │   │   └── ShippingProcessHandler.cs
+│   │   ├── Program.cs
+│   │   ├── appsettings.json
+│   │   └── Dockerfile
+│   │
+│   └── StarGate.Contracts/              # Shared contracts
+│       ├── Requests/                    # Request DTOs
+│       │   └── SubmitProcessRequest.cs
+│       ├── Responses/                   # Response DTOs
+│       │   ├── SubmitProcessResponse.cs
+│       │   ├── ProcessStatusResponse.cs
+│       │   └── ErrorResponse.cs
+│       └── Models/                      # Shared models
+│           └── ProcessData.cs
+│
+├── tests/
+│   ├── StarGate.Api.Tests/             # API unit tests
+│   │   ├── Endpoints/
+│   │   └── Middleware/
+│   ├── StarGate.Core.Tests/            # Core unit tests
+│   │   ├── Services/
+│   │   └── Domain/
+│   ├── StarGate.Infrastructure.Tests/  # Infrastructure tests
+│   │   ├── Persistence/
+│   │   ├── Caching/
+│   │   └── Messaging/
+│   ├── StarGate.Server.Tests/          # Server unit tests
+│   │   ├── Workers/
+│   │   └── Handlers/
+│   └── StarGate.Integration.Tests/     # Integration tests
+│       ├── ApiIntegrationTests.cs
+│       ├── BrokerIntegrationTests.cs
+│       └── EndToEndTests.cs
+│
+├── .editorconfig                        # Code style rules
+├── .gitignore
+├── StarGate.sln                         # Solution file
+├── Directory.Build.props                # Shared MSBuild properties
+└── docker-compose.yml                   # Local development stack
+```
 
 ---
 
@@ -99,31 +286,31 @@ This document outlines the technical analysis and development plan for the StarG
 ### Phase 3: Message Broker (Week 4)
 
 #### Sprint 3.1: RabbitMQ Implementation
-- [ ] Implement RabbitMqBroker
-- [ ] Implement RabbitMqConsumer
-- [ ] Configure connection management and recovery
-- [ ] Implement message serialization
-- [ ] Write unit tests for broker
+- [x] Implement RabbitMqBroker
+- [x] Implement RabbitMqConsumer
+- [x] Configure connection management and recovery
+- [x] Implement message serialization
+- [x] Write unit tests for broker
 
 #### Sprint 3.2: Broker Integration
-- [ ] Integration tests with RabbitMQ container
-- [ ] Test message publishing and consumption
-- [ ] Test error handling and requeue logic
-- [ ] Document broker configuration
+- [x] Integration tests with RabbitMQ container
+- [x] Test message publishing and consumption
+- [x] Test error handling and requeue logic
+- [x] Document broker configuration
 
 ### Phase 4: Configuration Management (Week 5)
 
 #### Sprint 4.1: Policy Implementation
-- [ ] Implement PolicyProvider service
-- [ ] Add policy resolution logic (type defaults + client overrides)
-- [ ] Implement configuration caching strategy
-- [ ] Write unit tests for policy resolution
+- [x] Implement PolicyProvider service
+- [x] Add policy resolution logic (type defaults + client overrides)
+- [x] Implement configuration caching strategy
+- [x] Write unit tests for policy resolution
 
 #### Sprint 4.2: Policy Integration
-- [ ] Integrate policies into ProcessService
-- [ ] Integrate policies into ProcessWorker
-- [ ] Add policy validation and constraints
-- [ ] Integration tests for policy enforcement
+- [x] Integrate policies into ProcessService
+- [x] Integrate policies into ProcessWorker
+- [x] Add policy validation and constraints
+- [x] Integration tests for policy enforcement
 
 ### Phase 5: API Gateway (Week 6-7)
 

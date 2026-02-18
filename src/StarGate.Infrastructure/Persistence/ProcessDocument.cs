@@ -105,6 +105,30 @@ public class ProcessDocument
     /// </summary>
     [BsonElement("retryable")]
     public bool Retryable { get; set; }
+
+    /// <summary>
+    /// Timestamp when the process times out (calculated from policy).
+    /// </summary>
+    [BsonElement("timeoutAt")]
+    public DateTime? TimeoutAt { get; set; }
+
+    /// <summary>
+    /// Current retry count.
+    /// </summary>
+    [BsonElement("retryCount")]
+    public int RetryCount { get; set; }
+
+    /// <summary>
+    /// Maximum retry attempts (from policy at creation time).
+    /// </summary>
+    [BsonElement("maxRetries")]
+    public int MaxRetries { get; set; }
+
+    /// <summary>
+    /// Timestamp when the process expires and can be deleted (calculated from retention policy).
+    /// </summary>
+    [BsonElement("retentionExpiresAt")]
+    public DateTime? RetentionExpiresAt { get; set; }
 }
 
 /// <summary>
