@@ -108,7 +108,7 @@ public class ProcessWorker : BackgroundService
                     "No policy found for process type {ProcessType}, client {ClientId}",
                     process.ProcessType,
                     process.ClientId);
-                await context.RejectAsync();
+                await context.RejectAsync(false); // Don't requeue - send to DLQ
                 return;
             }
 
@@ -118,7 +118,7 @@ public class ProcessWorker : BackgroundService
                 _logger.LogError(
                     "Policy validation failed for process {ProcessId}",
                     process.ProcessId);
-                await context.RejectAsync();
+                await context.RejectAsync(false); // Don't requeue - send to DLQ
                 return;
             }
 
@@ -144,7 +144,7 @@ public class ProcessWorker : BackgroundService
             _logger.LogInformation(
                 "Message handling cancelled for process {ProcessId}",
                 process.ProcessId);
-            await context.RequeueAsync();
+            await context.RejectAsync(true); // Requeue for retry
         }
         catch (Exception ex)
         {
@@ -152,7 +152,7 @@ public class ProcessWorker : BackgroundService
                 ex,
                 "Error handling message for process {ProcessId}",
                 process.ProcessId);
-            await context.RequeueAsync();
+            await context.RejectAsync(true); // Requeue for retry
         }
     }
 
