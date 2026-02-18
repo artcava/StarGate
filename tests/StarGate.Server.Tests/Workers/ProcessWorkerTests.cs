@@ -3,8 +3,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using StarGate.Core.Abstractions;
 using StarGate.Core.Domain;
-using StarGate.Core.Domain.Configuration;
-using StarGate.Core.Exceptions;
 using StarGate.Server.Workers;
 using Xunit;
 
@@ -136,9 +134,8 @@ public class ProcessWorkerTests
         cts.CancelAfter(TimeSpan.FromMilliseconds(100));
 
         _consumerMock
-            .Setup(x => x.StartConsumingAsync(
-                It.IsAny<string>(),
-                It.IsAny<Func<MessageEnvelope<Process>, CancellationToken, Task<MessageHandlingResult>>>(),
+            .Setup(x => x.StartConsumingAsync<Process>(
+                It.IsAny<Func<Process, MessageContext, Task>>(),
                 It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
@@ -160,9 +157,8 @@ public class ProcessWorkerTests
 
         // Assert
         _consumerMock.Verify(
-            x => x.StartConsumingAsync(
-                "stargate.processes",
-                It.IsAny<Func<MessageEnvelope<Process>, CancellationToken, Task<MessageHandlingResult>>>(),
+            x => x.StartConsumingAsync<Process>(
+                It.IsAny<Func<Process, MessageContext, Task>>(),
                 It.IsAny<CancellationToken>()),
             Times.Once);
     }
@@ -175,9 +171,8 @@ public class ProcessWorkerTests
         cts.CancelAfter(TimeSpan.FromMilliseconds(100));
 
         _consumerMock
-            .Setup(x => x.StartConsumingAsync(
-                It.IsAny<string>(),
-                It.IsAny<Func<MessageEnvelope<Process>, CancellationToken, Task<MessageHandlingResult>>>(),
+            .Setup(x => x.StartConsumingAsync<Process>(
+                It.IsAny<Func<Process, MessageContext, Task>>(),
                 It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
