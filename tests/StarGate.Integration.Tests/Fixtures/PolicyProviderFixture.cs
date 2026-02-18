@@ -2,7 +2,6 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using MongoDB.Driver;
 using StarGate.Application.Services;
 using StarGate.Core.Abstractions;
 using StarGate.Core.Domain.Configuration;
@@ -15,15 +14,13 @@ namespace StarGate.Integration.Tests.Fixtures;
 
 /// <summary>
 /// Comprehensive integration test fixture for PolicyProvider and related services.
+/// Uses Testcontainers for MongoDB via MongoDbFixture.
 /// Provides full DI container with MongoDB, Redis caching, and all policy services.
 /// </summary>
 public sealed class PolicyProviderFixture : IAsyncLifetime
 {
-    private const string TestDatabaseName = "stargate_policy_provider_integration_tests";
-    
+    private readonly MongoDbFixture _mongoFixture;
     private ServiceProvider? _serviceProvider;
-    private MongoClient? _mongoClient;
-    private IMongoDatabase? _database;
     
     public IPolicyProvider PolicyProvider => GetRequiredService<IPolicyProvider>();
     public IPolicyRepository PolicyRepository => GetRequiredService<IPolicyRepository>();
@@ -43,23 +40,16 @@ public sealed class PolicyProviderFixture : IAsyncLifetime
     /// </summary>
     public ClientPolicyOverride PremiumClientOrderOverride { get; private set; } = null!;
     public ClientPolicyOverride StandardClientPaymentOverride { get; private set; } = null!;
+
+    public PolicyProviderFixture()
+    {
+        _mongoFixture = new MongoDbFixture();
+    }
     
     public async Task InitializeAsync()
     {
-        // Setup MongoDB
-        var mongoSettings = new MongoClientSettings
-        {
-            Server = new MongoServerAddress("localhost", 27017),
-            ConnectTimeout = TimeSpan.FromSeconds(10),
-            ServerSelectionTimeout = TimeSpan.FromSeconds(10)
-        };
-        
-        _mongoClient = new MongoClient(mongoSettings);
-        _database = _mongoClient.GetDatabase(TestDatabaseName);
-        
-        // Clean up database from previous runs
-        await _mongoClient.DropDatabaseAsync(TestDatabaseName);
-        _database = _mongoClient.GetDatabase(TestDatabaseName);
+        // Initialize Testcontainers MongoDB
+        await _mongoFixture.InitializeAsync();
         
         // Configure services
         var services = new ServiceCollection();
@@ -69,8 +59,8 @@ public sealed class PolicyProviderFixture : IAsyncLifetime
             .AddConsole()
             .SetMinimumLevel(LogLevel.Information));
         
-        // MongoDB
-        services.AddSingleton(_database);
+        // MongoDB - Use Testcontainers database
+        services.AddSingleton(_mongoFixture.Database);
         
         // Redis Cache (in-memory for testing)
         services.AddMemoryCache();
@@ -209,12 +199,8 @@ public sealed class PolicyProviderFixture : IAsyncLifetime
     
     public async Task DisposeAsync()
     {
-        if (_mongoClient != null && _database != null)
-        {
-            await _mongoClient.DropDatabaseAsync(TestDatabaseName);
-        }
-        
         _serviceProvider?.Dispose();
+        await _mongoFixture.DisposeAsync();
     }
     
     /// <summary>
@@ -231,12 +217,8 @@ public sealed class PolicyProviderFixture : IAsyncLifetime
     /// </summary>
     public async Task ResetDatabaseAsync()
     {
-        if (_mongoClient != null)
-        {
-            await _mongoClient.DropDatabaseAsync(TestDatabaseName);
-            _database = _mongoClient.GetDatabase(TestDatabaseName);
-            await SeedTestDataAsync();
-        }
+        await _mongoFixture.ResetDatabaseAsync();
+        await SeedTestDataAsync();
     }
     
     private T GetRequiredService<T>() where T : notnull
