@@ -31,7 +31,7 @@ public static class PolicyCacheEndpoints
 
         // Get cache statistics
         // Returns cache hit/miss statistics and per-key metrics for policy caching.
-        group.MapGet("/statistics", async (
+        group.MapGet("/statistics", (
             [FromServices] IPolicyProvider policyProvider) =>
         {
             if (policyProvider is PolicyProvider provider)
