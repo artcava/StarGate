@@ -1,11 +1,11 @@
-namespace StarGate.Server.Workers;
-
 using Microsoft.Extensions.Hosting;
 using StarGate.Core.Abstractions;
 using StarGate.Core.Domain;
 using StarGate.Core.Domain.Configuration;
 using StarGate.Core.Exceptions;
 using System.Threading.Channels;
+
+namespace StarGate.Server.Workers;
 
 /// <summary>
 /// Background worker that consumes messages from RabbitMQ and executes processes.
