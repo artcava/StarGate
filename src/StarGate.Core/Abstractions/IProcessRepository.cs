@@ -30,6 +30,17 @@ public interface IProcessRepository
     public Task<Process?> GetByIdAsync(Guid processId, CancellationToken ct = default);
 
     /// <summary>
+    /// Retrieves a process by idempotency key.
+    /// Used for idempotency checks to prevent duplicate process submissions.
+    /// </summary>
+    /// <param name="idempotencyKey">Idempotency key.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Process if found, null otherwise.</returns>
+    public Task<Process?> GetByIdempotencyKeyAsync(
+        string idempotencyKey,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// Retrieves a process by client ID and client process ID.
     /// Used for idempotency checks to prevent duplicate process submissions.
     /// Enforces unique constraint: (ClientId, ClientProcessId) pair must be unique.
@@ -96,5 +107,32 @@ public interface IProcessRepository
     public Task<int> CountActiveProcessesAsync(
         string clientId,
         string processType,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Counts the number of running processes for a specific type and client.
+    /// Running processes include those in Accepted or Running status.
+    /// Used to enforce the MaxConcurrentExecutions policy constraint.
+    /// </summary>
+    /// <param name="processType">Process type to count.</param>
+    /// <param name="clientId">Client identifier.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Number of running processes for the specified type and client.</returns>
+    public Task<int> CountRunningProcessesByTypeAsync(
+        string processType,
+        string clientId,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Gets processes that have expired based on their retention policy.
+    /// Returns processes in terminal states (Completed, Failed, Cancelled) where
+    /// RetentionExpiresAt is less than or equal to the specified expiration date.
+    /// Results are limited to prevent excessive memory usage.
+    /// </summary>
+    /// <param name="expirationDate">The expiration cutoff date (typically DateTime.UtcNow).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>List of expired processes ready for cleanup (max 1000 per call).</returns>
+    public Task<IReadOnlyList<Process>> GetExpiredProcessesAsync(
+        DateTime expirationDate,
         CancellationToken ct = default);
 }
