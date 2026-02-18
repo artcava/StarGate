@@ -169,12 +169,7 @@ public class ProcessService
 
         var process = await _processRepository.GetByIdAsync(processId, cancellationToken);
 
-        if (process is null)
-        {
-            throw new InvalidOperationException($"Process with ID '{processId}' not found");
-        }
-
-        return process;
+        return process is null ? throw new InvalidOperationException($"Process with ID '{processId}' not found") : process;
     }
 
     /// <summary>
@@ -204,13 +199,10 @@ public class ProcessService
             clientProcessId,
             cancellationToken);
 
-        if (process is null)
-        {
-            throw new InvalidOperationException(
-                $"Process with ClientId '{clientId}' and ClientProcessId '{clientProcessId}' not found");
-        }
-
-        return process;
+        return process is null
+            ? throw new InvalidOperationException(
+                $"Process with ClientId '{clientId}' and ClientProcessId '{clientProcessId}' not found")
+            : process;
     }
 
     /// <summary>
