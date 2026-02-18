@@ -1,8 +1,7 @@
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using StarGate.Core.Abstractions;
 using StarGate.Core.Domain;
-using StarGate.Core.Domain.Configuration;
-using StarGate.Core.Exceptions;
 using System.Threading.Channels;
 
 namespace StarGate.Server.Workers;
@@ -79,18 +78,16 @@ public class ProcessWorker : BackgroundService
 
     private async Task StartConsumerAsync(CancellationToken cancellationToken)
     {
-        await _consumer.StartConsumingAsync(
-            "stargate.processes",
-            HandleMessageAsync,
+        await _consumer.StartConsumingAsync<Process>(
+            async (process, context) => await HandleMessageAsync(process, context, cancellationToken),
             cancellationToken);
     }
 
-    private async Task<MessageHandlingResult> HandleMessageAsync(
-        MessageEnvelope<Process> envelope,
+    private async Task HandleMessageAsync(
+        Process process,
+        MessageContext context,
         CancellationToken cancellationToken)
     {
-        var process = envelope.Payload;
-
         try
         {
             _logger.LogInformation(
@@ -101,8 +98,8 @@ public class ProcessWorker : BackgroundService
 
             // Load policy for this process
             var policy = await _policyProvider.GetPolicyAsync(
-                process.ProcessType,
                 process.ClientId,
+                process.ProcessType,
                 cancellationToken);
 
             if (policy == null)
@@ -111,41 +108,43 @@ public class ProcessWorker : BackgroundService
                     "No policy found for process type {ProcessType}, client {ClientId}",
                     process.ProcessType,
                     process.ClientId);
-                return MessageHandlingResult.Reject;
+                await context.RejectAsync();
+                return;
             }
 
             // Validate policy constraints
-            if (!ValidatePolicy(policy, process))
+            if (!ValidatePolicy(policy))
             {
                 _logger.LogError(
                     "Policy validation failed for process {ProcessId}",
                     process.ProcessId);
-                return MessageHandlingResult.Reject;
+                await context.RejectAsync();
+                return;
             }
 
             // Queue for execution with policy context
-            var context = new ProcessExecutionContext
+            var executionContext = new ProcessExecutionContext
             {
                 Process = process,
                 Policy = policy,
-                MessageId = envelope.MessageId,
-                CorrelationId = envelope.CorrelationId ?? process.ProcessId.ToString()
+                MessageId = context.MessageId,
+                CorrelationId = context.CorrelationId ?? process.ProcessId.ToString()
             };
 
-            await _executionChannel.Writer.WriteAsync(context, cancellationToken);
+            await _executionChannel.Writer.WriteAsync(executionContext, cancellationToken);
 
             _logger.LogDebug(
                 "Process {ProcessId} queued for execution",
                 process.ProcessId);
 
-            return MessageHandlingResult.Acknowledge;
+            await context.AcknowledgeAsync();
         }
         catch (OperationCanceledException)
         {
             _logger.LogInformation(
                 "Message handling cancelled for process {ProcessId}",
                 process.ProcessId);
-            return MessageHandlingResult.Requeue;
+            await context.RequeueAsync();
         }
         catch (Exception ex)
         {
@@ -153,7 +152,7 @@ public class ProcessWorker : BackgroundService
                 ex,
                 "Error handling message for process {ProcessId}",
                 process.ProcessId);
-            return MessageHandlingResult.Requeue;
+            await context.RequeueAsync();
         }
     }
 
@@ -177,7 +176,8 @@ public class ProcessWorker : BackgroundService
         var policy = context.Policy;
 
         // Get or create semaphore for process type concurrency control
-        var typeSemaphore = GetOrCreateTypeSemaphore(process.ProcessType, policy.MaxConcurrentExecutions);
+        var maxConcurrency = policy.MaxConcurrentProcesses ?? Environment.ProcessorCount * 2;
+        var typeSemaphore = GetOrCreateTypeSemaphore(process.ProcessType, maxConcurrency);
 
         await _globalSemaphore.WaitAsync(cancellationToken);
         try
@@ -188,9 +188,9 @@ public class ProcessWorker : BackgroundService
                 _logger.LogInformation(
                     "Executing process {ProcessId} with policy: Timeout={Timeout}s, MaxRetries={MaxRetries}, MaxConcurrency={MaxConcurrency}",
                     process.ProcessId,
-                    policy.TimeoutSeconds,
-                    policy.MaxRetryAttempts,
-                    policy.MaxConcurrentExecutions);
+                    policy.Timeout.TotalSeconds,
+                    policy.RetryPolicy.MaxAttempts,
+                    maxConcurrency);
 
                 await ExecuteProcessWithRetryAsync(context, cancellationToken);
             }
@@ -211,34 +211,40 @@ public class ProcessWorker : BackgroundService
     {
         var process = context.Process;
         var policy = context.Policy;
-        var attemptCount = process.RetryCount ?? 0;
+        var attemptCount = process.RetryCount;
 
-        for (var attempt = attemptCount; attempt <= policy.MaxRetryAttempts; attempt++)
+        for (var attempt = attemptCount; attempt <= policy.RetryPolicy.MaxAttempts; attempt++)
         {
             try
             {
                 // Create timeout token
                 using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                timeoutCts.CancelAfter(TimeSpan.FromSeconds(policy.TimeoutSeconds));
+                timeoutCts.CancelAfter(policy.Timeout);
 
                 // Update process status
-                process.Status = ProcessStatus.Processing;
-                process.RetryCount = attempt;
-                process.UpdatedAt = DateTime.UtcNow;
-                await _repository.UpdateAsync(process);
+                var updatedProcess = process with
+                {
+                    Status = ProcessStatus.Processing,
+                    RetryCount = attempt,
+                    UpdatedAt = DateTime.UtcNow
+                };
+                await _repository.UpdateAsync(updatedProcess);
 
                 // Get handler
                 var handler = _handlerFactory.GetHandler(process.ProcessType);
 
                 // Execute with timeout
-                await handler.ExecuteAsync(process, timeoutCts.Token);
+                await handler.ExecuteAsync(updatedProcess, timeoutCts.Token);
 
                 // Success - update status
-                process.Status = ProcessStatus.Completed;
-                process.Progress = 100;
-                process.CompletedAt = DateTime.UtcNow;
-                process.UpdatedAt = DateTime.UtcNow;
-                await _repository.UpdateAsync(process);
+                updatedProcess = updatedProcess with
+                {
+                    Status = ProcessStatus.Completed,
+                    Progress = 100,
+                    CompletedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+                await _repository.UpdateAsync(updatedProcess);
 
                 _logger.LogInformation(
                     "Process {ProcessId} completed successfully after {Attempts} attempt(s)",
@@ -254,9 +260,12 @@ public class ProcessWorker : BackgroundService
                     "Process {ProcessId} execution cancelled due to worker shutdown",
                     process.ProcessId);
 
-                process.Status = ProcessStatus.Accepted;
-                process.UpdatedAt = DateTime.UtcNow;
-                await _repository.UpdateAsync(process);
+                var requeuedProcess = process with
+                {
+                    Status = ProcessStatus.Accepted,
+                    UpdatedAt = DateTime.UtcNow
+                };
+                await _repository.UpdateAsync(requeuedProcess);
                 throw;
             }
             catch (OperationCanceledException)
@@ -265,61 +274,43 @@ public class ProcessWorker : BackgroundService
                 _logger.LogWarning(
                     "Process {ProcessId} execution timed out after {Timeout}s (attempt {Attempt}/{MaxAttempts})",
                     process.ProcessId,
-                    policy.TimeoutSeconds,
+                    policy.Timeout.TotalSeconds,
                     attempt + 1,
-                    policy.MaxRetryAttempts + 1);
+                    policy.RetryPolicy.MaxAttempts + 1);
 
-                if (attempt >= policy.MaxRetryAttempts)
+                if (attempt >= policy.RetryPolicy.MaxAttempts)
                 {
                     await HandleMaxRetriesExceededAsync(process, "Execution timeout");
                     return;
                 }
 
                 // Retry with exponential backoff
-                await DelayForRetryAsync(attempt, policy, cancellationToken);
+                await DelayForRetryAsync(attempt, cancellationToken);
             }
-            catch (ProcessExecutionException ex)
+            catch (Exception ex)
             {
                 _logger.LogError(
                     ex,
                     "Process {ProcessId} execution failed (attempt {Attempt}/{MaxAttempts}): {Error}",
                     process.ProcessId,
                     attempt + 1,
-                    policy.MaxRetryAttempts + 1,
+                    policy.RetryPolicy.MaxAttempts + 1,
                     ex.Message);
 
-                if (attempt >= policy.MaxRetryAttempts || !process.Retryable)
+                if (attempt >= policy.RetryPolicy.MaxAttempts || !process.Retryable)
                 {
                     await HandleMaxRetriesExceededAsync(process, ex.Message);
                     return;
                 }
 
                 // Retry with exponential backoff
-                await DelayForRetryAsync(attempt, policy, cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(
-                    ex,
-                    "Unexpected error executing process {ProcessId} (attempt {Attempt}/{MaxAttempts})",
-                    process.ProcessId,
-                    attempt + 1,
-                    policy.MaxRetryAttempts + 1);
-
-                if (attempt >= policy.MaxRetryAttempts)
-                {
-                    await HandleMaxRetriesExceededAsync(process, ex.Message);
-                    return;
-                }
-
-                await DelayForRetryAsync(attempt, policy, cancellationToken);
+                await DelayForRetryAsync(attempt, cancellationToken);
             }
         }
     }
 
     private async Task DelayForRetryAsync(
         int attemptNumber,
-        ProcessTypePolicy policy,
         CancellationToken cancellationToken)
     {
         // Exponential backoff: 2^attempt seconds (1s, 2s, 4s, 8s, ...)
@@ -339,55 +330,46 @@ public class ProcessWorker : BackgroundService
         _logger.LogError(
             "Process {ProcessId} failed after {MaxAttempts} attempts: {Error}",
             process.ProcessId,
-            (process.RetryCount ?? 0) + 1,
+            process.RetryCount + 1,
             errorMessage);
 
-        process.Status = ProcessStatus.Failed;
-        process.FailedAt = DateTime.UtcNow;
-        process.UpdatedAt = DateTime.UtcNow;
-
-        if (process.Errors == null)
+        var failedProcess = process with
         {
-            process.Errors = new List<ProcessError>();
-        }
+            Status = ProcessStatus.Failed,
+            Error = new ProcessError("MAX_RETRIES_EXCEEDED", errorMessage, null),
+            CompletedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
 
-        process.Errors.Add(new ProcessError
-        {
-            ErrorCode = "MAX_RETRIES_EXCEEDED",
-            Message = errorMessage,
-            Timestamp = DateTime.UtcNow,
-            Retryable = false
-        });
-
-        await _repository.UpdateAsync(process);
+        await _repository.UpdateAsync(failedProcess);
     }
 
-    private bool ValidatePolicy(ProcessTypePolicy policy, Process process)
+    private bool ValidatePolicy(EffectivePolicy policy)
     {
         // Validate timeout
-        if (policy.TimeoutSeconds <= 0)
+        if (policy.Timeout <= TimeSpan.Zero)
         {
             _logger.LogError(
                 "Invalid timeout in policy: {Timeout}s",
-                policy.TimeoutSeconds);
+                policy.Timeout.TotalSeconds);
             return false;
         }
 
         // Validate max retries
-        if (policy.MaxRetryAttempts < 0)
+        if (policy.RetryPolicy.MaxAttempts < 0)
         {
             _logger.LogError(
                 "Invalid max retry attempts in policy: {MaxRetries}",
-                policy.MaxRetryAttempts);
+                policy.RetryPolicy.MaxAttempts);
             return false;
         }
 
         // Validate concurrency
-        if (policy.MaxConcurrentExecutions <= 0)
+        if (policy.MaxConcurrentProcesses.HasValue && policy.MaxConcurrentProcesses.Value <= 0)
         {
             _logger.LogError(
                 "Invalid max concurrent executions in policy: {MaxConcurrency}",
-                policy.MaxConcurrentExecutions);
+                policy.MaxConcurrentProcesses.Value);
             return false;
         }
 
@@ -432,7 +414,7 @@ public class ProcessWorker : BackgroundService
 internal record ProcessExecutionContext
 {
     public required Process Process { get; init; }
-    public required ProcessTypePolicy Policy { get; init; }
+    public required EffectivePolicy Policy { get; init; }
     public required string MessageId { get; init; }
     public required string CorrelationId { get; init; }
 }
