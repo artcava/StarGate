@@ -1,0 +1,280 @@
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using StarGate.Application.Services;
+using StarGate.Core.Abstractions;
+using StarGate.Core.Domain.Configuration;
+using StarGate.Infrastructure.Persistence;
+using StarGate.Infrastructure.Services;
+using StarGate.Infrastructure.Validation;
+using Xunit;
+
+namespace StarGate.Integration.Tests.Fixtures;
+
+/// <summary>
+/// Comprehensive integration test fixture for PolicyProvider and related services.
+/// Uses Testcontainers for MongoDB via MongoDbFixture.
+/// Provides full DI container with MongoDB, Redis caching, and all policy services.
+/// </summary>
+public sealed class PolicyProviderFixture : IAsyncLifetime
+{
+    private readonly MongoDbFixture _mongoFixture;
+    private ServiceProvider? _serviceProvider;
+    
+    public IPolicyProvider PolicyProvider => GetRequiredService<IPolicyProvider>();
+    public IPolicyRepository PolicyRepository => GetRequiredService<IPolicyRepository>();
+    public IPolicyValidator PolicyValidator => GetRequiredService<IPolicyValidator>();
+    public PolicyResolutionService ResolutionService => GetRequiredService<PolicyResolutionService>();
+    public PolicyCacheStatistics CacheStatistics => GetRequiredService<PolicyCacheStatistics>();
+    
+    /// <summary>
+    /// Test data: Process type policies
+    /// </summary>
+    public ProcessTypePolicy OrderPolicy { get; private set; } = null!;
+    public ProcessTypePolicy PaymentPolicy { get; private set; } = null!;
+    public ProcessTypePolicy ShippingPolicy { get; private set; } = null!;
+    
+    /// <summary>
+    /// Test data: Client overrides
+    /// </summary>
+    public ClientPolicyOverride PremiumClientOrderOverride { get; private set; } = null!;
+    public ClientPolicyOverride StandardClientPaymentOverride { get; private set; } = null!;
+
+    public PolicyProviderFixture()
+    {
+        _mongoFixture = new MongoDbFixture();
+    }
+    
+    public async Task InitializeAsync()
+    {
+        // Initialize Testcontainers MongoDB
+        await _mongoFixture.InitializeAsync();
+        
+        // Configure services
+        var services = new ServiceCollection();
+        
+        // Logging
+        services.AddLogging(builder => builder
+            .AddConsole()
+            .SetMinimumLevel(LogLevel.Information));
+        
+        // MongoDB - Use Testcontainers database
+        services.AddSingleton(_mongoFixture.Database);
+        
+        // Redis Cache (in-memory for testing)
+        services.AddMemoryCache();
+        services.AddSingleton<ICacheStore, InMemoryCacheStore>();
+        
+        // Policy Repository
+        services.AddSingleton<IPolicyRepository, MongoPolicyRepository>();
+        
+        // Policy Validation
+        services.AddSingleton<ProcessTypePolicyValidator>();
+        services.AddSingleton<ClientPolicyOverrideValidator>();
+        services.AddSingleton<IPolicyValidator, PolicyValidator>();
+        
+        // Policy Resolution Service
+        services.AddSingleton<PolicyResolutionService>();
+        
+        // Policy Cache Statistics
+        services.AddSingleton<PolicyCacheStatistics>();
+        
+        // Policy Provider Options
+        services.Configure<PolicyProviderOptions>(options =>
+        {
+            options.CacheTtlMinutes = 30;
+            options.EnableCacheWarmup = false; // Manual warmup in tests
+            options.EnableBackgroundRefresh = false; // No background refresh in tests
+            options.DefaultTimeoutSeconds = 300;
+            options.DefaultMaxRetryAttempts = 3;
+            options.DefaultRetryDelaySeconds = 5;
+            options.DefaultBackoffStrategy = "Exponential";
+            options.DefaultRetentionDays = 30;
+            options.DefaultMaxConcurrentProcesses = 10;
+        });
+        
+        // Policy Provider
+        services.AddSingleton<IPolicyProvider, PolicyProvider>();
+        
+        _serviceProvider = services.BuildServiceProvider();
+        
+        // Seed test data
+        await SeedTestDataAsync();
+    }
+    
+    private async Task SeedTestDataAsync()
+    {
+        var repository = PolicyRepository;
+        
+        // Create process type policies
+        OrderPolicy = new ProcessTypePolicy
+        {
+            ProcessType = "order",
+            Timeout = TimeSpan.FromMinutes(5),
+            RetryPolicy = new RetryPolicy
+            {
+                Enabled = true,
+                MaxAttempts = 3,
+                InitialDelay = TimeSpan.FromSeconds(5),
+                BackoffStrategy = BackoffStrategy.Exponential,
+                MaxDelay = TimeSpan.FromMinutes(5)
+            },
+            ResultRetention = TimeSpan.FromDays(30),
+            MaxConcurrentProcesses = 10,
+            UpdatedAt = DateTime.UtcNow
+        };
+        
+        PaymentPolicy = new ProcessTypePolicy
+        {
+            ProcessType = "payment",
+            Timeout = TimeSpan.FromMinutes(2),
+            RetryPolicy = new RetryPolicy
+            {
+                Enabled = true,
+                MaxAttempts = 5,
+                InitialDelay = TimeSpan.FromSeconds(3),
+                BackoffStrategy = BackoffStrategy.Exponential,
+                MaxDelay = TimeSpan.FromMinutes(3)
+            },
+            ResultRetention = TimeSpan.FromDays(90),
+            MaxConcurrentProcesses = 20,
+            UpdatedAt = DateTime.UtcNow
+        };
+        
+        ShippingPolicy = new ProcessTypePolicy
+        {
+            ProcessType = "shipping",
+            Timeout = TimeSpan.FromMinutes(10),
+            RetryPolicy = new RetryPolicy
+            {
+                Enabled = true,
+                MaxAttempts = 2,
+                InitialDelay = TimeSpan.FromSeconds(10),
+                BackoffStrategy = BackoffStrategy.Linear,
+                MaxDelay = TimeSpan.FromMinutes(10)
+            },
+            ResultRetention = TimeSpan.FromDays(60),
+            MaxConcurrentProcesses = 5,
+            UpdatedAt = DateTime.UtcNow
+        };
+        
+        await repository.SaveProcessTypePolicyAsync(OrderPolicy);
+        await repository.SaveProcessTypePolicyAsync(PaymentPolicy);
+        await repository.SaveProcessTypePolicyAsync(ShippingPolicy);
+        
+        // Create client overrides
+        PremiumClientOrderOverride = new ClientPolicyOverride
+        {
+            ClientId = "premium-client",
+            ProcessType = "order",
+            Timeout = TimeSpan.FromMinutes(15), // Extended timeout
+            RetryPolicy = new RetryPolicy
+            {
+                Enabled = true,
+                MaxAttempts = 5, // More retries
+                InitialDelay = TimeSpan.FromSeconds(5),
+                BackoffStrategy = BackoffStrategy.Exponential,
+                MaxDelay = TimeSpan.FromMinutes(10)
+            },
+            ResultRetention = null, // Use default
+            MaxConcurrentProcesses = 50, // Higher concurrency
+            UpdatedAt = DateTime.UtcNow
+        };
+        
+        StandardClientPaymentOverride = new ClientPolicyOverride
+        {
+            ClientId = "standard-client",
+            ProcessType = "payment",
+            Timeout = TimeSpan.FromMinutes(1), // Shorter timeout
+            RetryPolicy = null, // Use default
+            ResultRetention = TimeSpan.FromDays(30), // Shorter retention
+            MaxConcurrentProcesses = null, // Use default
+            UpdatedAt = DateTime.UtcNow
+        };
+        
+        await repository.SaveClientOverrideAsync(PremiumClientOrderOverride);
+        await repository.SaveClientOverrideAsync(StandardClientPaymentOverride);
+    }
+    
+    public async Task DisposeAsync()
+    {
+        _serviceProvider?.Dispose();
+        await _mongoFixture.DisposeAsync();
+    }
+    
+    /// <summary>
+    /// Helper to reset all caches and statistics.
+    /// </summary>
+    public async Task ResetCachesAsync()
+    {
+        await PolicyProvider.RefreshPoliciesAsync();
+        CacheStatistics.Reset();
+    }
+    
+    /// <summary>
+    /// Helper to reset database to initial seeded state.
+    /// </summary>
+    public async Task ResetDatabaseAsync()
+    {
+        await _mongoFixture.ResetDatabaseAsync();
+        await SeedTestDataAsync();
+    }
+    
+    private T GetRequiredService<T>() where T : notnull
+    {
+        return _serviceProvider == null
+            ? throw new InvalidOperationException("Service provider not initialized")
+            : _serviceProvider.GetRequiredService<T>();
+    }
+}
+
+/// <summary>
+/// Simple in-memory implementation of ICacheStore for testing.
+/// Simulates Redis behavior without external dependencies.
+/// </summary>
+public class InMemoryCacheStore : ICacheStore
+{
+    private readonly IMemoryCache _cache;
+    
+    public InMemoryCacheStore(IMemoryCache cache)
+    {
+        _cache = cache ?? throw new ArgumentNullException(nameof(cache));
+    }
+    
+    public Task<T?> GetAsync<T>(string key, CancellationToken ct = default) where T : class
+    {
+        _cache.TryGetValue(key, out T? value);
+        return Task.FromResult(value);
+    }
+    
+    public Task SetAsync<T>(string key, T value, TimeSpan ttl, CancellationToken ct = default) where T : class
+    {
+        var options = new MemoryCacheEntryOptions
+        {
+            AbsoluteExpirationRelativeToNow = ttl
+        };
+        
+        _cache.Set(key, value, options);
+        return Task.CompletedTask;
+    }
+    
+    public Task DeleteAsync(string key, CancellationToken ct = default)
+    {
+        _cache.Remove(key);
+        return Task.CompletedTask;
+    }
+    
+    public Task DeleteByPatternAsync(string pattern, CancellationToken ct = default)
+    {
+        // Simple in-memory implementation doesn't support pattern deletion
+        // In production, this would use Redis SCAN + DEL
+        return Task.CompletedTask;
+    }
+    
+    public Task<bool> ExistsAsync(string key, CancellationToken ct = default)
+    {
+        var exists = _cache.TryGetValue(key, out _);
+        return Task.FromResult(exists);
+    }
+}

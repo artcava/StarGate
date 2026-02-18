@@ -129,10 +129,16 @@ public class MongoPolicyRepository : IPolicyRepository
 
         ClientPolicyOverrideDocument document = PolicyMapper.MapToDocument(@override);
 
-        // Preserve existing ObjectId if updating
+        // Set composite key: preserve existing Id for updates, generate for new inserts
         if (existingDocument != null)
         {
+            // Update: preserve existing Id
             document.Id = existingDocument.Id;
+        }
+        else
+        {
+            // Insert: generate composite key "{clientId}:{processType}"
+            document.Id = $"{@override.ClientId}:{@override.ProcessType}";
         }
 
         ReplaceOptions options = new ReplaceOptions { IsUpsert = true };
@@ -143,9 +149,10 @@ public class MongoPolicyRepository : IPolicyRepository
             ct);
 
         _logger.LogInformation(
-            "Client policy override saved: ClientId={ClientId}, ProcessType={ProcessType}",
+            "Client policy override saved: ClientId={ClientId}, ProcessType={ProcessType}, Id={Id}",
             @override.ClientId,
-            @override.ProcessType);
+            @override.ProcessType,
+            document.Id);
 
         return @override;
     }

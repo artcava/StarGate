@@ -280,7 +280,7 @@ public class PolicyProvider : IPolicyProvider
             return redisPolicy;
         }
 
-        // Cache miss
+        // Cache miss - record before loading
         _cacheStatistics.RecordMiss(cacheKey);
         _logger.LogDebug("Type policy cache miss, loading from repository: {ProcessType}", processType);
         
@@ -289,8 +289,9 @@ public class PolicyProvider : IPolicyProvider
         {
             policy = await _policyRepository.GetProcessTypePolicyAsync(processType, ct);
         }
-        catch (KeyNotFoundException)
+        catch (InvalidOperationException)
         {
+            // Repository throws InvalidOperationException when policy not found
             _logger.LogWarning(
                 "Process type policy not found, using fallback defaults: {ProcessType}",
                 processType);
@@ -331,7 +332,8 @@ public class PolicyProvider : IPolicyProvider
             return redisOverride;
         }
 
-        // Cache miss (not recording as miss since null is valid - no override exists)
+        // Cache miss - record it
+        _cacheStatistics.RecordMiss(cacheKey);
         _logger.LogDebug(
             "Client override cache miss, loading from repository: ClientId={ClientId}, ProcessType={ProcessType}",
             clientId,
