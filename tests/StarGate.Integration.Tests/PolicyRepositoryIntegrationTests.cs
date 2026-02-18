@@ -94,8 +94,11 @@ public class PolicyRepositoryIntegrationTests : IClassFixture<PolicyRepositoryFi
     [Fact]
     public async Task SaveProcessTypePolicyAsync_Should_UpdateExistingPolicy()
     {
-        // Arrange
+        // Arrange - Get original policy first
         var originalPolicy = await _fixture.PolicyRepository.GetProcessTypePolicyAsync("order");
+        var originalTimeout = originalPolicy.Timeout;
+        var originalMaxConcurrent = originalPolicy.MaxConcurrentProcesses;
+        
         var updatedPolicy = originalPolicy with
         {
             Timeout = TimeSpan.FromMinutes(10), // Changed from 5 to 10
@@ -103,17 +106,26 @@ public class PolicyRepositoryIntegrationTests : IClassFixture<PolicyRepositoryFi
             UpdatedAt = DateTime.UtcNow
         };
 
-        // Act
-        var savedPolicy = await _fixture.PolicyRepository.SaveProcessTypePolicyAsync(updatedPolicy);
+        try
+        {
+            // Act
+            var savedPolicy = await _fixture.PolicyRepository.SaveProcessTypePolicyAsync(updatedPolicy);
 
-        // Assert
-        savedPolicy.Timeout.Should().Be(TimeSpan.FromMinutes(10));
-        savedPolicy.MaxConcurrentProcesses.Should().Be(20);
-        savedPolicy.UpdatedAt.Should().BeAfter(originalPolicy.UpdatedAt);
-        
-        // Verify changes persisted
-        var retrievedPolicy = await _fixture.PolicyRepository.GetProcessTypePolicyAsync("order");
-        retrievedPolicy.Timeout.Should().Be(TimeSpan.FromMinutes(10));
+            // Assert
+            savedPolicy.Timeout.Should().Be(TimeSpan.FromMinutes(10));
+            savedPolicy.MaxConcurrentProcesses.Should().Be(20);
+            savedPolicy.UpdatedAt.Should().BeAfter(originalPolicy.UpdatedAt);
+            
+            // Verify changes persisted
+            var retrievedPolicy = await _fixture.PolicyRepository.GetProcessTypePolicyAsync("order");
+            retrievedPolicy.Timeout.Should().Be(TimeSpan.FromMinutes(10));
+        }
+        finally
+        {
+            // Cleanup: Restore original policy to avoid test interference
+            var restoredPolicy = originalPolicy with { UpdatedAt = DateTime.UtcNow };
+            await _fixture.PolicyRepository.SaveProcessTypePolicyAsync(restoredPolicy);
+        }
     }
 
     [Fact]
