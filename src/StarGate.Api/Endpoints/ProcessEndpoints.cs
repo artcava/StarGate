@@ -1,7 +1,7 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
+using StarGate.Api.Models;
 using StarGate.Contracts.Requests;
-using StarGate.Contracts.Responses;
 using StarGate.Core.Abstractions;
 using StarGate.Core.Domain;
 using StarGate.Core.Exceptions;

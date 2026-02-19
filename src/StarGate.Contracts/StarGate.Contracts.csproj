@@ -5,8 +5,4 @@
     <RootNamespace>StarGate.Contracts</RootNamespace>
   </PropertyGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\StarGate.Core\StarGate.Core.csproj" />
-  </ItemGroup>
-
 </Project>
