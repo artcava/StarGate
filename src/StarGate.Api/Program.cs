@@ -20,6 +20,9 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
+// Add health checks
+builder.Services.AddApplicationHealthChecks(builder.Configuration);
+
 // Add global exception handling
 builder.Services.AddGlobalExceptionHandling();
 
@@ -52,14 +55,12 @@ app.UseGlobalExceptionHandling();
 
 app.UseHttpsRedirection();
 
+// Map health check endpoints (before authentication)
+app.MapHealthCheckEndpoints();
+
 // Map endpoints
 app.MapGet("/", () => Results.Redirect("/swagger"))
     .ExcludeFromDescription();
-
-app.MapGet("/health/live", () => Results.Ok(new { status = "healthy" }))
-    .WithTags("Health")
-    .WithName("HealthCheck")
-    .Produces(200);
 
 app.MapPolicyCacheEndpoints();
 app.MapProcessEndpoints();
