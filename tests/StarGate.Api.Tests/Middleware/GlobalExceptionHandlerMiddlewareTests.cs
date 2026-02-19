@@ -83,10 +83,11 @@ public class GlobalExceptionHandlerMiddlewareTests
     }
 
     [Fact]
-    public async Task TryHandleAsync_Should_Return400_ForDomainException()
+    public async Task TryHandleAsync_Should_HandleDomainException()
     {
         // Arrange
-        var exception = new DomainException("Domain validation failed");
+        // Use DuplicateProcessException which is a concrete DomainException
+        var exception = new DuplicateProcessException("test-key");
 
         // Act
         var handled = await _middleware.TryHandleAsync(
@@ -96,7 +97,7 @@ public class GlobalExceptionHandlerMiddlewareTests
 
         // Assert
         handled.Should().BeTrue();
-        _httpContext.Response.StatusCode.Should().Be(400);
+        _httpContext.Response.StatusCode.Should().Be(409);
     }
 
     [Fact]
