@@ -1,6 +1,5 @@
 using FluentAssertions;
 using FluentValidation;
-using FluentValidation.Results;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using StarGate.Api.Models;
@@ -9,6 +8,8 @@ using StarGate.Core.Abstractions;
 using StarGate.Core.Domain;
 using StarGate.Core.Exceptions;
 using Xunit;
+using FluentValidationResult = FluentValidation.Results.ValidationResult;
+using FluentValidationFailure = FluentValidation.Results.ValidationFailure;
 
 namespace StarGate.Api.Tests.Endpoints;
 
@@ -16,25 +17,25 @@ public class ProcessEndpointsTests
 {
     private readonly Mock<IProcessService> _processServiceMock;
     private readonly Mock<IValidator<CreateProcessRequest>> _validatorMock;
-    private readonly NullLogger<Program> _logger;
+    private readonly NullLogger<ProcessEndpointsTests> _logger;
 
     public ProcessEndpointsTests()
     {
         _processServiceMock = new Mock<IProcessService>();
         _validatorMock = new Mock<IValidator<CreateProcessRequest>>();
-        _logger = NullLogger<Program>.Instance;
+        _logger = NullLogger<ProcessEndpointsTests>.Instance;
     }
 
     [Fact]
-    public async Task CreateProcessAsync_Should_ReturnValidationProblem_WhenValidationFails()
+    public void CreateProcessAsync_Should_ReturnValidationProblem_WhenValidationFails()
     {
         // Arrange
         var request = CreateValidRequest();
-        var validationFailures = new List<ValidationFailure>
+        var validationFailures = new List<FluentValidationFailure>
         {
-            new ValidationFailure("ClientId", "ClientId is required")
+            new FluentValidationFailure("ClientId", "ClientId is required")
         };
-        var validationResult = new ValidationResult(validationFailures);
+        var validationResult = new FluentValidationResult(validationFailures);
 
         _validatorMock
             .Setup(v => v.ValidateAsync(request, It.IsAny<CancellationToken>()))
@@ -56,7 +57,7 @@ public class ProcessEndpointsTests
 
         _validatorMock
             .Setup(v => v.ValidateAsync(request, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new ValidationResult());
+            .ReturnsAsync(new FluentValidationResult());
 
         _processServiceMock
             .Setup(s => s.GetProcessByClientProcessIdAsync(
@@ -98,7 +99,7 @@ public class ProcessEndpointsTests
 
         _validatorMock
             .Setup(v => v.ValidateAsync(request, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new ValidationResult());
+            .ReturnsAsync(new FluentValidationResult());
 
         _processServiceMock
             .Setup(s => s.GetProcessByClientProcessIdAsync(
