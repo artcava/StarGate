@@ -1,10 +1,10 @@
-namespace StarGate.Api.Middleware;
-
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using StarGate.Api.Exceptions;
 using StarGate.Core.Exceptions;
 using System.Text.Json;
+
+namespace StarGate.Api.Middleware;
 
 /// <summary>
 /// Middleware for handling unhandled exceptions globally.

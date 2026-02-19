@@ -1,5 +1,3 @@
-namespace StarGate.Api.Tests.Middleware;
-
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -10,6 +8,8 @@ using StarGate.Api.Middleware;
 using StarGate.Core.Exceptions;
 using System.Text.Json;
 using Xunit;
+
+namespace StarGate.Api.Tests.Middleware;
 
 public class GlobalExceptionHandlerMiddlewareTests
 {

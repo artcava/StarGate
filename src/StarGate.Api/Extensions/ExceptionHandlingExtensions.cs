@@ -1,6 +1,6 @@
-namespace StarGate.Api.Extensions;
-
 using StarGate.Api.Middleware;
+
+namespace StarGate.Api.Extensions;
 
 /// <summary>
 /// Extension methods for configuring exception handling.

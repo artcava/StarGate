@@ -1,10 +1,10 @@
-namespace StarGate.Api.Tests.Exceptions;
-
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using StarGate.Api.Exceptions;
 using StarGate.Core.Exceptions;
 using Xunit;
+
+namespace StarGate.Api.Tests.Exceptions;
 
 public class ProblemDetailsFactoryTests
 {

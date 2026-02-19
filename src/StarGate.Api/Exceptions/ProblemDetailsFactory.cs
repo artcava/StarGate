@@ -1,7 +1,7 @@
-namespace StarGate.Api.Exceptions;
-
 using Microsoft.AspNetCore.Mvc;
 using StarGate.Core.Exceptions;
+
+namespace StarGate.Api.Exceptions;
 
 /// <summary>
 /// Factory for creating Problem Details responses.
