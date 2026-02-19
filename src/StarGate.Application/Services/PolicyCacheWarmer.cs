@@ -77,9 +77,10 @@ public class PolicyCacheWarmer : IHostedService
             {
                 try
                 {
+                    // Fixed: correct parameter order (clientId first, processType second)
                     await _policyProvider.GetPolicyAsync(
-                        clientOverride.ProcessType,
                         clientOverride.ClientId,
+                        clientOverride.ProcessType,
                         cancellationToken);
                 }
                 catch (Exception ex)
