@@ -6,6 +6,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.9.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\StarGate.Application\StarGate.Application.csproj" />
     <ProjectReference Include="..\StarGate.Core\StarGate.Core.csproj" />
     <ProjectReference Include="..\StarGate.Infrastructure\StarGate.Infrastructure.csproj" />
