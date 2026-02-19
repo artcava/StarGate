@@ -1,5 +1,6 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
+using StarGate.Api.Extensions;
 using StarGate.Api.Models;
 using StarGate.Contracts.Requests;
 using StarGate.Core.Abstractions;
@@ -21,6 +22,7 @@ public static class ProcessEndpoints
         // POST /api/processes - Create a new process
         group.MapPost("/", CreateProcessAsync)
             .WithName("CreateProcess")
+            .AddValidation<CreateProcessRequest>()
             .Produces<ProcessResponse>(StatusCodes.Status201Created)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status409Conflict)
@@ -44,22 +46,10 @@ public static class ProcessEndpoints
 
     private static async Task<IResult> CreateProcessAsync(
         [FromBody] CreateProcessRequest request,
-        [FromServices] IValidator<CreateProcessRequest> validator,
         [FromServices] IProcessService processService,
         [FromServices] ILogger<Program> logger,
         CancellationToken cancellationToken)
     {
-        // Validate request
-        var validationResult = await validator.ValidateAsync(request, cancellationToken);
-        if (!validationResult.IsValid)
-        {
-            logger.LogWarning(
-                "CreateProcess validation failed: {Errors}",
-                string.Join(", ", validationResult.Errors.Select(e => e.ErrorMessage)));
-
-            return Results.ValidationProblem(validationResult.ToDictionary());
-        }
-
         try
         {
             logger.LogInformation(
