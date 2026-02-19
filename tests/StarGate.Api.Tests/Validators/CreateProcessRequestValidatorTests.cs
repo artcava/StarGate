@@ -432,16 +432,20 @@ public class CreateProcessRequestValidatorTests
     public void Validate_Should_Succeed_WithMaximumValidLengths()
     {
         // Arrange
+        // Create 50 unique keys with max length (200 chars)
+        // Keys: "k{0}" padded to 200, "k{1}" padded to 200, etc.
+        var metadata = Enumerable.Range(0, 50)
+            .ToDictionary(
+                i => $"k{i}".PadRight(200, 'x'),  // Unique keys with max length
+                i => new string('v', 200));        // Values with max length
+
         var request = new CreateProcessRequest
         {
             ClientId = new string('a', 100),
             ProcessType = new string('a', 100),
             ClientProcessId = new string('a', 200),
             IdempotencyKey = new string('a', 100),
-            Metadata = Enumerable.Range(0, 50)
-                .ToDictionary(
-                    i => new string('k', 200),
-                    i => new string('v', 200))
+            Metadata = metadata
         };
 
         // Act
