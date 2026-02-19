@@ -2,12 +2,9 @@ using FluentAssertions;
 using FluentValidation;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
-using StarGate.Api.Models;
 using StarGate.Contracts.Requests;
 using StarGate.Core.Abstractions;
 using StarGate.Core.Domain;
-using StarGate.Core.Exceptions;
-using Xunit;
 using FluentValidationResult = FluentValidation.Results.ValidationResult;
 using FluentValidationFailure = FluentValidation.Results.ValidationFailure;
 
