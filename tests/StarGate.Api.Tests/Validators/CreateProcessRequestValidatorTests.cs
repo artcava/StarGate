@@ -41,15 +41,16 @@ public class CreateProcessRequestValidatorTests
         result.Errors.Should().BeEmpty();
     }
 
+#pragma warning disable xUnit1012 // Null should not be used for non-nullable type parameter
     [Theory]
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public void Validate_Should_Fail_WhenClientIdIsEmpty(string clientId)
+    public void Validate_Should_Fail_WhenClientIdIsEmpty(string? clientId)
     {
         // Arrange
         var request = CreateValidRequest();
-        request = request with { ClientId = clientId };
+        request = request with { ClientId = clientId! };
 
         // Act
         var result = _validator.Validate(request);
@@ -58,6 +59,7 @@ public class CreateProcessRequestValidatorTests
         result.IsValid.Should().BeFalse();
         result.Errors.Should().Contain(e => e.PropertyName == nameof(CreateProcessRequest.ClientId));
     }
+#pragma warning restore xUnit1012
 
     [Fact]
     public void Validate_Should_Fail_WhenClientIdExceedsMaxLength()
@@ -115,15 +117,16 @@ public class CreateProcessRequestValidatorTests
         result.IsValid.Should().BeTrue();
     }
 
+#pragma warning disable xUnit1012 // Null should not be used for non-nullable type parameter
     [Theory]
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public void Validate_Should_Fail_WhenProcessTypeIsEmpty(string processType)
+    public void Validate_Should_Fail_WhenProcessTypeIsEmpty(string? processType)
     {
         // Arrange
         var request = CreateValidRequest();
-        request = request with { ProcessType = processType };
+        request = request with { ProcessType = processType! };
 
         // Act
         var result = _validator.Validate(request);
@@ -132,6 +135,7 @@ public class CreateProcessRequestValidatorTests
         result.IsValid.Should().BeFalse();
         result.Errors.Should().Contain(e => e.PropertyName == nameof(CreateProcessRequest.ProcessType));
     }
+#pragma warning restore xUnit1012
 
     [Fact]
     public void Validate_Should_Fail_WhenProcessTypeExceedsMaxLength()
@@ -190,15 +194,16 @@ public class CreateProcessRequestValidatorTests
         result.IsValid.Should().BeTrue();
     }
 
+#pragma warning disable xUnit1012 // Null should not be used for non-nullable type parameter
     [Theory]
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public void Validate_Should_Fail_WhenClientProcessIdIsEmpty(string clientProcessId)
+    public void Validate_Should_Fail_WhenClientProcessIdIsEmpty(string? clientProcessId)
     {
         // Arrange
         var request = CreateValidRequest();
-        request = request with { ClientProcessId = clientProcessId };
+        request = request with { ClientProcessId = clientProcessId! };
 
         // Act
         var result = _validator.Validate(request);
@@ -207,6 +212,7 @@ public class CreateProcessRequestValidatorTests
         result.IsValid.Should().BeFalse();
         result.Errors.Should().Contain(e => e.PropertyName == nameof(CreateProcessRequest.ClientProcessId));
     }
+#pragma warning restore xUnit1012
 
     [Fact]
     public void Validate_Should_Fail_WhenClientProcessIdExceedsMaxLength()
@@ -225,15 +231,16 @@ public class CreateProcessRequestValidatorTests
             e.ErrorMessage.Contains("must not exceed 200 characters"));
     }
 
+#pragma warning disable xUnit1012 // Null should not be used for non-nullable type parameter
     [Theory]
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public void Validate_Should_Fail_WhenIdempotencyKeyIsEmpty(string idempotencyKey)
+    public void Validate_Should_Fail_WhenIdempotencyKeyIsEmpty(string? idempotencyKey)
     {
         // Arrange
         var request = CreateValidRequest();
-        request = request with { IdempotencyKey = idempotencyKey };
+        request = request with { IdempotencyKey = idempotencyKey! };
 
         // Act
         var result = _validator.Validate(request);
@@ -242,6 +249,7 @@ public class CreateProcessRequestValidatorTests
         result.IsValid.Should().BeFalse();
         result.Errors.Should().Contain(e => e.PropertyName == nameof(CreateProcessRequest.IdempotencyKey));
     }
+#pragma warning restore xUnit1012
 
     [Fact]
     public void Validate_Should_Fail_WhenIdempotencyKeyExceedsMaxLength()
@@ -304,7 +312,9 @@ public class CreateProcessRequestValidatorTests
     {
         // Arrange
         var request = CreateValidRequest();
+#pragma warning disable CS8625 // Cannot convert null literal to non-nullable reference type - intentional for testing
         request = request with { Metadata = null };
+#pragma warning restore CS8625
 
         // Act
         var result = _validator.Validate(request);
@@ -405,7 +415,7 @@ public class CreateProcessRequestValidatorTests
         {
             { "key1", "value1" },
             { "key2", "value2" },
-            { "key3", null }  // Null values allowed
+            { "key3", null! }  // Null values allowed
         };
 
         var request = CreateValidRequest();
