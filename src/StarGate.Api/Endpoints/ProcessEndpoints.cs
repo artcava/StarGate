@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using StarGate.Contracts.Requests;
 using StarGate.Contracts.Responses;
 using StarGate.Core.Abstractions;
+using StarGate.Core.Domain;
 using StarGate.Core.Exceptions;
 
 namespace StarGate.Api.Endpoints;
@@ -15,8 +16,7 @@ public static class ProcessEndpoints
     public static void MapProcessEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/processes")
-            .WithTags("Processes")
-            .WithOpenApi();
+            .WithTags("Processes");
 
         // POST /api/processes - Create a new process
         group.MapPost("/", CreateProcessAsync)
@@ -87,14 +87,13 @@ public static class ProcessEndpoints
                     statusCode: StatusCodes.Status409Conflict);
             }
 
-            // Map CreateProcessRequest to SubmitProcessRequest
-            var submitRequest = new SubmitProcessRequest
-            {
-                ProcessType = request.ProcessType,
-                ClientProcessId = request.ClientProcessId,
-                IdempotencyKey = request.IdempotencyKey,
-                Data = null // Metadata not currently mapped to Data
-            };
+            // Map CreateProcessRequest to SubmitProcessRequest (record constructor)
+            var submitRequest = new SubmitProcessRequest(
+                ClientProcessId: request.ClientProcessId,
+                ProcessType: request.ProcessType,
+                Payload: request.Metadata ?? new Dictionary<string, string>(),
+                IdempotencyKey: request.IdempotencyKey
+            );
 
             var process = await processService.SubmitProcessAsync(
                 request.ClientId,
