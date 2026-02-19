@@ -3,6 +3,7 @@ using FluentValidation;
 using FluentValidation.Results;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using StarGate.Api.Models;
 using StarGate.Contracts.Requests;
 using StarGate.Core.Abstractions;
 using StarGate.Core.Domain;
@@ -116,13 +117,12 @@ public class ProcessEndpointsTests
         // Act
         await _processServiceMock.Object.SubmitProcessAsync(
             request.ClientId,
-            new SubmitProcessRequest
-            {
-                ProcessType = request.ProcessType,
-                ClientProcessId = request.ClientProcessId,
-                IdempotencyKey = request.IdempotencyKey,
-                Data = null
-            },
+            new SubmitProcessRequest(
+                ClientProcessId: request.ClientProcessId,
+                ProcessType: request.ProcessType,
+                Payload: request.Metadata ?? new Dictionary<string, string>(),
+                IdempotencyKey: request.IdempotencyKey
+            ),
             CancellationToken.None);
 
         // Assert
