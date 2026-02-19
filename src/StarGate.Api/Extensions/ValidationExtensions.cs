@@ -1,8 +1,8 @@
-namespace StarGate.Api.Extensions;
-
 using FluentValidation;
 using FluentValidation.Results;
 using StarGate.Api.Filters;
+
+namespace StarGate.Api.Extensions;
 
 /// <summary>
 /// Extension methods for validation.

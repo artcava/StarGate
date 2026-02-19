@@ -1,7 +1,7 @@
-namespace StarGate.Api.Filters;
-
 using FluentValidation;
 using Microsoft.AspNetCore.Http;
+
+namespace StarGate.Api.Filters;
 
 /// <summary>
 /// Filter that automatically validates requests using FluentValidation.

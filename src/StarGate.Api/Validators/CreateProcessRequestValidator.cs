@@ -1,7 +1,7 @@
-namespace StarGate.Api.Validators;
-
 using FluentValidation;
 using StarGate.Contracts.Requests;
+
+namespace StarGate.Api.Validators;
 
 /// <summary>
 /// Validator for CreateProcessRequest.
@@ -53,7 +53,9 @@ public class CreateProcessRequestValidator : BaseValidator<CreateProcessRequest>
     private static bool BeValidClientId(string clientId)
     {
         if (string.IsNullOrWhiteSpace(clientId))
+        {
             return false;
+        }
 
         // Allow alphanumeric, hyphens, underscores, and dots
         return System.Text.RegularExpressions.Regex.IsMatch(clientId, "^[a-zA-Z0-9-_.]+$");
@@ -62,7 +64,9 @@ public class CreateProcessRequestValidator : BaseValidator<CreateProcessRequest>
     private static bool BeValidMetadata(Dictionary<string, string>? metadata)
     {
         if (metadata == null)
+        {
             return true;
+        }
 
         return metadata.All(kvp =>
             !string.IsNullOrWhiteSpace(kvp.Key) &&

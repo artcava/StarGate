@@ -1,9 +1,9 @@
-namespace StarGate.Api.Tests.Validators;
-
 using FluentAssertions;
 using StarGate.Api.Validators;
 using StarGate.Contracts.Requests;
 using Xunit;
+
+namespace StarGate.Api.Tests.Validators;
 
 /// <summary>
 /// Unit tests for CreateProcessRequestValidator.

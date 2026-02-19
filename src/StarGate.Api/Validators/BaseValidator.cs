@@ -1,6 +1,6 @@
-namespace StarGate.Api.Validators;
-
 using FluentValidation;
+
+namespace StarGate.Api.Validators;
 
 /// <summary>
 /// Base validator with common validation rules.
