@@ -1,5 +1,6 @@
 using FluentValidation;
 using StarGate.Api.Endpoints;
+using StarGate.Api.Extensions;
 using StarGate.Api.Infrastructure;
 using StarGate.Api.Validators;
 using StarGate.Application;
@@ -18,6 +19,9 @@ builder.Services.AddSwaggerGen(options =>
         Description = "StarGate - Asynchronous Process Management System"
     });
 });
+
+// Add global exception handling
+builder.Services.AddGlobalExceptionHandling();
 
 // Add FluentValidation
 builder.Services.AddValidatorsFromAssemblyContaining<CreateProcessRequestValidator>();
@@ -42,6 +46,9 @@ if (app.Environment.IsDevelopment())
         options.RoutePrefix = "swagger";
     });
 }
+
+// Use global exception handling (must be early in pipeline)
+app.UseGlobalExceptionHandling();
 
 app.UseHttpsRedirection();
 
