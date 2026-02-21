@@ -1,7 +1,7 @@
-using global::HealthChecks.UI.Client;
 using HealthChecks.UI.Client;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using RabbitMQ.Client;
 using StarGate.Api.HealthChecks;
 
 namespace StarGate.Api.Extensions;
@@ -44,37 +44,36 @@ public static class HealthCheckExtensions
                 timeout: TimeSpan.FromSeconds(3));
         }
 
-        // Add RabbitMQ health check if connection string is configured
-        var rabbitMqConnectionString = configuration.GetConnectionString("RabbitMQ");
-        if (!string.IsNullOrWhiteSpace(rabbitMqConnectionString))
+        // Add RabbitMQ health check
+        // In version 9.0.0, AddRabbitMQ requires a factory function
+        var rabbitMqConfig = configuration.GetSection("RabbitMQ");
+        var hostName = rabbitMqConfig.GetValue<string>("HostName");
+        var port = rabbitMqConfig.GetValue<int>("Port");
+        var userName = rabbitMqConfig.GetValue<string>("UserName");
+        var password = rabbitMqConfig.GetValue<string>("Password");
+        var virtualHost = rabbitMqConfig.GetValue<string>("VirtualHost") ?? "/";
+
+        if (!string.IsNullOrWhiteSpace(hostName))
         {
             healthChecksBuilder.AddRabbitMQ(
-                rabbitMqConnectionString,
+                rabbitConnectionFactory: sp =>
+                {
+                    var factory = new ConnectionFactory
+                    {
+                        HostName = hostName,
+                        Port = port,
+                        UserName = userName,
+                        Password = password,
+                        VirtualHost = virtualHost,
+                        AutomaticRecoveryEnabled = true,
+                        NetworkRecoveryInterval = TimeSpan.FromSeconds(10)
+                    };
+                    return factory.CreateConnection();
+                },
                 name: "rabbitmq",
                 failureStatus: HealthStatus.Unhealthy,
                 tags: new[] { "messagebroker", "rabbitmq", "ready" },
                 timeout: TimeSpan.FromSeconds(3));
-        }
-        else
-        {
-            // Fallback: build connection string from RabbitMQ configuration section
-            var rabbitMqConfig = configuration.GetSection("RabbitMQ");
-            var hostName = rabbitMqConfig.GetValue<string>("HostName");
-            var port = rabbitMqConfig.GetValue<int>("Port");
-            var userName = rabbitMqConfig.GetValue<string>("UserName");
-            var password = rabbitMqConfig.GetValue<string>("Password");
-            var virtualHost = rabbitMqConfig.GetValue<string>("VirtualHost") ?? "/";
-
-            if (!string.IsNullOrWhiteSpace(hostName))
-            {
-                var connectionString = $"amqp://{userName}:{password}@{hostName}:{port}{virtualHost}";
-                healthChecksBuilder.AddRabbitMQ(
-                    connectionString,
-                    name: "rabbitmq",
-                    failureStatus: HealthStatus.Unhealthy,
-                    tags: new[] { "messagebroker", "rabbitmq", "ready" },
-                    timeout: TimeSpan.FromSeconds(3));
-            }
         }
 
         // Add custom health checks
