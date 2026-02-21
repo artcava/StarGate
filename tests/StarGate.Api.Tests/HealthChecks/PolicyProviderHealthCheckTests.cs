@@ -26,13 +26,12 @@ public class PolicyProviderHealthCheckTests
     public async Task CheckHealthAsync_Should_ReturnHealthy_WhenPolicyProviderIsAccessible()
     {
         // Arrange
-        EffectivePolicy? nullPolicy = null;
         _policyProviderMock
             .Setup(p => p.GetPolicyAsync(
                 It.IsAny<string>(),
                 It.IsAny<string>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(nullPolicy);
+            .ReturnsAsync(value: null!);
 
         var context = new HealthCheckContext();
 

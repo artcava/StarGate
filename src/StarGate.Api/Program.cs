@@ -1,41 +1,66 @@
+using FluentValidation;
+using StarGate.Api.Endpoints;
 using StarGate.Api.Extensions;
-using StarGate.Application.Extensions;
-using StarGate.Infrastructure.Extensions;
+using StarGate.Api.Infrastructure;
+using StarGate.Api.Validators;
+using StarGate.Application;
+using StarGate.Core.Abstractions;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-builder.Services.AddControllers();
+// Add services
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
+    {
+        Title = "StarGate API",
+        Version = "v1",
+        Description = "StarGate - Asynchronous Process Management System"
+    });
+});
 
-// Add application layers
-builder.Services.AddInfrastructure(builder.Configuration);
-builder.Services.AddApplication();
+// Add global exception handling
+builder.Services.AddGlobalExceptionHandling();
 
-// Add exception handling
-builder.Services.AddExceptionHandling();
+// Add FluentValidation
+builder.Services.AddValidatorsFromAssemblyContaining<CreateProcessRequestValidator>();
+
+// Register Infrastructure services (in-memory implementations for testing)
+// TODO: Replace with actual Infrastructure layer services when available
+builder.Services.AddSingleton<IPolicyRepository, InMemoryPolicyRepository>();
+builder.Services.AddSingleton<ICacheStore, InMemoryCacheStore>();
+
+// Add Application layer services
+builder.Services.AddApplicationServices(builder.Configuration);
 
 // Add health checks
 builder.Services.AddApplicationHealthChecks(builder.Configuration);
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// Configure middleware
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint("/swagger/v1/swagger.json", "StarGate API v1");
+        options.RoutePrefix = "swagger";
+    });
 }
 
-// Add exception handler middleware early in pipeline
-app.UseExceptionHandling();
+// Use global exception handling (must be early in pipeline)
+app.UseGlobalExceptionHandling();
 
 app.UseHttpsRedirection();
 
-app.UseAuthorization();
+// Map endpoints
+app.MapGet("/", () => Results.Redirect("/swagger"))
+    .ExcludeFromDescription();
 
-app.MapControllers();
+app.MapPolicyCacheEndpoints();
+app.MapProcessEndpoints();
 
 // Map health check endpoints
 app.MapHealthCheckEndpoints();
