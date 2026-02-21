@@ -1,7 +1,9 @@
+namespace StarGate.Api.Extensions;
+
+using HealthChecks.UI.Client;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using StarGate.Api.HealthChecks;
-
-namespace StarGate.Api.Extensions;
 
 /// <summary>
 /// Extension methods for configuring health checks.
@@ -96,7 +98,7 @@ public static class HealthCheckExtensions
     public static IEndpointRouteBuilder MapHealthCheckEndpoints(this IEndpointRouteBuilder app)
     {
         // Liveness endpoint - always returns 200 if API is running
-        app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+        app.MapHealthChecks("/health/live", new HealthCheckOptions
         {
             Predicate = _ => false, // No checks, just returns if API is alive
             ResponseWriter = async (context, report) =>
@@ -111,43 +113,34 @@ public static class HealthCheckExtensions
         })
         .WithName("Liveness")
         .WithTags("Health")
-        .WithOpenApi(operation =>
-        {
-            operation.Summary = "Liveness probe";
-            operation.Description = "Returns OK if the API process is running. Used by orchestrators to detect if the application needs to be restarted.";
-            return operation;
-        })
+        .WithMetadata(new Microsoft.AspNetCore.Http.Metadata.EndpointSummaryAttribute("Liveness probe"))
+        .WithMetadata(new Microsoft.AspNetCore.Http.Metadata.EndpointDescriptionAttribute(
+            "Returns OK if the API process is running. Used by orchestrators to detect if the application needs to be restarted."))
         .AllowAnonymous(); // No authentication required
 
         // Readiness endpoint - checks all dependencies
-        app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+        app.MapHealthChecks("/health/ready", new HealthCheckOptions
         {
             Predicate = check => check.Tags.Contains("ready"),
-            ResponseWriter = HealthChecks.UI.Client.UIResponseWriter.WriteHealthCheckUIResponse
+            ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
         })
         .WithName("Readiness")
         .WithTags("Health")
-        .WithOpenApi(operation =>
-        {
-            operation.Summary = "Readiness probe";
-            operation.Description = "Checks if the API is ready to accept traffic by verifying all dependencies. Used by load balancers for traffic routing.";
-            return operation;
-        })
+        .WithMetadata(new Microsoft.AspNetCore.Http.Metadata.EndpointSummaryAttribute("Readiness probe"))
+        .WithMetadata(new Microsoft.AspNetCore.Http.Metadata.EndpointDescriptionAttribute(
+            "Checks if the API is ready to accept traffic by verifying all dependencies. Used by load balancers for traffic routing."))
         .AllowAnonymous();
 
         // Detailed health endpoint (for monitoring/debugging)
-        app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+        app.MapHealthChecks("/health", new HealthCheckOptions
         {
-            ResponseWriter = HealthChecks.UI.Client.UIResponseWriter.WriteHealthCheckUIResponse
+            ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
         })
         .WithName("Health")
         .WithTags("Health")
-        .WithOpenApi(operation =>
-        {
-            operation.Summary = "Detailed health status";
-            operation.Description = "Returns detailed status of all health checks including timing and error information. Useful for monitoring and debugging.";
-            return operation;
-        })
+        .WithMetadata(new Microsoft.AspNetCore.Http.Metadata.EndpointSummaryAttribute("Detailed health status"))
+        .WithMetadata(new Microsoft.AspNetCore.Http.Metadata.EndpointDescriptionAttribute(
+            "Returns detailed status of all health checks including timing and error information. Useful for monitoring and debugging."))
         .AllowAnonymous();
 
         return app;
