@@ -34,6 +34,9 @@ builder.Services.AddSingleton<ICacheStore, InMemoryCacheStore>();
 // Add Application layer services
 builder.Services.AddApplicationServices(builder.Configuration);
 
+// Add health checks
+builder.Services.AddApplicationHealthChecks(builder.Configuration);
+
 var app = builder.Build();
 
 // Configure middleware
@@ -56,12 +59,13 @@ app.UseHttpsRedirection();
 app.MapGet("/", () => Results.Redirect("/swagger"))
     .ExcludeFromDescription();
 
-app.MapGet("/health/live", () => Results.Ok(new { status = "healthy" }))
-    .WithTags("Health")
-    .WithName("HealthCheck")
-    .Produces(200);
-
 app.MapPolicyCacheEndpoints();
 app.MapProcessEndpoints();
 
+// Map health check endpoints
+app.MapHealthCheckEndpoints();
+
 app.Run();
+
+// Make Program accessible to test projects
+public partial class Program { }
