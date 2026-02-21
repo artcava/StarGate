@@ -1,7 +1,7 @@
-namespace StarGate.Api.HealthChecks;
-
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using StarGate.Core.Abstractions;
+
+namespace StarGate.Api.HealthChecks;
 
 /// <summary>
 /// Health check for PolicyProvider availability.

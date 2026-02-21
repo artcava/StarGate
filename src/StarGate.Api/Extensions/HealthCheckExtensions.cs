@@ -1,7 +1,7 @@
-namespace StarGate.Api.Extensions;
-
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using StarGate.Api.HealthChecks;
+
+namespace StarGate.Api.Extensions;
 
 /// <summary>
 /// Extension methods for configuring health checks.
