@@ -1,6 +1,7 @@
 using HealthChecks.UI.Client;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using MongoDB.Driver;
 using RabbitMQ.Client;
 using StarGate.Api.HealthChecks;
 
@@ -25,7 +26,7 @@ public static class HealthCheckExtensions
         if (!string.IsNullOrWhiteSpace(mongoConnectionString))
         {
             healthChecksBuilder.AddMongoDb(
-                mongoConnectionString,
+                sp => new MongoClient(mongoConnectionString),
                 name: "mongodb",
                 failureStatus: HealthStatus.Unhealthy,
                 tags: new[] { "db", "mongodb", "ready" },
@@ -53,10 +54,12 @@ public static class HealthCheckExtensions
         var password = rabbitMqConfig.GetValue<string>("Password");
         var virtualHost = rabbitMqConfig.GetValue<string>("VirtualHost") ?? "/";
 
-        if (!string.IsNullOrWhiteSpace(hostName))
+        if (!string.IsNullOrWhiteSpace(hostName) && 
+            !string.IsNullOrWhiteSpace(userName) && 
+            !string.IsNullOrWhiteSpace(password))
         {
             healthChecksBuilder.AddRabbitMQ(
-                rabbitConnectionFactory: sp =>
+                sp =>
                 {
                     var factory = new ConnectionFactory
                     {
