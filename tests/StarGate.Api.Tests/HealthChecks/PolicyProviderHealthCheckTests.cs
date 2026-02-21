@@ -26,12 +26,13 @@ public class PolicyProviderHealthCheckTests
     public async Task CheckHealthAsync_Should_ReturnHealthy_WhenPolicyProviderIsAccessible()
     {
         // Arrange
+        EffectivePolicy? nullPolicy = null;
         _policyProviderMock
             .Setup(p => p.GetPolicyAsync(
                 It.IsAny<string>(),
                 It.IsAny<string>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync((EffectivePolicy?)null);
+            .ReturnsAsync(nullPolicy);
 
         var context = new HealthCheckContext();
 
@@ -54,9 +55,10 @@ public class PolicyProviderHealthCheckTests
             Timeout = TimeSpan.FromSeconds(300),
             RetryPolicy = new RetryPolicy
             {
+                Enabled = true,
                 MaxAttempts = 3,
-                BackoffType = BackoffType.Exponential,
                 InitialDelay = TimeSpan.FromSeconds(5),
+                BackoffStrategy = BackoffStrategy.Exponential,
                 MaxDelay = TimeSpan.FromMinutes(5)
             },
             ResultRetention = TimeSpan.FromDays(30),
