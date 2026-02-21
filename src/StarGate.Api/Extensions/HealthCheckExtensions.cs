@@ -1,8 +1,6 @@
 using HealthChecks.UI.Client;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using MongoDB.Driver;
-using RabbitMQ.Client;
 using StarGate.Api.HealthChecks;
 
 namespace StarGate.Api.Extensions;
@@ -26,7 +24,7 @@ public static class HealthCheckExtensions
         if (!string.IsNullOrWhiteSpace(mongoConnectionString))
         {
             healthChecksBuilder.AddMongoDb(
-                sp => new MongoClient(mongoConnectionString),
+                mongoConnectionString,
                 name: "mongodb",
                 failureStatus: HealthStatus.Unhealthy,
                 tags: new[] { "db", "mongodb", "ready" },
@@ -46,7 +44,7 @@ public static class HealthCheckExtensions
         }
 
         // Add RabbitMQ health check
-        // In version 9.0.0, AddRabbitMQ requires a factory function
+        // Build connection string from configuration
         var rabbitMqConfig = configuration.GetSection("RabbitMQ");
         var hostName = rabbitMqConfig.GetValue<string>("HostName");
         var port = rabbitMqConfig.GetValue<int>("Port");
@@ -58,21 +56,9 @@ public static class HealthCheckExtensions
             !string.IsNullOrWhiteSpace(userName) && 
             !string.IsNullOrWhiteSpace(password))
         {
+            var rabbitMqConnectionString = $"amqp://{userName}:{password}@{hostName}:{port}{virtualHost}";
             healthChecksBuilder.AddRabbitMQ(
-                sp =>
-                {
-                    var factory = new ConnectionFactory
-                    {
-                        HostName = hostName,
-                        Port = port,
-                        UserName = userName,
-                        Password = password,
-                        VirtualHost = virtualHost,
-                        AutomaticRecoveryEnabled = true,
-                        NetworkRecoveryInterval = TimeSpan.FromSeconds(10)
-                    };
-                    return factory.CreateConnection();
-                },
+                rabbitMqConnectionString,
                 name: "rabbitmq",
                 failureStatus: HealthStatus.Unhealthy,
                 tags: new[] { "messagebroker", "rabbitmq", "ready" },
