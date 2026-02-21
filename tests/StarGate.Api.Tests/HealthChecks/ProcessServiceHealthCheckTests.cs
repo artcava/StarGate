@@ -1,5 +1,3 @@
-namespace StarGate.Api.Tests.HealthChecks;
-
 using FluentAssertions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -8,6 +6,8 @@ using StarGate.Api.HealthChecks;
 using StarGate.Core.Abstractions;
 using StarGate.Core.Domain;
 using Xunit;
+
+namespace StarGate.Api.Tests.HealthChecks;
 
 public class ProcessServiceHealthCheckTests
 {
