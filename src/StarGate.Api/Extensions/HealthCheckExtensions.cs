@@ -1,9 +1,9 @@
+namespace StarGate.Api.Extensions;
+
 using HealthChecks.UI.Client;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using StarGate.Api.HealthChecks;
-
-namespace StarGate.Api.Extensions;
 
 /// <summary>
 /// Extension methods for configuring health checks.
@@ -113,9 +113,6 @@ public static class HealthCheckExtensions
         })
         .WithName("Liveness")
         .WithTags("Health")
-        .WithMetadata(new Microsoft.AspNetCore.Http.Metadata.EndpointSummaryAttribute("Liveness probe"))
-        .WithMetadata(new Microsoft.AspNetCore.Http.Metadata.EndpointDescriptionAttribute(
-            "Returns OK if the API process is running. Used by orchestrators to detect if the application needs to be restarted."))
         .AllowAnonymous(); // No authentication required
 
         // Readiness endpoint - checks all dependencies
@@ -126,9 +123,6 @@ public static class HealthCheckExtensions
         })
         .WithName("Readiness")
         .WithTags("Health")
-        .WithMetadata(new Microsoft.AspNetCore.Http.Metadata.EndpointSummaryAttribute("Readiness probe"))
-        .WithMetadata(new Microsoft.AspNetCore.Http.Metadata.EndpointDescriptionAttribute(
-            "Checks if the API is ready to accept traffic by verifying all dependencies. Used by load balancers for traffic routing."))
         .AllowAnonymous();
 
         // Detailed health endpoint (for monitoring/debugging)
@@ -138,9 +132,6 @@ public static class HealthCheckExtensions
         })
         .WithName("Health")
         .WithTags("Health")
-        .WithMetadata(new Microsoft.AspNetCore.Http.Metadata.EndpointSummaryAttribute("Detailed health status"))
-        .WithMetadata(new Microsoft.AspNetCore.Http.Metadata.EndpointDescriptionAttribute(
-            "Returns detailed status of all health checks including timing and error information. Useful for monitoring and debugging."))
         .AllowAnonymous();
 
         return app;
