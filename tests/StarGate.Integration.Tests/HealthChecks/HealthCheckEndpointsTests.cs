@@ -1,10 +1,10 @@
-namespace StarGate.Integration.Tests.HealthChecks;
-
 using System.Net;
 using System.Text.Json;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Xunit;
+
+namespace StarGate.Integration.Tests.HealthChecks;
 
 public class HealthCheckEndpointsTests : IClassFixture<WebApplicationFactory<Program>>
 {
