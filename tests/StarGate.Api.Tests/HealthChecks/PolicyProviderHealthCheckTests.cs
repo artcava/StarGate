@@ -31,7 +31,7 @@ public class PolicyProviderHealthCheckTests
                 It.IsAny<string>(),
                 It.IsAny<string>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync((ProcessTypePolicy?)null);
+            .ReturnsAsync((EffectivePolicy?)null);
 
         var context = new HealthCheckContext();
 
@@ -47,14 +47,27 @@ public class PolicyProviderHealthCheckTests
     public async Task CheckHealthAsync_Should_ReturnHealthy_WhenPolicyProviderReturnsPolicy()
     {
         // Arrange
-        var policy = new ProcessTypePolicy
+        var policy = new EffectivePolicy
         {
             ProcessType = "test",
-            TimeoutSeconds = 300,
-            MaxRetryAttempts = 3,
-            RetryDelaySeconds = 5,
-            RetentionDays = 30,
-            MaxConcurrentProcesses = 10
+            ClientId = "test-client",
+            Timeout = TimeSpan.FromSeconds(300),
+            RetryPolicy = new RetryPolicy
+            {
+                MaxAttempts = 3,
+                BackoffType = BackoffType.Exponential,
+                InitialDelay = TimeSpan.FromSeconds(5),
+                MaxDelay = TimeSpan.FromMinutes(5)
+            },
+            ResultRetention = TimeSpan.FromDays(30),
+            MaxConcurrentProcesses = 10,
+            Source = new PolicySource
+            {
+                TimeoutFromOverride = false,
+                RetryPolicyFromOverride = false,
+                ResultRetentionFromOverride = false,
+                ConcurrencyLimitFromOverride = false
+            }
         };
 
         _policyProviderMock
