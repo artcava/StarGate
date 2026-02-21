@@ -144,16 +144,16 @@ public class HealthCheckEndpointsTests : IClassFixture<WebApplicationFactory<Pro
         
         // UIResponseWriter may use application/json or application/health+json
         var readinessContentType = readinessResponse.Content.Headers.ContentType?.MediaType;
-        readinessContentType.Should().Match(ct => 
-            ct == "application/json" || 
-            ct == "application/health+json" ||
-            ct?.Contains("json") == true);
+        var isValidReadinessType = readinessContentType == "application/json" || 
+                                    readinessContentType == "application/health+json" ||
+                                    (readinessContentType != null && readinessContentType.Contains("json"));
+        isValidReadinessType.Should().BeTrue();
         
         var healthContentType = healthResponse.Content.Headers.ContentType?.MediaType;
-        healthContentType.Should().Match(ct => 
-            ct == "application/json" || 
-            ct == "application/health+json" ||
-            ct?.Contains("json") == true);
+        var isValidHealthType = healthContentType == "application/json" || 
+                                 healthContentType == "application/health+json" ||
+                                 (healthContentType != null && healthContentType.Contains("json"));
+        isValidHealthType.Should().BeTrue();
     }
 
     [Fact]
