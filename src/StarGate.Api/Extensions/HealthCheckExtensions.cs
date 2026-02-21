@@ -1,9 +1,10 @@
-namespace StarGate.Api.Extensions;
-
+using global::HealthChecks.UI.Client;
 using HealthChecks.UI.Client;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using StarGate.Api.HealthChecks;
+
+namespace StarGate.Api.Extensions;
 
 /// <summary>
 /// Extension methods for configuring health checks.
