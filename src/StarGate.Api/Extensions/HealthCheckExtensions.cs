@@ -2,6 +2,7 @@ using HealthChecks.UI.Client;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using StarGate.Api.HealthChecks;
+using StarGate.Core.Abstractions;
 
 namespace StarGate.Api.Extensions;
 
@@ -85,18 +86,30 @@ public static class HealthCheckExtensions
             }
         }
 
-        // Always add custom health checks (these work without external dependencies)
-        healthChecksBuilder.AddCheck<ProcessServiceHealthCheck>(
-            "process-service",
-            failureStatus: HealthStatus.Unhealthy,
-            tags: new[] { "service", "ready" },
-            timeout: TimeSpan.FromSeconds(5));
+        // Add custom health checks ONLY if their dependencies are registered
+        // This prevents DI errors in test environments
+        
+        // Check if IProcessRepository is registered before adding ProcessServiceHealthCheck
+        var hasProcessRepository = services.Any(d => d.ServiceType == typeof(IProcessRepository));
+        if (hasProcessRepository)
+        {
+            healthChecksBuilder.AddCheck<ProcessServiceHealthCheck>(
+                "process-service",
+                failureStatus: HealthStatus.Unhealthy,
+                tags: new[] { "service", "ready" },
+                timeout: TimeSpan.FromSeconds(5));
+        }
 
-        healthChecksBuilder.AddCheck<PolicyProviderHealthCheck>(
-            "policy-provider",
-            failureStatus: HealthStatus.Degraded,
-            tags: new[] { "service", "ready" },
-            timeout: TimeSpan.FromSeconds(5));
+        // Check if IPolicyProvider is registered before adding PolicyProviderHealthCheck
+        var hasPolicyProvider = services.Any(d => d.ServiceType == typeof(IPolicyProvider));
+        if (hasPolicyProvider)
+        {
+            healthChecksBuilder.AddCheck<PolicyProviderHealthCheck>(
+                "policy-provider",
+                failureStatus: HealthStatus.Degraded,
+                tags: new[] { "service", "ready" },
+                timeout: TimeSpan.FromSeconds(5));
+        }
 
         return services;
     }
