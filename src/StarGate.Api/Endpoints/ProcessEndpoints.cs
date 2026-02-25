@@ -6,6 +6,7 @@ using StarGate.Contracts.Requests;
 using StarGate.Core.Abstractions;
 using StarGate.Core.Domain;
 using StarGate.Core.Exceptions;
+using System.Security.Claims;
 
 namespace StarGate.Api.Endpoints;
 
@@ -17,7 +18,8 @@ public static class ProcessEndpoints
     public static void MapProcessEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/processes")
-            .WithTags("Processes");
+            .WithTags("Processes")
+            .RequireAuthorization(); // Require authentication for all endpoints
 
         // POST /api/processes - Create a new process
         group.MapPost("/", CreateProcessAsync)
@@ -25,6 +27,8 @@ public static class ProcessEndpoints
             .AddValidation<CreateProcessRequest>()
             .Produces<ProcessResponse>(StatusCodes.Status201Created)
             .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
             .Produces(StatusCodes.Status409Conflict)
             .Produces(StatusCodes.Status429TooManyRequests)
             .Produces(StatusCodes.Status500InternalServerError);
@@ -33,6 +37,7 @@ public static class ProcessEndpoints
         group.MapGet("/{processId:guid}", GetProcessByIdAsync)
             .WithName("GetProcessById")
             .Produces<ProcessResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status404NotFound)
             .Produces(StatusCodes.Status500InternalServerError);
 
@@ -40,6 +45,8 @@ public static class ProcessEndpoints
         group.MapGet("/client/{clientId}/{clientProcessId}", GetProcessByClientIdAsync)
             .WithName("GetProcessByClientId")
             .Produces<ProcessResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
             .Produces(StatusCodes.Status404NotFound)
             .Produces(StatusCodes.Status500InternalServerError);
     }
@@ -48,10 +55,28 @@ public static class ProcessEndpoints
         [FromBody] CreateProcessRequest request,
         [FromServices] IProcessService processService,
         [FromServices] ILogger<Program> logger,
+        ClaimsPrincipal user,
         CancellationToken cancellationToken)
     {
         try
         {
+            // Extract client ID from JWT claims
+            var clientIdFromToken = user.GetClientId();
+
+            // Validate that request.ClientId matches token
+            if (clientIdFromToken != null && request.ClientId != clientIdFromToken)
+            {
+                logger.LogWarning(
+                    "Client ID mismatch: Token={TokenClientId}, Request={RequestClientId}",
+                    clientIdFromToken,
+                    request.ClientId);
+
+                return Results.Problem(
+                    title: "Forbidden",
+                    detail: "Client ID in request does not match authenticated client",
+                    statusCode: StatusCodes.Status403Forbidden);
+            }
+
             logger.LogInformation(
                 "Creating process: ClientId={ClientId}, ProcessType={ProcessType}, ClientProcessId={ClientProcessId}",
                 request.ClientId,
@@ -170,10 +195,28 @@ public static class ProcessEndpoints
         string clientProcessId,
         [FromServices] IProcessService processService,
         [FromServices] ILogger<Program> logger,
+        ClaimsPrincipal user,
         CancellationToken cancellationToken)
     {
         try
         {
+            // Extract client ID from JWT claims
+            var clientIdFromToken = user.GetClientId();
+
+            // Validate that clientId parameter matches token
+            if (clientIdFromToken != null && clientId != clientIdFromToken)
+            {
+                logger.LogWarning(
+                    "Client ID mismatch: Token={TokenClientId}, Request={RequestClientId}",
+                    clientIdFromToken,
+                    clientId);
+
+                return Results.Problem(
+                    title: "Forbidden",
+                    detail: "Client ID in request does not match authenticated client",
+                    statusCode: StatusCodes.Status403Forbidden);
+            }
+
             logger.LogDebug(
                 "Retrieving process: ClientId={ClientId}, ClientProcessId={ClientProcessId}",
                 clientId,
