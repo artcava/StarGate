@@ -1,9 +1,9 @@
-namespace StarGate.Api.Extensions;
-
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using StarGate.Api.Configuration;
 using System.Text;
+
+namespace StarGate.Api.Extensions;
 
 /// <summary>
 /// Extension methods for configuring authentication.

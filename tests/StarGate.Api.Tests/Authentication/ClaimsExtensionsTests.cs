@@ -1,9 +1,9 @@
-namespace StarGate.Api.Tests.Authentication;
-
 using FluentAssertions;
 using StarGate.Api.Extensions;
 using System.Security.Claims;
 using Xunit;
+
+namespace StarGate.Api.Tests.Authentication;
 
 public class ClaimsExtensionsTests
 {

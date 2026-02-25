@@ -1,5 +1,3 @@
-namespace StarGate.Api.Tests.Authentication;
-
 using FluentAssertions;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -9,6 +7,8 @@ using Microsoft.Extensions.Options;
 using StarGate.Api.Configuration;
 using StarGate.Api.Extensions;
 using Xunit;
+
+namespace StarGate.Api.Tests.Authentication;
 
 public class JwtAuthenticationTests
 {

@@ -1,6 +1,6 @@
-namespace StarGate.Api.Extensions;
-
 using System.Security.Claims;
+
+namespace StarGate.Api.Extensions;
 
 /// <summary>
 /// Extension methods for working with claims.
