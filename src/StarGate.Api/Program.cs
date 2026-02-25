@@ -10,15 +10,11 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(options =>
-{
-    options.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
-    {
-        Title = "StarGate API",
-        Version = "v1",
-        Description = "StarGate - Asynchronous Process Management System"
-    });
-});
+builder.Services.AddSwaggerWithJwt(); // Updated to include JWT
+
+// Add authentication
+builder.Services.AddJwtAuthentication(builder.Configuration);
+builder.Services.AddAuthorization();
 
 // Add global exception handling
 builder.Services.AddGlobalExceptionHandling();
@@ -55,6 +51,10 @@ app.UseGlobalExceptionHandling();
 
 app.UseHttpsRedirection();
 
+// Authentication & Authorization (order matters!)
+app.UseAuthentication();
+app.UseAuthorization();
+
 // Map endpoints
 app.MapGet("/", () => Results.Redirect("/swagger"))
     .ExcludeFromDescription();
@@ -62,7 +62,7 @@ app.MapGet("/", () => Results.Redirect("/swagger"))
 app.MapPolicyCacheEndpoints();
 app.MapProcessEndpoints();
 
-// Map health check endpoints
+// Map health check endpoints (before authentication)
 app.MapHealthCheckEndpoints();
 
 app.Run();
