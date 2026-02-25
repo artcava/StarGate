@@ -323,7 +323,7 @@ StarGate/
 
 #### Sprint 5.2: Security
 - [x] Configure JWT authentication
-- [ ] Implement authorization policies
+- [x] Implement authorization policies
 - [ ] Add rate limiting
 - [ ] Configure CORS
 - [ ] Security testing
