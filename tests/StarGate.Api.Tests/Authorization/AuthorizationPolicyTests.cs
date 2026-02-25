@@ -1,5 +1,3 @@
-namespace StarGate.Api.Tests.Authorization;
-
 using FluentAssertions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.DependencyInjection;
@@ -7,6 +5,8 @@ using Microsoft.Extensions.Options;
 using StarGate.Api.Authorization;
 using StarGate.Api.Extensions;
 using Xunit;
+
+namespace StarGate.Api.Tests.Authorization;
 
 public class AuthorizationPolicyTests
 {

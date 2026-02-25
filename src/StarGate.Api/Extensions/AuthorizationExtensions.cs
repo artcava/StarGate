@@ -1,10 +1,10 @@
-namespace StarGate.Api.Extensions;
-
 using Microsoft.AspNetCore.Authorization;
 using StarGate.Api.Authorization;
 using StarGate.Api.Authorization.Handlers;
 using StarGate.Api.Authorization.Requirements;
 using System.Security.Claims;
+
+namespace StarGate.Api.Extensions;
 
 /// <summary>
 /// Extension methods for configuring authorization.

@@ -1,6 +1,6 @@
-namespace StarGate.Api.Authorization.Requirements;
-
 using Microsoft.AspNetCore.Authorization;
+
+namespace StarGate.Api.Authorization.Requirements;
 
 /// <summary>
 /// Requirement that the authenticated user has specific scopes.

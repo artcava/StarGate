@@ -1,8 +1,8 @@
-namespace StarGate.Api.Authorization.Handlers;
-
 using Microsoft.AspNetCore.Authorization;
 using StarGate.Api.Extensions;
 using StarGate.Core.Domain;
+
+namespace StarGate.Api.Authorization.Handlers;
 
 /// <summary>
 /// Operations that can be performed on a process.
