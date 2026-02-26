@@ -49,10 +49,7 @@ public class RateLimitingTests : IClassFixture<WebApplicationFactory<Program>>
         tooManyRequestsResponse.Should().NotBeNull("some requests should be rate limited");
 
         // Check Retry-After header
-        if (tooManyRequestsResponse != null)
-        {
-            tooManyRequestsResponse.Headers.RetryAfter.Should().NotBeNull();
-        }
+        tooManyRequestsResponse?.Headers.RetryAfter.Should().NotBeNull();
     }
 
     [Fact]
