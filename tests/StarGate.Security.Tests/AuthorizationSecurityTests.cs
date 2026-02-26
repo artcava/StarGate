@@ -31,8 +31,7 @@ public class AuthorizationSecurityTests : SecurityTestBase
         // In test environment without full infrastructure, may return 500
         response.StatusCode.Should().BeOneOf(
             HttpStatusCode.Forbidden,
-            HttpStatusCode.InternalServerError,
-            "accessing another client's data should not succeed");
+            HttpStatusCode.InternalServerError);
         
         response.StatusCode.Should().NotBe(HttpStatusCode.OK,
             "accessing another client's data should never return success");
@@ -88,8 +87,7 @@ public class AuthorizationSecurityTests : SecurityTestBase
         // BadRequest is acceptable because validation may occur before authorization check
         response.StatusCode.Should().BeOneOf(
             HttpStatusCode.Forbidden,
-            HttpStatusCode.BadRequest,
-            "clientId mismatch should be rejected");
+            HttpStatusCode.BadRequest);
         
         response.StatusCode.Should().NotBe(HttpStatusCode.OK,
             "clientId mismatch should never succeed");

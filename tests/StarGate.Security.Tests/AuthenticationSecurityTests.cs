@@ -45,8 +45,7 @@ public class AuthenticationSecurityTests : SecurityTestBase
         // 500 can occur if global exception handler intercepts JWT validation errors
         response.StatusCode.Should().BeOneOf(
             HttpStatusCode.Unauthorized, 
-            HttpStatusCode.InternalServerError,
-            "expired token should not grant access to protected endpoints");
+            HttpStatusCode.InternalServerError);
         
         response.StatusCode.Should().NotBe(HttpStatusCode.OK,
             "expired token should never return success");
