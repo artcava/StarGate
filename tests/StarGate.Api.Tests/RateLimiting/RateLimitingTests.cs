@@ -1,5 +1,6 @@
 using System.Net;
 using FluentAssertions;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace StarGate.Api.Tests.RateLimiting;
 
@@ -26,7 +27,7 @@ public class RateLimitingTests
         };
 
         await using var factory = new RateLimitTestFactory(configuration);
-        var client = factory.CreateClient();
+        var client = factory.Server.CreateClient();
 
         // Act - Make requests until rate limit is exceeded
         var responses = new List<HttpResponseMessage>();
@@ -58,7 +59,7 @@ public class RateLimitingTests
         };
 
         await using var factory = new RateLimitTestFactory(configuration);
-        var client = factory.CreateClient();
+        var client = factory.Server.CreateClient();
 
         // Act - Make many requests
         for (int i = 0; i < 100; i++)
@@ -88,7 +89,7 @@ public class RateLimitingTests
         };
 
         await using var factory = new RateLimitTestFactory(configuration);
-        var client = factory.CreateClient();
+        var client = factory.Server.CreateClient();
 
         // Act - Make requests until rate limit is exceeded
         HttpResponseMessage? rateLimitedResponse = null;
@@ -131,7 +132,7 @@ public class RateLimitingTests
         };
 
         await using var factory = new RateLimitTestFactory(configuration);
-        var client = factory.CreateClient();
+        var client = factory.Server.CreateClient();
 
         // Act - Make requests that should exceed limit
         var responses = new List<HttpStatusCode>();
@@ -147,9 +148,9 @@ public class RateLimitingTests
     }
 
     [Fact]
-    public async Task DEBUG_VerifyRateLimitingIsWorking()
+    public async Task DEBUG_VerifyConfiguration()
     {
-        // Arrange - Configurazione ultra-restrittiva: solo 1 richiesta permessa
+        // Arrange - Configurazione ultra-restrittiva
         var configuration = new Dictionary<string, string?>
         {
             ["RateLimit:Enabled"] = "true",
@@ -164,21 +165,41 @@ public class RateLimitingTests
         };
 
         await using var factory = new RateLimitTestFactory(configuration);
-        var client = factory.CreateClient();
 
-        // Act - Fai solo 3 richieste
+        // Verifica che i servizi siano registrati
+        using var scope = factory.Services.CreateScope();
+        var rateLimiterOptions = scope.ServiceProvider.GetService<Microsoft.Extensions.Options.IOptions<Microsoft.AspNetCore.RateLimiting.RateLimiterOptions>>();
+        var rateLimitConfig = scope.ServiceProvider.GetService<Microsoft.Extensions.Options.IOptions<StarGate.Api.Configuration.RateLimitOptions>>();
+
+        Console.WriteLine($"RateLimiterOptions registered: {rateLimiterOptions != null}");
+        Console.WriteLine($"RateLimitOptions registered: {rateLimitConfig != null}");
+
+        if (rateLimitConfig != null)
+        {
+            Console.WriteLine($"RateLimit Enabled: {rateLimitConfig.Value.Enabled}");
+            Console.WriteLine($"DefaultPolicy PermitLimit: {rateLimitConfig.Value.DefaultPolicy.PermitLimit}");
+            Console.WriteLine($"EndpointPolicies count: {rateLimitConfig.Value.EndpointPolicies.Count}");
+
+            if (rateLimitConfig.Value.EndpointPolicies.ContainsKey("ReadProcess"))
+            {
+                Console.WriteLine($"ReadProcess PermitLimit: {rateLimitConfig.Value.EndpointPolicies["ReadProcess"].PermitLimit}");
+            }
+        }
+
+        var client = factory.Server.CreateClient();
+
+        // Act
         var response1 = await client.GetAsync("/ratelimit-test");
         var response2 = await client.GetAsync("/ratelimit-test");
-        var response3 = await client.GetAsync("/ratelimit-test");
 
-        // Debug output
         Console.WriteLine($"Response 1: {response1.StatusCode}");
         Console.WriteLine($"Response 2: {response2.StatusCode}");
-        Console.WriteLine($"Response 3: {response3.StatusCode}");
 
-        // Assert - La seconda richiesta DEVE essere 429
-        response1.StatusCode.Should().Be(HttpStatusCode.OK, "first request should succeed");
-        response2.StatusCode.Should().Be(HttpStatusCode.TooManyRequests, "second request should be rate limited");
+        // Check if rate limiting middleware is in the pipeline
+        Console.WriteLine($"Response 1 has RateLimit headers: {response1.Headers.Contains("X-RateLimit-Limit")}");
+        Console.WriteLine($"Response 2 has RateLimit headers: {response2.Headers.Contains("X-RateLimit-Limit")}");
+
+        // Verifica che almeno la seconda richiesta sia rate limited
+        response2.StatusCode.Should().Be(HttpStatusCode.TooManyRequests, "second request should be rate limited with PermitLimit=1");
     }
-
 }

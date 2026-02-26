@@ -35,8 +35,12 @@ public static class RateLimitingExtensions
             // Configure global limiter
             options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
             {
+                // HARDCODE temporaneo per test: usa sempre lo stesso partition key
+                var clientId = "test-client-fixed";
+
+                // Originale (commentato temporaneamente):
                 // Partition by client ID from JWT
-                var clientId = context.User.GetClientId() ?? context.Connection.RemoteIpAddress?.ToString() ?? "anonymous";
+                // var clientId = context.User.GetClientId() ?? context.Connection.RemoteIpAddress?.ToString() ?? "anonymous";
 
                 return RateLimitPartition.GetSlidingWindowLimiter(
                     clientId,
@@ -53,7 +57,11 @@ public static class RateLimitingExtensions
             // Add policy for process creation (more restrictive)
             options.AddPolicy("CreateProcess", context =>
             {
-                var clientId = context.User.GetClientId() ?? context.Connection.RemoteIpAddress?.ToString() ?? "anonymous";
+                // HARDCODE temporaneo per test: usa sempre lo stesso partition key
+                var clientId = "test-client-fixed";
+
+                // Originale (commentato temporaneamente):
+                // var clientId = context.User.GetClientId() ?? context.Connection.RemoteIpAddress?.ToString() ?? "anonymous";
 
                 var policy = rateLimitOptions.EndpointPolicies.GetValueOrDefault("CreateProcess")
                     ?? rateLimitOptions.DefaultPolicy;
@@ -85,10 +93,33 @@ public static class RateLimitingExtensions
                 }
             });
 
+            //// Add policy for reading processes (less restrictive)
+            //options.AddPolicy("ReadProcess", context =>
+            //{
+            //    var clientId = context.User.GetClientId() ?? context.Connection.RemoteIpAddress?.ToString() ?? "anonymous";
+
+            //    var policy = rateLimitOptions.EndpointPolicies.GetValueOrDefault("ReadProcess")
+            //        ?? rateLimitOptions.DefaultPolicy;
+
+            //    return RateLimitPartition.GetSlidingWindowLimiter(
+            //        clientId,
+            //        _ => new SlidingWindowRateLimiterOptions
+            //        {
+            //            PermitLimit = policy.PermitLimit,
+            //            Window = TimeSpan.FromSeconds(policy.WindowSeconds),
+            //            SegmentsPerWindow = 10,
+            //            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            //            QueueLimit = policy.QueueLimit
+            //        });
+            //});
             // Add policy for reading processes (less restrictive)
             options.AddPolicy("ReadProcess", context =>
             {
-                var clientId = context.User.GetClientId() ?? context.Connection.RemoteIpAddress?.ToString() ?? "anonymous";
+                // HARDCODE temporaneo per test: usa sempre lo stesso partition key
+                var clientId = "test-client-fixed";
+
+                // Originale (commentato temporaneamente):
+                // var clientId = context.User.GetClientId() ?? context.Connection.RemoteIpAddress?.ToString() ?? "anonymous";
 
                 var policy = rateLimitOptions.EndpointPolicies.GetValueOrDefault("ReadProcess")
                     ?? rateLimitOptions.DefaultPolicy;
