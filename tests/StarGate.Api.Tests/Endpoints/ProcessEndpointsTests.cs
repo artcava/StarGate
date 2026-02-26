@@ -329,11 +329,14 @@ public class ProcessEndpointsTests : EndpointTestBase
             s => s.SubmitProcessAsync(
                 request.ClientId,
                 It.Is<SubmitProcessRequest>(r =>
-                    r.Payload is Dictionary<string, string> dict &&
-                    dict.Count == metadata.Count &&
-                    dict.ContainsKey("inputFile") && dict["inputFile"] == "data.csv" &&
-                    dict.ContainsKey("outputFormat") && dict["outputFormat"] == "json" &&
-                    dict.ContainsKey("priority") && dict["priority"] == "high"),
+                    (r.Payload as Dictionary<string, string>) != null &&
+                    (r.Payload as Dictionary<string, string>)!.Count == metadata.Count &&
+                    (r.Payload as Dictionary<string, string>)!.ContainsKey("inputFile") &&
+                    (r.Payload as Dictionary<string, string>)!["inputFile"] == "data.csv" &&
+                    (r.Payload as Dictionary<string, string>)!.ContainsKey("outputFormat") &&
+                    (r.Payload as Dictionary<string, string>)!["outputFormat"] == "json" &&
+                    (r.Payload as Dictionary<string, string>)!.ContainsKey("priority") &&
+                    (r.Payload as Dictionary<string, string>)!["priority"] == "high"),
                 It.IsAny<CancellationToken>()),
             Times.Once);
     }
@@ -389,7 +392,9 @@ public class ProcessEndpointsTests : EndpointTestBase
         _processServiceMock.Verify(
             s => s.SubmitProcessAsync(
                 request.ClientId,
-                It.Is<SubmitProcessRequest>(r => r.Payload is Dictionary<string, string> dict && dict.Count == 0),
+                It.Is<SubmitProcessRequest>(r =>
+                    (r.Payload as Dictionary<string, string>) != null &&
+                    (r.Payload as Dictionary<string, string>)!.Count == 0),
                 It.IsAny<CancellationToken>()),
             Times.Once);
     }
@@ -662,7 +667,7 @@ public class ProcessEndpointsTests : EndpointTestBase
             "CreateProcessAsync",
             BindingFlags.NonPublic | BindingFlags.Static);
 
-        if (method is null)
+        if (method == null)
         {
             throw new InvalidOperationException("CreateProcessAsync method not found");
         }
@@ -681,7 +686,7 @@ public class ProcessEndpointsTests : EndpointTestBase
             "GetProcessByIdAsync",
             BindingFlags.NonPublic | BindingFlags.Static);
 
-        if (method is null)
+        if (method == null)
         {
             throw new InvalidOperationException("GetProcessByIdAsync method not found");
         }
@@ -703,7 +708,7 @@ public class ProcessEndpointsTests : EndpointTestBase
             "GetProcessByClientIdAsync",
             BindingFlags.NonPublic | BindingFlags.Static);
 
-        if (method is null)
+        if (method == null)
         {
             throw new InvalidOperationException("GetProcessByClientIdAsync method not found");
         }
