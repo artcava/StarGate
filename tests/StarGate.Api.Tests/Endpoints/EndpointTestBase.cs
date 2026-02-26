@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -51,14 +52,12 @@ public abstract class EndpointTestBase
 
     protected static T GetResultValue<T>(IResult result)
     {
-        var okResult = result as Ok<T>;
-        if (okResult != null)
+        if (result is Ok<T> okResult)
         {
             return okResult.Value!;
         }
 
-        var createdResult = result as Created<T>;
-        if (createdResult != null)
+        if (result is Created<T> createdResult)
         {
             return createdResult.Value!;
         }

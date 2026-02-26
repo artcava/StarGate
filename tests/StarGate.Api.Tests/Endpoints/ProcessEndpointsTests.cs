@@ -108,7 +108,9 @@ public class ProcessEndpointsTests : EndpointTestBase
             ClientProcessId = request.ClientProcessId,
             ProcessType = request.ProcessType,
             Status = ProcessStatus.Accepted,
-            CreatedAt = DateTime.UtcNow.AddMinutes(-5)
+            CreatedAt = DateTime.UtcNow.AddMinutes(-5),
+            UpdatedAt = DateTime.UtcNow.AddMinutes(-5),
+            IdempotencyKey = request.IdempotencyKey
         };
 
         _processServiceMock
@@ -134,9 +136,10 @@ public class ProcessEndpointsTests : EndpointTestBase
         // Arrange
         var request = new CreateProcessRequest
         {
-            ClientId = "different-client", // Different from user's client_id
+            ClientId = "different-client",
             ClientProcessId = "client-proc-123",
-            ProcessType = "DataTransformation"
+            ProcessType = "DataTransformation",
+            IdempotencyKey = "idempotency-123"
         };
 
         var user = CreateDefaultUser("test-client");
@@ -169,7 +172,9 @@ public class ProcessEndpointsTests : EndpointTestBase
             ClientProcessId = request.ClientProcessId,
             ProcessType = request.ProcessType,
             Status = ProcessStatus.Accepted,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+            IdempotencyKey = request.IdempotencyKey
         };
 
         _processServiceMock
@@ -211,7 +216,8 @@ public class ProcessEndpointsTests : EndpointTestBase
         {
             ClientId = "test-client",
             ClientProcessId = "client-proc-123",
-            ProcessType = "DataTransformation"
+            ProcessType = "DataTransformation",
+            IdempotencyKey = "idempotency-123"
         };
 
         _processServiceMock
@@ -226,10 +232,7 @@ public class ProcessEndpointsTests : EndpointTestBase
                 It.IsAny<string>(),
                 It.IsAny<SubmitProcessRequest>(),
                 It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new PolicyViolationException(
-                request.ClientId,
-                request.ProcessType,
-                "Rate limit exceeded"));
+            .ThrowsAsync(new PolicyViolationException("Rate limit exceeded for client test-client and process type DataTransformation"));
 
         var user = CreateDefaultUser(request.ClientId);
 
@@ -249,7 +252,8 @@ public class ProcessEndpointsTests : EndpointTestBase
         {
             ClientId = "test-client",
             ClientProcessId = "client-proc-123",
-            ProcessType = "DataTransformation"
+            ProcessType = "DataTransformation",
+            IdempotencyKey = "idempotency-123"
         };
 
         _processServiceMock
@@ -285,6 +289,7 @@ public class ProcessEndpointsTests : EndpointTestBase
             ClientId = "test-client",
             ClientProcessId = "client-proc-123",
             ProcessType = "DataTransformation",
+            IdempotencyKey = "idempotency-123",
             Metadata = metadata
         };
 
@@ -292,8 +297,12 @@ public class ProcessEndpointsTests : EndpointTestBase
         {
             ProcessId = Guid.NewGuid(),
             ClientId = request.ClientId,
+            ClientProcessId = request.ClientProcessId,
+            ProcessType = request.ProcessType,
             Status = ProcessStatus.Accepted,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+            IdempotencyKey = request.IdempotencyKey
         };
 
         _processServiceMock
@@ -321,9 +330,9 @@ public class ProcessEndpointsTests : EndpointTestBase
                 request.ClientId,
                 It.Is<SubmitProcessRequest>(r =>
                     r.Payload.Count == metadata.Count &&
-                    r.Payload["inputFile"] == "data.csv" &&
-                    r.Payload["outputFormat"] == "json" &&
-                    r.Payload["priority"] == "high"),
+                    r.Payload.ContainsKey("inputFile") && r.Payload["inputFile"] == "data.csv" &&
+                    r.Payload.ContainsKey("outputFormat") && r.Payload["outputFormat"] == "json" &&
+                    r.Payload.ContainsKey("priority") && r.Payload["priority"] == "high"),
                 It.IsAny<CancellationToken>()),
             Times.Once);
     }
@@ -337,15 +346,20 @@ public class ProcessEndpointsTests : EndpointTestBase
             ClientId = "test-client",
             ClientProcessId = "client-proc-123",
             ProcessType = "DataTransformation",
-            Metadata = null // Null metadata
+            IdempotencyKey = "idempotency-123",
+            Metadata = null
         };
 
         var expectedProcess = new Process
         {
             ProcessId = Guid.NewGuid(),
             ClientId = request.ClientId,
+            ClientProcessId = request.ClientProcessId,
+            ProcessType = request.ProcessType,
             Status = ProcessStatus.Accepted,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+            IdempotencyKey = request.IdempotencyKey
         };
 
         _processServiceMock
@@ -397,7 +411,8 @@ public class ProcessEndpointsTests : EndpointTestBase
             Status = ProcessStatus.Processing,
             Progress = 50,
             CreatedAt = DateTime.UtcNow.AddMinutes(-10),
-            UpdatedAt = DateTime.UtcNow
+            UpdatedAt = DateTime.UtcNow,
+            IdempotencyKey = "idempotency-123"
         };
 
         _processServiceMock
@@ -463,8 +478,12 @@ public class ProcessEndpointsTests : EndpointTestBase
         {
             ProcessId = processId,
             ClientId = "test-client",
+            ClientProcessId = "client-proc-123",
+            ProcessType = "DataTransformation",
             Status = ProcessStatus.Completed,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+            IdempotencyKey = "idempotency-123"
         };
 
         _processServiceMock
@@ -499,7 +518,8 @@ public class ProcessEndpointsTests : EndpointTestBase
             Status = ProcessStatus.Completed,
             Progress = 100,
             CreatedAt = DateTime.UtcNow.AddHours(-1),
-            UpdatedAt = DateTime.UtcNow
+            UpdatedAt = DateTime.UtcNow,
+            IdempotencyKey = "idempotency-order-123"
         };
 
         _processServiceMock
@@ -555,7 +575,7 @@ public class ProcessEndpointsTests : EndpointTestBase
         // Arrange
         var clientId = "different-client";
         var clientProcessId = "order-123";
-        var user = CreateDefaultUser("test-client"); // Different client
+        var user = CreateDefaultUser("test-client");
 
         // Act
         var result = await InvokeGetProcessByClientIdAsync(clientId, clientProcessId, user);
@@ -600,8 +620,11 @@ public class ProcessEndpointsTests : EndpointTestBase
             ProcessId = Guid.NewGuid(),
             ClientId = clientId,
             ClientProcessId = clientProcessId,
+            ProcessType = "OrderProcessing",
             Status = ProcessStatus.Accepted,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+            IdempotencyKey = "idempotency-order-123"
         };
 
         _processServiceMock
@@ -638,7 +661,7 @@ public class ProcessEndpointsTests : EndpointTestBase
             "CreateProcessAsync",
             BindingFlags.NonPublic | BindingFlags.Static);
 
-        if (method == null)
+        if (method is null)
         {
             throw new InvalidOperationException("CreateProcessAsync method not found");
         }
@@ -657,7 +680,7 @@ public class ProcessEndpointsTests : EndpointTestBase
             "GetProcessByIdAsync",
             BindingFlags.NonPublic | BindingFlags.Static);
 
-        if (method == null)
+        if (method is null)
         {
             throw new InvalidOperationException("GetProcessByIdAsync method not found");
         }
@@ -679,7 +702,7 @@ public class ProcessEndpointsTests : EndpointTestBase
             "GetProcessByClientIdAsync",
             BindingFlags.NonPublic | BindingFlags.Static);
 
-        if (method == null)
+        if (method is null)
         {
             throw new InvalidOperationException("GetProcessByClientIdAsync method not found");
         }
