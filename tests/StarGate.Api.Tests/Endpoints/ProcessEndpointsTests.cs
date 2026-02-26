@@ -667,7 +667,7 @@ public class ProcessEndpointsTests : EndpointTestBase
             "CreateProcessAsync",
             BindingFlags.NonPublic | BindingFlags.Static);
 
-        if (method == null)
+        if (method is null)
         {
             throw new InvalidOperationException("CreateProcessAsync method not found");
         }
@@ -686,7 +686,7 @@ public class ProcessEndpointsTests : EndpointTestBase
             "GetProcessByIdAsync",
             BindingFlags.NonPublic | BindingFlags.Static);
 
-        if (method == null)
+        if (method is null)
         {
             throw new InvalidOperationException("GetProcessByIdAsync method not found");
         }
@@ -708,7 +708,7 @@ public class ProcessEndpointsTests : EndpointTestBase
             "GetProcessByClientIdAsync",
             BindingFlags.NonPublic | BindingFlags.Static);
 
-        if (method == null)
+        if (method is null)
         {
             throw new InvalidOperationException("GetProcessByClientIdAsync method not found");
         }
