@@ -1,10 +1,10 @@
-namespace StarGate.Security.Tests;
-
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using System.Net;
 using System.Net.Http.Json;
 using Xunit;
+
+namespace StarGate.Security.Tests;
 
 public class InputValidationSecurityTests : SecurityTestBase
 {

@@ -1,11 +1,11 @@
-namespace StarGate.Security.Tests;
-
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using Xunit;
+
+namespace StarGate.Security.Tests;
 
 /// <summary>
 /// Base class for security tests providing JWT token generation and common utilities.

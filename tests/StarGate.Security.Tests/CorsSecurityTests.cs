@@ -1,9 +1,9 @@
-namespace StarGate.Security.Tests;
-
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using System.Net;
 using Xunit;
+
+namespace StarGate.Security.Tests;
 
 public class CorsSecurityTests : SecurityTestBase
 {
