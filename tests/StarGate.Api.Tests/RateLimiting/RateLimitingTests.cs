@@ -145,4 +145,40 @@ public class RateLimitingTests
         responses.Should().Contain(HttpStatusCode.OK);
         responses.Should().Contain(HttpStatusCode.TooManyRequests);
     }
+
+    [Fact]
+    public async Task DEBUG_VerifyRateLimitingIsWorking()
+    {
+        // Arrange - Configurazione ultra-restrittiva: solo 1 richiesta permessa
+        var configuration = new Dictionary<string, string?>
+        {
+            ["RateLimit:Enabled"] = "true",
+            ["RateLimit:DefaultPolicy:PermitLimit"] = "1",
+            ["RateLimit:DefaultPolicy:WindowSeconds"] = "60",
+            ["RateLimit:DefaultPolicy:QueueLimit"] = "0",
+            ["RateLimit:DefaultPolicy:UseSlidingWindow"] = "false",
+            ["RateLimit:EndpointPolicies:ReadProcess:PermitLimit"] = "1",
+            ["RateLimit:EndpointPolicies:ReadProcess:WindowSeconds"] = "60",
+            ["RateLimit:EndpointPolicies:ReadProcess:QueueLimit"] = "0",
+            ["RateLimit:EndpointPolicies:ReadProcess:UseSlidingWindow"] = "false"
+        };
+
+        await using var factory = new RateLimitTestFactory(configuration);
+        var client = factory.CreateClient();
+
+        // Act - Fai solo 3 richieste
+        var response1 = await client.GetAsync("/ratelimit-test");
+        var response2 = await client.GetAsync("/ratelimit-test");
+        var response3 = await client.GetAsync("/ratelimit-test");
+
+        // Debug output
+        Console.WriteLine($"Response 1: {response1.StatusCode}");
+        Console.WriteLine($"Response 2: {response2.StatusCode}");
+        Console.WriteLine($"Response 3: {response3.StatusCode}");
+
+        // Assert - La seconda richiesta DEVE essere 429
+        response1.StatusCode.Should().Be(HttpStatusCode.OK, "first request should succeed");
+        response2.StatusCode.Should().Be(HttpStatusCode.TooManyRequests, "second request should be rate limited");
+    }
+
 }

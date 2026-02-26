@@ -20,8 +20,8 @@ public class RateLimitTestFactory : WebApplicationFactory<Program>
     {
         builder.ConfigureAppConfiguration((context, config) =>
         {
-            // Clear existing configuration sources and add our test configuration
-            config.Sources.Clear();
+            // NON cancellare le sources, aggiungi solo la nostra configurazione
+            // che avrà priorità sulle altre
             config.AddInMemoryCollection(_configuration);
         });
     }
