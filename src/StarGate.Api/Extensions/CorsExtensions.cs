@@ -1,7 +1,7 @@
+namespace StarGate.Api.Extensions;
+
 using Microsoft.AspNetCore.Cors.Infrastructure;
 using StarGate.Api.Configuration;
-
-namespace StarGate.Api.Extensions;
 
 /// <summary>
 /// Extension methods for configuring CORS.
@@ -19,15 +19,15 @@ public static class CorsExtensions
         IConfiguration configuration,
         IWebHostEnvironment environment)
     {
-        var corsOptions = configuration.GetSection(CorsOptions.SectionName).Get<CorsOptions>()
-            ?? new CorsOptions();
+        var corsOptions = configuration.GetSection(ApiCorsOptions.SectionName).Get<ApiCorsOptions>()
+            ?? new ApiCorsOptions();
 
         if (!corsOptions.Enabled)
         {
             return services;
         }
 
-        services.Configure<CorsOptions>(configuration.GetSection(CorsOptions.SectionName));
+        services.Configure<ApiCorsOptions>(configuration.GetSection(ApiCorsOptions.SectionName));
 
         services.AddCors(options =>
         {
@@ -54,7 +54,7 @@ public static class CorsExtensions
 
     private static void ConfigureCorsPolicy(
         CorsPolicyBuilder builder,
-        CorsOptions options,
+        ApiCorsOptions options,
         IWebHostEnvironment environment)
     {
         // Configure origins

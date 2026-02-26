@@ -3,7 +3,7 @@ namespace StarGate.Api.Configuration;
 /// <summary>
 /// Configuration options for CORS.
 /// </summary>
-public class CorsOptions
+public class ApiCorsOptions
 {
     public const string SectionName = "Cors";
 
