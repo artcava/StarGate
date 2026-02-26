@@ -1,16 +1,14 @@
-namespace StarGate.Api.Tests.Cors;
-
 using FluentAssertions;
 using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using Moq;
 using StarGate.Api.Configuration;
 using StarGate.Api.Extensions;
-using Xunit;
+
+namespace StarGate.Api.Tests.Cors;
 
 public class CorsConfigurationTests
 {
