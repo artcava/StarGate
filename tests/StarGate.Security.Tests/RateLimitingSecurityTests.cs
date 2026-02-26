@@ -67,10 +67,7 @@ public class RateLimitingSecurityTests : SecurityTestBase
         }
 
         // Assert - If rate limited, should include Retry-After header
-        if (rateLimitedResponse != null)
-        {
-            rateLimitedResponse.Headers.Should().ContainKey("Retry-After");
-        }
+        rateLimitedResponse?.Headers.Should().ContainKey("Retry-After");
     }
 
     [Fact]
