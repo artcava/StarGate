@@ -4,6 +4,8 @@
 
 StarGate API implements rate limiting to protect against abuse, ensure fair resource usage, and prevent DoS attacks. Rate limits are applied per client based on JWT claims and configured policies.
 
+**Note**: Rate limiting functionality is built into ASP.NET Core 8.0 and doesn't require a separate NuGet package. The `Microsoft.AspNetCore.RateLimiting` namespace and `System.Threading.RateLimiting` types are part of the framework.
+
 ## Architecture
 
 ### Algorithms
@@ -116,6 +118,22 @@ Retry-After: 30
   "retryAfter": 30
 }
 ```
+
+## Implementation Details
+
+### Framework Integration
+
+Rate limiting in .NET 8.0 uses:
+- **Microsoft.AspNetCore.RateLimiting** namespace (built into framework)
+- **System.Threading.RateLimiting** for limiter implementations
+- No additional NuGet packages required
+
+### Extension Methods
+
+The implementation provides:
+- `AddApiRateLimiting()` - Registers rate limiting services
+- `RequireRateLimiting()` - Applies policy to endpoints
+- Custom `OnRejected` handler for 429 responses
 
 ## Testing
 
@@ -294,7 +312,8 @@ For multi-instance deployments, consider:
 2. **Shared limits** (recommended for production)
    - Use Redis as distributed cache
    - Consistent limits across all instances
-   - Requires additional package: `Microsoft.Extensions.Caching.StackExchangeRedis`
+   - Requires: `Microsoft.Extensions.Caching.StackExchangeRedis`
+   - Custom implementation using Redis for limiter state
 
 ## Security Best Practices
 
