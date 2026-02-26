@@ -6,6 +6,14 @@ This document describes the Cross-Origin Resource Sharing (CORS) configuration f
 
 CORS is a security feature implemented by web browsers that restricts web pages from making requests to a different domain than the one serving the web page. The StarGate API implements CORS middleware to allow controlled access from web browsers.
 
+## Architecture
+
+The CORS implementation consists of:
+
+- **`ApiCorsOptions`**: Type-safe configuration class for CORS settings
+- **`CorsExtensions`**: Extension methods to configure CORS policies
+- **`CorsHeadersMiddleware`**: Middleware to add custom correlation headers
+
 ## Configuration
 
 ### Development Environment
@@ -62,6 +70,8 @@ In production, CORS is configured with strict origin restrictions:
 ```
 
 ## Configuration Options
+
+The `ApiCorsOptions` class provides the following configuration options:
 
 ### Enabled
 - **Type**: `bool`
@@ -354,6 +364,33 @@ These headers must be listed in `ExposedHeaders` to be accessible by browser Jav
   "X-Correlation-Id",
   "X-Request-Id"
 ]
+```
+
+## Implementation Details
+
+### ApiCorsOptions Class
+
+The `ApiCorsOptions` class provides type-safe configuration:
+
+```csharp
+public class ApiCorsOptions
+{
+    public const string SectionName = "Cors";
+    public bool Enabled { get; init; } = true;
+    public List<string> AllowedOrigins { get; init; } = new();
+    public bool AllowAnyOrigin { get; init; } = false;
+    // ... other properties
+}
+```
+
+### CorsExtensions
+
+Extension methods for easy configuration:
+
+```csharp
+// In Program.cs
+builder.Services.AddApiCors(builder.Configuration, builder.Environment);
+app.UseApiCors();
 ```
 
 ## References
