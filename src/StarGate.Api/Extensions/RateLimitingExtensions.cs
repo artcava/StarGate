@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Options;
 using StarGate.Api.Configuration;
 
 namespace StarGate.Api.Extensions;
@@ -35,8 +36,15 @@ public static class RateLimitingExtensions
             // Configure global limiter
             options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
             {
+                var rateLimitConfig = context.RequestServices
+                        .GetRequiredService<IOptions<RateLimitOptions>>()
+                        .Value;
+                Console.WriteLine($"DEBUG: GlobalLimiter invoked for path: {context.Request.Path}");
                 // HARDCODE temporaneo per test: usa sempre lo stesso partition key
                 var clientId = "test-client-fixed";
+
+                Console.WriteLine($"DEBUG: Using clientId: {clientId}");
+                Console.WriteLine($"DEBUG: PermitLimit: {rateLimitOptions.DefaultPolicy.PermitLimit}");
 
                 // Originale (commentato temporaneamente):
                 // Partition by client ID from JWT
@@ -57,6 +65,9 @@ public static class RateLimitingExtensions
             // Add policy for process creation (more restrictive)
             options.AddPolicy("CreateProcess", context =>
             {
+                var rateLimitConfig = context.RequestServices
+                        .GetRequiredService<IOptions<RateLimitOptions>>()
+                        .Value;
                 // HARDCODE temporaneo per test: usa sempre lo stesso partition key
                 var clientId = "test-client-fixed";
 
@@ -115,6 +126,9 @@ public static class RateLimitingExtensions
             // Add policy for reading processes (less restrictive)
             options.AddPolicy("ReadProcess", context =>
             {
+                var rateLimitConfig = context.RequestServices
+                        .GetRequiredService<IOptions<RateLimitOptions>>()
+                        .Value;
                 // HARDCODE temporaneo per test: usa sempre lo stesso partition key
                 var clientId = "test-client-fixed";
 
