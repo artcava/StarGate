@@ -1,14 +1,16 @@
+namespace StarGate.Api.Tests.Cors;
+
 using FluentAssertions;
 using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Moq;
 using StarGate.Api.Configuration;
 using StarGate.Api.Extensions;
-
-namespace StarGate.Api.Tests.Cors;
+using Xunit;
 
 public class CorsConfigurationTests
 {
@@ -17,6 +19,7 @@ public class CorsConfigurationTests
     {
         // Arrange
         var services = new ServiceCollection();
+        services.AddLogging(); // Required for CorsService
         var configuration = CreateConfiguration();
         var environment = CreateEnvironment(Environments.Production);
 
@@ -34,6 +37,7 @@ public class CorsConfigurationTests
     {
         // Arrange
         var services = new ServiceCollection();
+        services.AddLogging(); // Required for CorsService
         var configData = new Dictionary<string, string?>
         {
             ["Cors:Enabled"] = "true",
@@ -63,6 +67,7 @@ public class CorsConfigurationTests
     {
         // Arrange
         var services = new ServiceCollection();
+        services.AddLogging(); // Required for CorsService
         var configData = new Dictionary<string, string?>
         {
             ["Cors:Enabled"] = "true",
@@ -87,6 +92,7 @@ public class CorsConfigurationTests
     {
         // Arrange
         var services = new ServiceCollection();
+        services.AddLogging(); // Required for CorsService
         var configData = new Dictionary<string, string?>
         {
             ["Cors:Enabled"] = "false"
@@ -110,6 +116,7 @@ public class CorsConfigurationTests
     {
         // Arrange
         var services = new ServiceCollection();
+        services.AddLogging(); // Required for CorsService
         var configData = new Dictionary<string, string?>
         {
             ["Cors:Enabled"] = "true",
@@ -138,6 +145,7 @@ public class CorsConfigurationTests
     {
         // Arrange
         var services = new ServiceCollection();
+        services.AddLogging(); // Required for CorsService
         var configuration = CreateConfiguration();
         var environment = CreateEnvironment(Environments.Development);
 
@@ -155,6 +163,7 @@ public class CorsConfigurationTests
     {
         // Arrange
         var services = new ServiceCollection();
+        services.AddLogging(); // Required for CorsService
         var configuration = CreateConfiguration();
         var environment = CreateEnvironment(Environments.Production);
 
