@@ -41,8 +41,8 @@ public class CorsConfigurationTests
         var configData = new Dictionary<string, string?>
         {
             ["Cors:Enabled"] = "true",
-            ["Cors:AllowAnyOrigin"] = "false",
-            ["Cors:AllowedOrigins:0"] = "" // Empty
+            ["Cors:AllowAnyOrigin"] = "false"
+            // No AllowedOrigins configured - empty list
         };
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(configData)
