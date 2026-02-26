@@ -2,6 +2,7 @@ using FluentValidation;
 using StarGate.Api.Endpoints;
 using StarGate.Api.Extensions;
 using StarGate.Api.Infrastructure;
+using StarGate.Api.Middleware;
 using StarGate.Api.Validators;
 using StarGate.Application;
 using StarGate.Core.Abstractions;
@@ -11,6 +12,9 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerWithJwt(); // Updated to include JWT
+
+// Add CORS
+builder.Services.AddApiCors(builder.Configuration, builder.Environment);
 
 // Add authentication
 builder.Services.AddJwtAuthentication(builder.Configuration);
@@ -54,6 +58,12 @@ app.UseGlobalExceptionHandling();
 
 app.UseHttpsRedirection();
 
+// Use CORS (must be before authentication and authorization)
+app.UseApiCors();
+
+// Add CORS headers middleware (for custom correlation headers)
+app.UseMiddleware<CorsHeadersMiddleware>();
+
 // Use rate limiting (before authentication to protect against abuse)
 app.UseRateLimiter();
 
@@ -68,7 +78,7 @@ app.MapGet("/", () => Results.Redirect("/swagger"))
 // Rate limiting test endpoint (for testing purposes)
 app.MapGet("/ratelimit-test", () => Results.Ok(new { message = "Rate limit test endpoint" }))
     .WithName("RateLimitTest")
-    // .RequireRateLimiting("ReadProcess")  // COMMENTATO temporaneamente
+    .RequireRateLimiting("ReadProcess")
     .ExcludeFromDescription();
 
 app.MapPolicyCacheEndpoints();
