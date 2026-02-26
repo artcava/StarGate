@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
@@ -28,8 +29,7 @@ public abstract class SecurityTestBase : IClassFixture<WebApplicationFactory<Pro
         {
             builder.ConfigureAppConfiguration((context, config) =>
             {
-                // Add in-memory configuration that matches JwtOptions structure
-                // JwtOptions.SectionName = "Jwt" (not "Authentication:Jwt")
+                // Add in-memory configuration
                 config.AddInMemoryCollection(new Dictionary<string, string?>
                 {
                     // JWT Configuration
@@ -46,12 +46,29 @@ public abstract class SecurityTestBase : IClassFixture<WebApplicationFactory<Pro
                     ["RateLimiting:CreateProcess:PermitLimit"] = "100",
                     ["RateLimiting:CreateProcess:Window"] = "00:01:00",
                     ["RateLimiting:ReadProcess:PermitLimit"] = "200",
-                    ["RateLimiting:ReadProcess:Window"] = "00:01:00",
-                    
-                    // CORS Configuration (permissive for tests)
-                    ["Cors:AllowedOrigins:0"] = "https://localhost:3000",
-                    ["Cors:AllowedOrigins:1"] = "http://localhost:3000",
-                    ["Cors:AllowCredentials"] = "true"
+                    ["RateLimiting:ReadProcess:Window"] = "00:01:00"
+                });
+            });
+            
+            builder.ConfigureServices(services =>
+            {
+                // Reconfigure JWT authentication with test settings
+                services.Configure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
+                {
+                    options.RequireHttpsMetadata = false;
+                    options.SaveToken = true;
+                    options.TokenValidationParameters = new TokenValidationParameters
+                    {
+                        ValidateIssuer = true,
+                        ValidateAudience = true,
+                        ValidateLifetime = true,
+                        ValidateIssuerSigningKey = true,
+                        ValidIssuer = TestIssuer,
+                        ValidAudience = TestAudience,
+                        IssuerSigningKey = new SymmetricSecurityKey(
+                            Encoding.UTF8.GetBytes(TestSecretKey)),
+                        ClockSkew = TimeSpan.FromSeconds(30)
+                    };
                 });
             });
             
