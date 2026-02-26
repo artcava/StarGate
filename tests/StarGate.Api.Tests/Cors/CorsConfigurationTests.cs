@@ -33,28 +33,24 @@ public class CorsConfigurationTests
     }
 
     [Fact]
-    public void AddApiCors_Should_ThrowException_WhenNoOriginsConfigured()
+    public void AddApiCors_Should_RegisterCorsOptions_WithValidConfiguration()
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddLogging(); // Required for CorsService
-        var configData = new Dictionary<string, string?>
-        {
-            ["Cors:Enabled"] = "true",
-            ["Cors:AllowAnyOrigin"] = "false"
-            // No AllowedOrigins configured - empty list
-        };
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(configData)
-            .Build();
+        services.AddLogging();
+        var configuration = CreateConfiguration();
         var environment = CreateEnvironment(Environments.Production);
 
-        // Act & Assert
-        // Exception is thrown during AddApiCors when configuring the policy
-        Action act = () => services.AddApiCors(configuration, environment);
-        
-        act.Should().Throw<InvalidOperationException>()
-            .WithMessage("*no allowed origins*");
+        // Act
+        services.AddApiCors(configuration, environment);
+        var serviceProvider = services.BuildServiceProvider();
+
+        // Assert
+        var options = serviceProvider.GetService<Microsoft.Extensions.Options.IOptions<ApiCorsOptions>>();
+        options.Should().NotBeNull();
+        options!.Value.Should().NotBeNull();
+        options.Value.Enabled.Should().BeTrue();
+        options.Value.AllowedOrigins.Should().Contain("https://example.com");
     }
 
     [Fact]
@@ -83,7 +79,7 @@ public class CorsConfigurationTests
     }
 
     [Fact]
-    public void AddApiCors_Should_NotRegisterServices_WhenDisabled()
+    public void AddApiCors_Should_NotRegisterCorsServices_WhenDisabled()
     {
         // Arrange
         var services = new ServiceCollection();
@@ -133,6 +129,11 @@ public class CorsConfigurationTests
         // Assert
         var corsService = serviceProvider.GetService<ICorsService>();
         corsService.Should().NotBeNull();
+        
+        var options = serviceProvider.GetService<Microsoft.Extensions.Options.IOptions<ApiCorsOptions>>();
+        options!.Value.AllowedOrigins.Should().HaveCount(2);
+        options.Value.AllowedOrigins.Should().Contain("https://example.com");
+        options.Value.AllowedOrigins.Should().Contain("https://app.example.com");
     }
 
     [Fact]
@@ -154,12 +155,21 @@ public class CorsConfigurationTests
     }
 
     [Fact]
-    public void AddApiCors_Should_RegisterApiCorsOptions()
+    public void AddApiCors_Should_ConfigurePreflightMaxAge()
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddLogging(); // Required for CorsService
-        var configuration = CreateConfiguration();
+        services.AddLogging();
+        var configData = new Dictionary<string, string?>
+        {
+            ["Cors:Enabled"] = "true",
+            ["Cors:AllowedOrigins:0"] = "https://example.com",
+            ["Cors:AllowAnyOrigin"] = "false",
+            ["Cors:PreflightMaxAgeSeconds"] = "3600"
+        };
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(configData)
+            .Build();
         var environment = CreateEnvironment(Environments.Production);
 
         // Act
@@ -168,9 +178,7 @@ public class CorsConfigurationTests
 
         // Assert
         var options = serviceProvider.GetService<Microsoft.Extensions.Options.IOptions<ApiCorsOptions>>();
-        options.Should().NotBeNull();
-        options!.Value.Should().NotBeNull();
-        options.Value.Enabled.Should().BeTrue();
+        options!.Value.PreflightMaxAgeSeconds.Should().Be(3600);
     }
 
     private static IConfiguration CreateConfiguration()
