@@ -29,15 +29,16 @@ public abstract class SecurityTestBase : IClassFixture<WebApplicationFactory<Pro
             builder.ConfigureAppConfiguration((context, config) =>
             {
                 // Add in-memory configuration that matches JwtOptions structure
+                // JwtOptions.SectionName = "Jwt" (not "Authentication:Jwt")
                 config.AddInMemoryCollection(new Dictionary<string, string?>
                 {
-                    // JWT Configuration matching JwtOptions.SectionName = "Authentication:Jwt"
-                    ["Authentication:Jwt:Issuer"] = TestIssuer,
-                    ["Authentication:Jwt:Audience"] = TestAudience,
-                    ["Authentication:Jwt:SecretKey"] = TestSecretKey,
-                    ["Authentication:Jwt:ValidateLifetime"] = "true",
-                    ["Authentication:Jwt:RequireHttpsMetadata"] = "false",
-                    ["Authentication:Jwt:ClockSkew"] = "00:00:30",
+                    // JWT Configuration
+                    ["Jwt:Issuer"] = TestIssuer,
+                    ["Jwt:Audience"] = TestAudience,
+                    ["Jwt:SecretKey"] = TestSecretKey,
+                    ["Jwt:ValidateLifetime"] = "true",
+                    ["Jwt:RequireHttpsMetadata"] = "false",
+                    ["Jwt:ClockSkew"] = "00:00:30",
                     
                     // Rate Limiting Configuration (relaxed for tests)
                     ["RateLimiting:GlobalFixedWindow:PermitLimit"] = "1000",
