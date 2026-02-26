@@ -12,6 +12,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerWithJwt(); // Updated to include JWT
 
+// Add CORS
+builder.Services.AddApiCors(builder.Configuration, builder.Environment);
+
 // Add authentication
 builder.Services.AddJwtAuthentication(builder.Configuration);
 builder.Services.AddAuthorization();
@@ -53,6 +56,9 @@ if (app.Environment.IsDevelopment())
 app.UseGlobalExceptionHandling();
 
 app.UseHttpsRedirection();
+
+// Use CORS (must be before authentication and authorization)
+app.UseApiCors();
 
 // Use rate limiting (before authentication to protect against abuse)
 app.UseRateLimiter();
