@@ -110,12 +110,16 @@ public static class RateLimitingExtensions
             {
                 context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
 
+                double? retryAfterSeconds = null;
+
                 if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
                 {
+                    retryAfterSeconds = retryAfter.TotalSeconds;
                     context.HttpContext.Response.Headers.RetryAfter = retryAfter.TotalSeconds.ToString(CultureInfo.InvariantCulture);
                 }
 
-                var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<RateLimitingExtensions>>();
+                var loggerFactory = context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>();
+                var logger = loggerFactory.CreateLogger("RateLimiting");
                 var clientId = context.HttpContext.User.GetClientId() ?? "anonymous";
 
                 logger.LogWarning(
@@ -130,7 +134,7 @@ public static class RateLimitingExtensions
                         title = "Too Many Requests",
                         status = StatusCodes.Status429TooManyRequests,
                         detail = "Rate limit exceeded. Please try again later.",
-                        retryAfter = retryAfter?.TotalSeconds
+                        retryAfter = retryAfterSeconds
                     },
                     cancellationToken: cancellationToken);
             };
