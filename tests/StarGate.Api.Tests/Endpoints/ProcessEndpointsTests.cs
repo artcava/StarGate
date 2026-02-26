@@ -329,10 +329,11 @@ public class ProcessEndpointsTests : EndpointTestBase
             s => s.SubmitProcessAsync(
                 request.ClientId,
                 It.Is<SubmitProcessRequest>(r =>
-                    r.Payload.Count == metadata.Count &&
-                    r.Payload.ContainsKey("inputFile") && r.Payload["inputFile"] == "data.csv" &&
-                    r.Payload.ContainsKey("outputFormat") && r.Payload["outputFormat"] == "json" &&
-                    r.Payload.ContainsKey("priority") && r.Payload["priority"] == "high"),
+                    r.Payload is Dictionary<string, string> dict &&
+                    dict.Count == metadata.Count &&
+                    dict.ContainsKey("inputFile") && dict["inputFile"] == "data.csv" &&
+                    dict.ContainsKey("outputFormat") && dict["outputFormat"] == "json" &&
+                    dict.ContainsKey("priority") && dict["priority"] == "high"),
                 It.IsAny<CancellationToken>()),
             Times.Once);
     }
@@ -388,7 +389,7 @@ public class ProcessEndpointsTests : EndpointTestBase
         _processServiceMock.Verify(
             s => s.SubmitProcessAsync(
                 request.ClientId,
-                It.Is<SubmitProcessRequest>(r => r.Payload.Count == 0),
+                It.Is<SubmitProcessRequest>(r => r.Payload is Dictionary<string, string> dict && dict.Count == 0),
                 It.IsAny<CancellationToken>()),
             Times.Once);
     }
