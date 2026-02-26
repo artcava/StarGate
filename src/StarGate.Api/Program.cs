@@ -16,6 +16,9 @@ builder.Services.AddSwaggerWithJwt(); // Updated to include JWT
 builder.Services.AddJwtAuthentication(builder.Configuration);
 builder.Services.AddAuthorization();
 
+// Add rate limiting
+builder.Services.AddApiRateLimiting(builder.Configuration);
+
 // Add global exception handling
 builder.Services.AddGlobalExceptionHandling();
 
@@ -51,12 +54,21 @@ app.UseGlobalExceptionHandling();
 
 app.UseHttpsRedirection();
 
+// Use rate limiting (before authentication to protect against abuse)
+app.UseRateLimiter();
+
 // Authentication & Authorization (order matters!)
 app.UseAuthentication();
 app.UseAuthorization();
 
 // Map endpoints
 app.MapGet("/", () => Results.Redirect("/swagger"))
+    .ExcludeFromDescription();
+
+// Rate limiting test endpoint (for testing purposes)
+app.MapGet("/ratelimit-test", () => Results.Ok(new { message = "Rate limit test endpoint" }))
+    .WithName("RateLimitTest")
+    // .RequireRateLimiting("ReadProcess")  // COMMENTATO temporaneamente
     .ExcludeFromDescription();
 
 app.MapPolicyCacheEndpoints();
