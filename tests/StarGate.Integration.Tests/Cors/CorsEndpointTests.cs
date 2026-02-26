@@ -112,7 +112,13 @@ public class CorsEndpointTests : IClassFixture<WebApplicationFactory<Program>>
 
         // Assert
         response.Headers.Should().ContainKey("X-Correlation-Id");
-        response.Headers.Should().ContainKey("X-Request-Id");
+        
+        // HTTP headers are case-insensitive per RFC 7230
+        // ASP.NET Core may normalize header names (e.g., X-Request-Id → X-Request-ID)
+        // Check for header existence regardless of casing
+        response.Headers.Keys.Should().Contain(
+            k => string.Equals(k, "X-Request-Id", StringComparison.OrdinalIgnoreCase),
+            "X-Request-Id header should be present (case-insensitive)");
     }
 
     [Fact]
