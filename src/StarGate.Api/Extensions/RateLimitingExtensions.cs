@@ -36,46 +36,38 @@ public static class RateLimitingExtensions
             // Configure global limiter
             options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
             {
+                // Read configuration at request time to support test configuration overrides
                 var rateLimitConfig = context.RequestServices
-                        .GetRequiredService<IOptions<RateLimitOptions>>()
-                        .Value;
-                Console.WriteLine($"DEBUG: GlobalLimiter invoked for path: {context.Request.Path}");
-                // HARDCODE temporaneo per test: usa sempre lo stesso partition key
-                var clientId = "test-client-fixed";
+                    .GetRequiredService<IOptions<RateLimitOptions>>()
+                    .Value;
 
-                Console.WriteLine($"DEBUG: Using clientId: {clientId}");
-                Console.WriteLine($"DEBUG: PermitLimit: {rateLimitOptions.DefaultPolicy.PermitLimit}");
-
-                // Originale (commentato temporaneamente):
                 // Partition by client ID from JWT
-                // var clientId = context.User.GetClientId() ?? context.Connection.RemoteIpAddress?.ToString() ?? "anonymous";
+                var clientId = context.User.GetClientId() ?? context.Connection.RemoteIpAddress?.ToString() ?? "anonymous";
 
                 return RateLimitPartition.GetSlidingWindowLimiter(
                     clientId,
                     _ => new SlidingWindowRateLimiterOptions
                     {
-                        PermitLimit = rateLimitOptions.DefaultPolicy.PermitLimit,
-                        Window = TimeSpan.FromSeconds(rateLimitOptions.DefaultPolicy.WindowSeconds),
+                        PermitLimit = rateLimitConfig.DefaultPolicy.PermitLimit,
+                        Window = TimeSpan.FromSeconds(rateLimitConfig.DefaultPolicy.WindowSeconds),
                         SegmentsPerWindow = 10,
                         QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-                        QueueLimit = rateLimitOptions.DefaultPolicy.QueueLimit
+                        QueueLimit = rateLimitConfig.DefaultPolicy.QueueLimit
                     });
             });
 
             // Add policy for process creation (more restrictive)
             options.AddPolicy("CreateProcess", context =>
             {
+                // Read configuration at request time to support test configuration overrides
                 var rateLimitConfig = context.RequestServices
-                        .GetRequiredService<IOptions<RateLimitOptions>>()
-                        .Value;
-                // HARDCODE temporaneo per test: usa sempre lo stesso partition key
-                var clientId = "test-client-fixed";
+                    .GetRequiredService<IOptions<RateLimitOptions>>()
+                    .Value;
 
-                // Originale (commentato temporaneamente):
-                // var clientId = context.User.GetClientId() ?? context.Connection.RemoteIpAddress?.ToString() ?? "anonymous";
+                var clientId = context.User.GetClientId() ?? context.Connection.RemoteIpAddress?.ToString() ?? "anonymous";
 
-                var policy = rateLimitOptions.EndpointPolicies.GetValueOrDefault("CreateProcess")
-                    ?? rateLimitOptions.DefaultPolicy;
+                var policy = rateLimitConfig.EndpointPolicies.GetValueOrDefault("CreateProcess")
+                    ?? rateLimitConfig.DefaultPolicy;
 
                 if (policy.UseSlidingWindow)
                 {
@@ -104,39 +96,18 @@ public static class RateLimitingExtensions
                 }
             });
 
-            //// Add policy for reading processes (less restrictive)
-            //options.AddPolicy("ReadProcess", context =>
-            //{
-            //    var clientId = context.User.GetClientId() ?? context.Connection.RemoteIpAddress?.ToString() ?? "anonymous";
-
-            //    var policy = rateLimitOptions.EndpointPolicies.GetValueOrDefault("ReadProcess")
-            //        ?? rateLimitOptions.DefaultPolicy;
-
-            //    return RateLimitPartition.GetSlidingWindowLimiter(
-            //        clientId,
-            //        _ => new SlidingWindowRateLimiterOptions
-            //        {
-            //            PermitLimit = policy.PermitLimit,
-            //            Window = TimeSpan.FromSeconds(policy.WindowSeconds),
-            //            SegmentsPerWindow = 10,
-            //            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-            //            QueueLimit = policy.QueueLimit
-            //        });
-            //});
             // Add policy for reading processes (less restrictive)
             options.AddPolicy("ReadProcess", context =>
             {
+                // Read configuration at request time to support test configuration overrides
                 var rateLimitConfig = context.RequestServices
-                        .GetRequiredService<IOptions<RateLimitOptions>>()
-                        .Value;
-                // HARDCODE temporaneo per test: usa sempre lo stesso partition key
-                var clientId = "test-client-fixed";
+                    .GetRequiredService<IOptions<RateLimitOptions>>()
+                    .Value;
 
-                // Originale (commentato temporaneamente):
-                // var clientId = context.User.GetClientId() ?? context.Connection.RemoteIpAddress?.ToString() ?? "anonymous";
+                var clientId = context.User.GetClientId() ?? context.Connection.RemoteIpAddress?.ToString() ?? "anonymous";
 
-                var policy = rateLimitOptions.EndpointPolicies.GetValueOrDefault("ReadProcess")
-                    ?? rateLimitOptions.DefaultPolicy;
+                var policy = rateLimitConfig.EndpointPolicies.GetValueOrDefault("ReadProcess")
+                    ?? rateLimitConfig.DefaultPolicy;
 
                 return RateLimitPartition.GetSlidingWindowLimiter(
                     clientId,
