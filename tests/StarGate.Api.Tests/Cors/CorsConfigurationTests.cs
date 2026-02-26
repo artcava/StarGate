@@ -1,3 +1,5 @@
+namespace StarGate.Api.Tests.Cors;
+
 using FluentAssertions;
 using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.Hosting;
@@ -9,8 +11,6 @@ using Moq;
 using StarGate.Api.Configuration;
 using StarGate.Api.Extensions;
 using Xunit;
-
-namespace StarGate.Api.Tests.Cors;
 
 public class CorsConfigurationTests
 {
@@ -49,15 +49,10 @@ public class CorsConfigurationTests
             .Build();
         var environment = CreateEnvironment(Environments.Production);
 
-        // Act
-        Action act = () =>
-        {
-            services.AddApiCors(configuration, environment);
-            var serviceProvider = services.BuildServiceProvider();
-            var corsService = serviceProvider.GetRequiredService<ICorsService>();
-        };
-
-        // Assert
+        // Act & Assert
+        // Exception is thrown during AddApiCors when configuring the policy
+        Action act = () => services.AddApiCors(configuration, environment);
+        
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*no allowed origins*");
     }
