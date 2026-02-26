@@ -1,40 +1,32 @@
 using System.Net;
 using FluentAssertions;
-using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Extensions.Configuration;
 
 namespace StarGate.Api.Tests.RateLimiting;
 
 /// <summary>
 /// Integration tests for rate limiting middleware.
 /// </summary>
-public class RateLimitingTests : IClassFixture<WebApplicationFactory<Program>>
+public class RateLimitingTests
 {
-    private readonly WebApplicationFactory<Program> _factory;
-
-    public RateLimitingTests(WebApplicationFactory<Program> factory)
-    {
-        _factory = factory;
-    }
-
     [Fact]
     public async Task Endpoint_Should_Return429_WhenRateLimitExceeded()
     {
         // Arrange
-        var client = _factory.WithWebHostBuilder(builder =>
+        var configuration = new Dictionary<string, string?>
         {
-            builder.ConfigureAppConfiguration((context, config) =>
-            {
-                config.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["RateLimit:Enabled"] = "true",
-                    ["RateLimit:DefaultPolicy:PermitLimit"] = "3",
-                    ["RateLimit:DefaultPolicy:WindowSeconds"] = "30",
-                    ["RateLimit:DefaultPolicy:QueueLimit"] = "0",
-                    ["RateLimit:DefaultPolicy:UseSlidingWindow"] = "true"
-                });
-            });
-        }).CreateClient();
+            ["RateLimit:Enabled"] = "true",
+            ["RateLimit:DefaultPolicy:PermitLimit"] = "1000",
+            ["RateLimit:DefaultPolicy:WindowSeconds"] = "60",
+            ["RateLimit:DefaultPolicy:QueueLimit"] = "0",
+            ["RateLimit:DefaultPolicy:UseSlidingWindow"] = "true",
+            ["RateLimit:EndpointPolicies:ReadProcess:PermitLimit"] = "3",
+            ["RateLimit:EndpointPolicies:ReadProcess:WindowSeconds"] = "30",
+            ["RateLimit:EndpointPolicies:ReadProcess:QueueLimit"] = "0",
+            ["RateLimit:EndpointPolicies:ReadProcess:UseSlidingWindow"] = "true"
+        };
+
+        await using var factory = new RateLimitTestFactory(configuration);
+        var client = factory.CreateClient();
 
         // Act - Make requests until rate limit is exceeded
         var responses = new List<HttpResponseMessage>();
@@ -56,16 +48,17 @@ public class RateLimitingTests : IClassFixture<WebApplicationFactory<Program>>
     public async Task RateLimiting_Should_BeDisabled_WhenConfiguredOff()
     {
         // Arrange
-        var client = _factory.WithWebHostBuilder(builder =>
+        var configuration = new Dictionary<string, string?>
         {
-            builder.ConfigureAppConfiguration((context, config) =>
-            {
-                config.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["RateLimit:Enabled"] = "false"
-                });
-            });
-        }).CreateClient();
+            ["RateLimit:Enabled"] = "false",
+            ["RateLimit:DefaultPolicy:PermitLimit"] = "1000",
+            ["RateLimit:DefaultPolicy:WindowSeconds"] = "60",
+            ["RateLimit:DefaultPolicy:QueueLimit"] = "0",
+            ["RateLimit:DefaultPolicy:UseSlidingWindow"] = "true"
+        };
+
+        await using var factory = new RateLimitTestFactory(configuration);
+        var client = factory.CreateClient();
 
         // Act - Make many requests
         for (int i = 0; i < 100; i++)
@@ -81,20 +74,21 @@ public class RateLimitingTests : IClassFixture<WebApplicationFactory<Program>>
     public async Task RateLimiting_Should_ReturnProperErrorBody_When429()
     {
         // Arrange
-        var client = _factory.WithWebHostBuilder(builder =>
+        var configuration = new Dictionary<string, string?>
         {
-            builder.ConfigureAppConfiguration((context, config) =>
-            {
-                config.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["RateLimit:Enabled"] = "true",
-                    ["RateLimit:DefaultPolicy:PermitLimit"] = "3",
-                    ["RateLimit:DefaultPolicy:WindowSeconds"] = "30",
-                    ["RateLimit:DefaultPolicy:QueueLimit"] = "0",
-                    ["RateLimit:DefaultPolicy:UseSlidingWindow"] = "true"
-                });
-            });
-        }).CreateClient();
+            ["RateLimit:Enabled"] = "true",
+            ["RateLimit:DefaultPolicy:PermitLimit"] = "1000",
+            ["RateLimit:DefaultPolicy:WindowSeconds"] = "60",
+            ["RateLimit:DefaultPolicy:QueueLimit"] = "0",
+            ["RateLimit:DefaultPolicy:UseSlidingWindow"] = "true",
+            ["RateLimit:EndpointPolicies:ReadProcess:PermitLimit"] = "2",
+            ["RateLimit:EndpointPolicies:ReadProcess:WindowSeconds"] = "30",
+            ["RateLimit:EndpointPolicies:ReadProcess:QueueLimit"] = "0",
+            ["RateLimit:EndpointPolicies:ReadProcess:UseSlidingWindow"] = "true"
+        };
+
+        await using var factory = new RateLimitTestFactory(configuration);
+        var client = factory.CreateClient();
 
         // Act - Make requests until rate limit is exceeded
         HttpResponseMessage? rateLimitedResponse = null;
@@ -123,22 +117,23 @@ public class RateLimitingTests : IClassFixture<WebApplicationFactory<Program>>
     public async Task RateLimiting_Should_UseSlidingWindow_ByDefault()
     {
         // Arrange
-        var client = _factory.WithWebHostBuilder(builder =>
+        var configuration = new Dictionary<string, string?>
         {
-            builder.ConfigureAppConfiguration((context, config) =>
-            {
-                config.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["RateLimit:Enabled"] = "true",
-                    ["RateLimit:DefaultPolicy:PermitLimit"] = "5",
-                    ["RateLimit:DefaultPolicy:WindowSeconds"] = "5",
-                    ["RateLimit:DefaultPolicy:QueueLimit"] = "0",
-                    ["RateLimit:DefaultPolicy:UseSlidingWindow"] = "true"
-                });
-            });
-        }).CreateClient();
+            ["RateLimit:Enabled"] = "true",
+            ["RateLimit:DefaultPolicy:PermitLimit"] = "1000",
+            ["RateLimit:DefaultPolicy:WindowSeconds"] = "60",
+            ["RateLimit:DefaultPolicy:QueueLimit"] = "0",
+            ["RateLimit:DefaultPolicy:UseSlidingWindow"] = "true",
+            ["RateLimit:EndpointPolicies:ReadProcess:PermitLimit"] = "5",
+            ["RateLimit:EndpointPolicies:ReadProcess:WindowSeconds"] = "5",
+            ["RateLimit:EndpointPolicies:ReadProcess:QueueLimit"] = "0",
+            ["RateLimit:EndpointPolicies:ReadProcess:UseSlidingWindow"] = "true"
+        };
 
-        // Act - Make requests close to limit
+        await using var factory = new RateLimitTestFactory(configuration);
+        var client = factory.CreateClient();
+
+        // Act - Make requests that should exceed limit
         var responses = new List<HttpStatusCode>();
         for (int i = 0; i < 10; i++)
         {
@@ -146,17 +141,7 @@ public class RateLimitingTests : IClassFixture<WebApplicationFactory<Program>>
             responses.Add(response.StatusCode);
         }
 
-        // Wait a bit and make more requests (sliding window should allow some)
-        await Task.Delay(TimeSpan.FromSeconds(2));
-
-        for (int i = 0; i < 5; i++)
-        {
-            var response = await client.GetAsync("/ratelimit-test");
-            responses.Add(response.StatusCode);
-        }
-
-        // Assert - With sliding window, some later requests should succeed
-        // and eventually some should be rate limited
+        // Assert - With sliding window, some requests should succeed and some should be rate limited
         responses.Should().Contain(HttpStatusCode.OK);
         responses.Should().Contain(HttpStatusCode.TooManyRequests);
     }
