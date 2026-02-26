@@ -1,7 +1,9 @@
+using Microsoft.Extensions.Options;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -63,10 +65,10 @@ public abstract class SecurityTestBase : IClassFixture<WebApplicationFactory<Pro
                         ValidateAudience = true,
                         ValidateLifetime = true,
                         ValidateIssuerSigningKey = true,
-                        ValidIssuer = TestIssuer,
-                        ValidAudience = TestAudience,
+                        ValidIssuer = _testIssuer,
+                        ValidAudience = _testAudience,
                         IssuerSigningKey = new SymmetricSecurityKey(
-                            Encoding.UTF8.GetBytes(TestSecretKey)),
+                            Encoding.UTF8.GetBytes(_testSecretKey)),
                         ClockSkew = TimeSpan.FromSeconds(30)
                     };
                 });
