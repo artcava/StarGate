@@ -1,12 +1,13 @@
+using System.Security.Claims;
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using StarGate.Api.Extensions;
 using StarGate.Api.Models;
 using StarGate.Contracts.Requests;
 using StarGate.Core.Abstractions;
 using StarGate.Core.Domain;
 using StarGate.Core.Exceptions;
-using System.Security.Claims;
 
 namespace StarGate.Api.Endpoints;
 
@@ -24,6 +25,7 @@ public static class ProcessEndpoints
         // POST /api/processes - Create a new process
         group.MapPost("/", CreateProcessAsync)
             .WithName("CreateProcess")
+            .RequireRateLimiting("CreateProcess") // Apply rate limiting policy
             .AddValidation<CreateProcessRequest>()
             .Produces<ProcessResponse>(StatusCodes.Status201Created)
             .Produces(StatusCodes.Status400BadRequest)
@@ -36,17 +38,21 @@ public static class ProcessEndpoints
         // GET /api/processes/{processId} - Get process by ID
         group.MapGet("/{processId:guid}", GetProcessByIdAsync)
             .WithName("GetProcessById")
+            .RequireRateLimiting("ReadProcess") // Apply rate limiting policy
             .Produces<ProcessResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status429TooManyRequests)
             .Produces(StatusCodes.Status404NotFound)
             .Produces(StatusCodes.Status500InternalServerError);
 
         // GET /api/processes/client/{clientId}/{clientProcessId} - Get process by client identifiers
         group.MapGet("/client/{clientId}/{clientProcessId}", GetProcessByClientIdAsync)
             .WithName("GetProcessByClientId")
+            .RequireRateLimiting("ReadProcess") // Apply rate limiting policy
             .Produces<ProcessResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status429TooManyRequests)
             .Produces(StatusCodes.Status404NotFound)
             .Produces(StatusCodes.Status500InternalServerError);
     }
