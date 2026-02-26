@@ -665,12 +665,7 @@ public class ProcessEndpointsTests : EndpointTestBase
         var endpointType = typeof(StarGate.Api.Endpoints.ProcessEndpoints);
         var method = endpointType.GetMethod(
             "CreateProcessAsync",
-            BindingFlags.NonPublic | BindingFlags.Static);
-
-        if (method is null)
-        {
-            throw new InvalidOperationException("CreateProcessAsync method not found");
-        }
+            BindingFlags.NonPublic | BindingFlags.Static) ?? throw new InvalidOperationException("CreateProcessAsync method not found");
 
         var result = await (Task<IResult>)method.Invoke(
             null,
@@ -684,12 +679,7 @@ public class ProcessEndpointsTests : EndpointTestBase
         var endpointType = typeof(StarGate.Api.Endpoints.ProcessEndpoints);
         var method = endpointType.GetMethod(
             "GetProcessByIdAsync",
-            BindingFlags.NonPublic | BindingFlags.Static);
-
-        if (method is null)
-        {
-            throw new InvalidOperationException("GetProcessByIdAsync method not found");
-        }
+            BindingFlags.NonPublic | BindingFlags.Static) ?? throw new InvalidOperationException("GetProcessByIdAsync method not found");
 
         var result = await (Task<IResult>)method.Invoke(
             null,
@@ -706,12 +696,7 @@ public class ProcessEndpointsTests : EndpointTestBase
         var endpointType = typeof(StarGate.Api.Endpoints.ProcessEndpoints);
         var method = endpointType.GetMethod(
             "GetProcessByClientIdAsync",
-            BindingFlags.NonPublic | BindingFlags.Static);
-
-        if (method is null)
-        {
-            throw new InvalidOperationException("GetProcessByClientIdAsync method not found");
-        }
+            BindingFlags.NonPublic | BindingFlags.Static) ?? throw new InvalidOperationException("GetProcessByClientIdAsync method not found");
 
         var result = await (Task<IResult>)method.Invoke(
             null,
