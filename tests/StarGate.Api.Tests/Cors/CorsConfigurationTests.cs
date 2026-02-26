@@ -1,3 +1,5 @@
+namespace StarGate.Api.Tests.Cors;
+
 using FluentAssertions;
 using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.Hosting;
@@ -8,8 +10,6 @@ using Moq;
 using StarGate.Api.Configuration;
 using StarGate.Api.Extensions;
 using Xunit;
-
-namespace StarGate.Api.Tests.Cors;
 
 public class CorsConfigurationTests
 {
@@ -149,6 +149,25 @@ public class CorsConfigurationTests
         // Assert
         var corsService = serviceProvider.GetService<ICorsService>();
         corsService.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void AddApiCors_Should_RegisterApiCorsOptions()
+    {
+        // Arrange
+        var services = new ServiceCollection();
+        var configuration = CreateConfiguration();
+        var environment = CreateEnvironment(Environments.Production);
+
+        // Act
+        services.AddApiCors(configuration, environment);
+        var serviceProvider = services.BuildServiceProvider();
+
+        // Assert
+        var options = serviceProvider.GetService<Microsoft.Extensions.Options.IOptions<ApiCorsOptions>>();
+        options.Should().NotBeNull();
+        options!.Value.Should().NotBeNull();
+        options.Value.Enabled.Should().BeTrue();
     }
 
     private static IConfiguration CreateConfiguration()
