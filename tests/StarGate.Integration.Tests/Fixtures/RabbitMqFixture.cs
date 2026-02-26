@@ -14,6 +14,7 @@ namespace StarGate.Integration.Tests.Fixtures;
 public class RabbitMqFixture : IAsyncLifetime
 {
     private readonly RabbitMqContainer _rabbitMqContainer;
+    private readonly object _channelLock = new();
     private IConnection? _connection;
     private RabbitMqBroker? _broker;
     private RabbitMqConsumer? _consumer;
@@ -106,19 +107,28 @@ public class RabbitMqFixture : IAsyncLifetime
     /// </summary>
     public void EnsureDlqBinding(string queueName)
     {
-        using var channel = _connection!.CreateModel();
-        try
+        lock (_channelLock)
         {
-            // Bind DLQ to DLX with routing key matching the source queue name
-            // This ensures rejected messages from 'queueName' are routed to DLQ
-            channel.QueueBind(
-                queue: Options.DeadLetterQueue,
-                exchange: Options.DeadLetterExchange,
-                routingKey: queueName);
-        }
-        catch
-        {
-            // Binding might already exist, ignore
+            // Verify connection is open before creating channel
+            if (_connection == null || !_connection.IsOpen)
+            {
+                throw new InvalidOperationException("RabbitMQ connection is not open");
+            }
+
+            using var channel = _connection.CreateModel();
+            try
+            {
+                // Bind DLQ to DLX with routing key matching the source queue name
+                // This ensures rejected messages from 'queueName' are routed to DLQ
+                channel.QueueBind(
+                    queue: Options.DeadLetterQueue,
+                    exchange: Options.DeadLetterExchange,
+                    routingKey: queueName);
+            }
+            catch (Exception ex) when (ex is not InvalidOperationException)
+            {
+                // Binding might already exist, ignore
+            }
         }
     }
 
@@ -127,14 +137,23 @@ public class RabbitMqFixture : IAsyncLifetime
     /// </summary>
     public void PurgeQueue(string queueName)
     {
-        using var channel = _connection!.CreateModel();
-        try
+        lock (_channelLock)
         {
-            channel.QueuePurge(queueName);
-        }
-        catch
-        {
-            // Queue might not exist, ignore
+            // Verify connection is open before creating channel
+            if (_connection == null || !_connection.IsOpen)
+            {
+                return; // Connection closed, nothing to purge
+            }
+
+            try
+            {
+                using var channel = _connection.CreateModel();
+                channel.QueuePurge(queueName);
+            }
+            catch
+            {
+                // Queue might not exist or channel error, ignore
+            }
         }
     }
 
@@ -143,9 +162,26 @@ public class RabbitMqFixture : IAsyncLifetime
     /// </summary>
     public uint GetMessageCount(string queueName)
     {
-        using var channel = _connection!.CreateModel();
-        var result = channel.QueueDeclarePassive(queueName);
-        return result.MessageCount;
+        lock (_channelLock)
+        {
+            // Verify connection is open before creating channel
+            if (_connection == null || !_connection.IsOpen)
+            {
+                return 0; // Connection closed, assume empty
+            }
+
+            try
+            {
+                using var channel = _connection.CreateModel();
+                var result = channel.QueueDeclarePassive(queueName);
+                return result.MessageCount;
+            }
+            catch
+            {
+                // Queue might not exist or channel error
+                return 0;
+            }
+        }
     }
 
     /// <summary>
@@ -153,14 +189,23 @@ public class RabbitMqFixture : IAsyncLifetime
     /// </summary>
     public void DeleteQueue(string queueName)
     {
-        using var channel = _connection!.CreateModel();
-        try
+        lock (_channelLock)
         {
-            channel.QueueDelete(queueName);
-        }
-        catch
-        {
-            // Queue might not exist, ignore
+            // Verify connection is open before creating channel
+            if (_connection == null || !_connection.IsOpen)
+            {
+                return; // Connection closed, nothing to delete
+            }
+
+            try
+            {
+                using var channel = _connection.CreateModel();
+                channel.QueueDelete(queueName);
+            }
+            catch
+            {
+                // Queue might not exist or channel error, ignore
+            }
         }
     }
 }
