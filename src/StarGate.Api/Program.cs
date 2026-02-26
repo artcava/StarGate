@@ -16,6 +16,9 @@ builder.Services.AddSwaggerWithJwt(); // Updated to include JWT
 builder.Services.AddJwtAuthentication(builder.Configuration);
 builder.Services.AddAuthorization();
 
+// Add rate limiting
+builder.Services.AddApiRateLimiting(builder.Configuration);
+
 // Add global exception handling
 builder.Services.AddGlobalExceptionHandling();
 
@@ -50,6 +53,9 @@ if (app.Environment.IsDevelopment())
 app.UseGlobalExceptionHandling();
 
 app.UseHttpsRedirection();
+
+// Use rate limiting (before authentication to protect against abuse)
+app.UseRateLimiter();
 
 // Authentication & Authorization (order matters!)
 app.UseAuthentication();
