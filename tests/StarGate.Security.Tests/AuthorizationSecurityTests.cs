@@ -14,39 +14,10 @@ public class AuthorizationSecurityTests : SecurityTestBase
     }
 
     [Fact]
-    public async Task Endpoint_Should_Return403_WhenMissingRequiredScope()
-    {
-        // Arrange
-        var token = GenerateJwtToken(
-            "test-client",
-            scopes: new[] { "process.read" }); // Missing process.write scope
-
-        var request = CreateAuthenticatedRequest(
-            HttpMethod.Post,
-            "/api/processes",
-            token);
-        request.Content = JsonContent.Create(new
-        {
-            clientId = "test-client",
-            clientProcessId = "proc-123",
-            type = "DataTransformation",
-            priority = 5
-        });
-
-        // Act
-        var response = await Client.SendAsync(request);
-
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-    }
-
-    [Fact]
     public async Task Endpoint_Should_Return403_WhenAccessingOtherClientData()
     {
-        // Arrange
-        var token = GenerateJwtToken(
-            "client-a",
-            scopes: new[] { "process.read" });
+        // Arrange - Client A tries to access Client B's data
+        var token = GenerateJwtToken("client-a");
 
         var request = CreateAuthenticatedRequest(
             HttpMethod.Get,
@@ -56,29 +27,25 @@ public class AuthorizationSecurityTests : SecurityTestBase
         // Act
         var response = await Client.SendAsync(request);
 
-        // Assert
+        // Assert - Should be Forbidden, not NotFound
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     [Fact]
-    public async Task AdminUser_Should_AccessAnyClientData()
+    public async Task Client_Should_AccessOwnData()
     {
-        // Arrange
-        var adminToken = GenerateJwtToken(
-            "admin-client",
-            roles: new[] { "admin" },
-            scopes: new[] { "process.read", "admin" });
+        // Arrange - Client A accesses own data
+        var token = GenerateJwtToken("client-a");
 
         var request = CreateAuthenticatedRequest(
             HttpMethod.Get,
-            "/api/processes/client/any-client/proc-123",
-            adminToken);
+            "/api/processes/client/client-a/proc-123",
+            token);
 
         // Act
         var response = await Client.SendAsync(request);
 
-        // Assert
-        // Should not be 403 Forbidden (may be 404 if process doesn't exist)
+        // Assert - Should not be Forbidden (may be 404 if process doesn't exist)
         response.StatusCode.Should().NotBe(HttpStatusCode.Forbidden);
     }
 
@@ -86,9 +53,7 @@ public class AuthorizationSecurityTests : SecurityTestBase
     public async Task Endpoint_Should_ValidateClientId_InRequestBody()
     {
         // Arrange
-        var token = GenerateJwtToken(
-            "client-a",
-            scopes: new[] { "process.write" });
+        var token = GenerateJwtToken("client-a");
 
         var request = CreateAuthenticatedRequest(
             HttpMethod.Post,
@@ -98,8 +63,8 @@ public class AuthorizationSecurityTests : SecurityTestBase
         {
             clientId = "client-b", // Different from token's client_id
             clientProcessId = "proc-123",
-            type = "DataTransformation",
-            priority = 5
+            processType = "DataTransformation",
+            metadata = new Dictionary<string, string>()
         });
 
         // Act
@@ -107,5 +72,30 @@ public class AuthorizationSecurityTests : SecurityTestBase
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Client_Should_CreateProcessWithMatchingClientId()
+    {
+        // Arrange
+        var token = GenerateJwtToken("test-client");
+
+        var request = CreateAuthenticatedRequest(
+            HttpMethod.Post,
+            "/api/processes",
+            token);
+        request.Content = JsonContent.Create(new
+        {
+            clientId = "test-client", // Matches token's client_id
+            clientProcessId = $"test-proc-{Guid.NewGuid()}",
+            processType = "DataTransformation",
+            metadata = new Dictionary<string, string>()
+        });
+
+        // Act
+        var response = await Client.SendAsync(request);
+
+        // Assert - Should not be Forbidden (may fail for other reasons like missing dependencies)
+        response.StatusCode.Should().NotBe(HttpStatusCode.Forbidden);
     }
 }

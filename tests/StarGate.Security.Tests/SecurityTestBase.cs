@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using Xunit;
 
 namespace StarGate.Security.Tests;
 
@@ -17,8 +17,23 @@ public abstract class SecurityTestBase : IClassFixture<WebApplicationFactory<Pro
 
     protected SecurityTestBase(WebApplicationFactory<Program> factory)
     {
-        Factory = factory;
-        Client = factory.CreateClient();
+        // Configure test factory with in-memory configuration
+        Factory = factory.WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureAppConfiguration((context, config) =>
+            {
+                config.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Authentication:Schemes:Bearer:ValidIssuer"] = "test-issuer",
+                    ["Authentication:Schemes:Bearer:ValidAudience"] = "test-audience",
+                    ["Authentication:Schemes:Bearer:SigningKey"] = "test-secret-key-at-least-32-characters-long",
+                    ["RateLimiting:GlobalFixedWindow:PermitLimit"] = "100",
+                    ["RateLimiting:GlobalFixedWindow:Window"] = "00:01:00"
+                });
+            });
+        });
+        
+        Client = Factory.CreateClient();
     }
 
     protected string GenerateJwtToken(
