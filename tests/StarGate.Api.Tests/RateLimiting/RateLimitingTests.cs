@@ -28,8 +28,8 @@ public class RateLimitingTests : IClassFixture<WebApplicationFactory<Program>>
                 config.AddInMemoryCollection(new Dictionary<string, string?>
                 {
                     ["RateLimit:Enabled"] = "true",
-                    ["RateLimit:DefaultPolicy:PermitLimit"] = "5",
-                    ["RateLimit:DefaultPolicy:WindowSeconds"] = "60",
+                    ["RateLimit:DefaultPolicy:PermitLimit"] = "3",
+                    ["RateLimit:DefaultPolicy:WindowSeconds"] = "30",
                     ["RateLimit:DefaultPolicy:QueueLimit"] = "0",
                     ["RateLimit:DefaultPolicy:UseSlidingWindow"] = "true"
                 });
@@ -40,7 +40,7 @@ public class RateLimitingTests : IClassFixture<WebApplicationFactory<Program>>
         var responses = new List<HttpResponseMessage>();
         for (int i = 0; i < 10; i++)
         {
-            var response = await client.GetAsync("/health/live");
+            var response = await client.GetAsync("/ratelimit-test");
             responses.Add(response);
         }
 
@@ -70,7 +70,7 @@ public class RateLimitingTests : IClassFixture<WebApplicationFactory<Program>>
         // Act - Make many requests
         for (int i = 0; i < 100; i++)
         {
-            var response = await client.GetAsync("/health/live");
+            var response = await client.GetAsync("/ratelimit-test");
 
             // Assert - No rate limiting
             response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -89,7 +89,7 @@ public class RateLimitingTests : IClassFixture<WebApplicationFactory<Program>>
                 {
                     ["RateLimit:Enabled"] = "true",
                     ["RateLimit:DefaultPolicy:PermitLimit"] = "3",
-                    ["RateLimit:DefaultPolicy:WindowSeconds"] = "60",
+                    ["RateLimit:DefaultPolicy:WindowSeconds"] = "30",
                     ["RateLimit:DefaultPolicy:QueueLimit"] = "0",
                     ["RateLimit:DefaultPolicy:UseSlidingWindow"] = "true"
                 });
@@ -100,7 +100,7 @@ public class RateLimitingTests : IClassFixture<WebApplicationFactory<Program>>
         HttpResponseMessage? rateLimitedResponse = null;
         for (int i = 0; i < 10; i++)
         {
-            var response = await client.GetAsync("/health/live");
+            var response = await client.GetAsync("/ratelimit-test");
             if (response.StatusCode == HttpStatusCode.TooManyRequests)
             {
                 rateLimitedResponse = response;
@@ -130,8 +130,8 @@ public class RateLimitingTests : IClassFixture<WebApplicationFactory<Program>>
                 config.AddInMemoryCollection(new Dictionary<string, string?>
                 {
                     ["RateLimit:Enabled"] = "true",
-                    ["RateLimit:DefaultPolicy:PermitLimit"] = "10",
-                    ["RateLimit:DefaultPolicy:WindowSeconds"] = "10",
+                    ["RateLimit:DefaultPolicy:PermitLimit"] = "5",
+                    ["RateLimit:DefaultPolicy:WindowSeconds"] = "5",
                     ["RateLimit:DefaultPolicy:QueueLimit"] = "0",
                     ["RateLimit:DefaultPolicy:UseSlidingWindow"] = "true"
                 });
@@ -142,7 +142,7 @@ public class RateLimitingTests : IClassFixture<WebApplicationFactory<Program>>
         var responses = new List<HttpStatusCode>();
         for (int i = 0; i < 10; i++)
         {
-            var response = await client.GetAsync("/health/live");
+            var response = await client.GetAsync("/ratelimit-test");
             responses.Add(response.StatusCode);
         }
 
@@ -151,7 +151,7 @@ public class RateLimitingTests : IClassFixture<WebApplicationFactory<Program>>
 
         for (int i = 0; i < 5; i++)
         {
-            var response = await client.GetAsync("/health/live");
+            var response = await client.GetAsync("/ratelimit-test");
             responses.Add(response.StatusCode);
         }
 

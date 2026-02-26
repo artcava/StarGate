@@ -65,6 +65,12 @@ app.UseAuthorization();
 app.MapGet("/", () => Results.Redirect("/swagger"))
     .ExcludeFromDescription();
 
+// Rate limiting test endpoint (for testing purposes)
+app.MapGet("/ratelimit-test", () => Results.Ok(new { message = "Rate limit test endpoint" }))
+    .WithName("RateLimitTest")
+    .RequireRateLimiting("ReadProcess")
+    .ExcludeFromDescription();
+
 app.MapPolicyCacheEndpoints();
 app.MapProcessEndpoints();
 
