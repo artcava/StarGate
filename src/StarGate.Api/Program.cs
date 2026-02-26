@@ -2,6 +2,7 @@ using FluentValidation;
 using StarGate.Api.Endpoints;
 using StarGate.Api.Extensions;
 using StarGate.Api.Infrastructure;
+using StarGate.Api.Middleware;
 using StarGate.Api.Validators;
 using StarGate.Application;
 using StarGate.Core.Abstractions;
@@ -59,6 +60,9 @@ app.UseHttpsRedirection();
 
 // Use CORS (must be before authentication and authorization)
 app.UseApiCors();
+
+// Add CORS headers middleware (for custom correlation headers)
+app.UseMiddleware<CorsHeadersMiddleware>();
 
 // Use rate limiting (before authentication to protect against abuse)
 app.UseRateLimiter();
