@@ -1,7 +1,7 @@
-namespace StarGate.Api.Extensions;
-
 using Microsoft.AspNetCore.Cors.Infrastructure;
 using StarGate.Api.Configuration;
+
+namespace StarGate.Api.Extensions;
 
 /// <summary>
 /// Extension methods for configuring CORS.

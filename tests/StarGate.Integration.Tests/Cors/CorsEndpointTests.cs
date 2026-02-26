@@ -1,10 +1,10 @@
-namespace StarGate.Integration.Tests.Cors;
-
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using System.Net;
 using System.Net.Http.Headers;
 using Xunit;
+
+namespace StarGate.Integration.Tests.Cors;
 
 public class CorsEndpointTests : IClassFixture<WebApplicationFactory<Program>>
 {
