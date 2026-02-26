@@ -17,12 +17,11 @@ public class InputValidationSecurityTests : SecurityTestBase
     [InlineData("<script>alert('xss')</script>")]
     [InlineData("'; DROP TABLE Processes; --")]
     [InlineData("../../../etc/passwd")]
+    [InlineData("")]
     public async Task Endpoint_Should_RejectMaliciousInput(string maliciousInput)
     {
         // Arrange
-        var token = GenerateJwtToken(
-            "test-client",
-            scopes: new[] { "process.write" });
+        var token = GenerateJwtToken("test-client");
 
         var request = CreateAuthenticatedRequest(
             HttpMethod.Post,
@@ -32,24 +31,23 @@ public class InputValidationSecurityTests : SecurityTestBase
         {
             clientId = "test-client",
             clientProcessId = maliciousInput,
-            type = "DataTransformation",
-            priority = 5
+            processType = "DataTransformation",
+            metadata = new Dictionary<string, string>()
         });
 
         // Act
         var response = await Client.SendAsync(request);
 
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        // Assert - Should reject with BadRequest
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest,
+            $"malicious input '{maliciousInput}' should be rejected");
     }
 
     [Fact]
     public async Task Endpoint_Should_ValidateStringLength()
     {
         // Arrange
-        var token = GenerateJwtToken(
-            "test-client",
-            scopes: new[] { "process.write" });
+        var token = GenerateJwtToken("test-client");
 
         var request = CreateAuthenticatedRequest(
             HttpMethod.Post,
@@ -59,27 +57,23 @@ public class InputValidationSecurityTests : SecurityTestBase
         {
             clientId = "test-client",
             clientProcessId = new string('x', 300), // Exceeds max length
-            type = "DataTransformation",
-            priority = 5
+            processType = "DataTransformation",
+            metadata = new Dictionary<string, string>()
         });
 
         // Act
         var response = await Client.SendAsync(request);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest,
+            "overly long input should be rejected");
     }
 
-    [Theory]
-    [InlineData(-1)]
-    [InlineData(0)]
-    [InlineData(11)]
-    public async Task Endpoint_Should_ValidatePriorityRange(int invalidPriority)
+    [Fact]
+    public async Task Endpoint_Should_RequireValidProcessType()
     {
         // Arrange
-        var token = GenerateJwtToken(
-            "test-client",
-            scopes: new[] { "process.write" });
+        var token = GenerateJwtToken("test-client");
 
         var request = CreateAuthenticatedRequest(
             HttpMethod.Post,
@@ -88,15 +82,46 @@ public class InputValidationSecurityTests : SecurityTestBase
         request.Content = JsonContent.Create(new
         {
             clientId = "test-client",
-            clientProcessId = "proc-123",
-            type = "DataTransformation",
-            priority = invalidPriority
+            clientProcessId = "valid-id",
+            processType = "InvalidType12345", // Invalid process type
+            metadata = new Dictionary<string, string>()
         });
 
         // Act
         var response = await Client.SendAsync(request);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest,
+            "invalid process type should be rejected");
+    }
+
+    [Fact]
+    public async Task Endpoint_Should_AcceptValidInput()
+    {
+        // Arrange
+        var token = GenerateJwtToken("test-client");
+
+        var request = CreateAuthenticatedRequest(
+            HttpMethod.Post,
+            "/api/processes",
+            token);
+        request.Content = JsonContent.Create(new
+        {
+            clientId = "test-client",
+            clientProcessId = $"valid-proc-{Guid.NewGuid()}",
+            processType = "DataTransformation",
+            metadata = new Dictionary<string, string>
+            {
+                ["source"] = "test",
+                ["target"] = "validation"
+            }
+        });
+
+        // Act
+        var response = await Client.SendAsync(request);
+
+        // Assert - Should not be BadRequest (may fail for other reasons like missing services)
+        response.StatusCode.Should().NotBe(HttpStatusCode.BadRequest,
+            "valid input should pass validation");
     }
 }
