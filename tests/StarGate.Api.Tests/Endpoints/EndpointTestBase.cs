@@ -1,10 +1,10 @@
-namespace StarGate.Api.Tests.Endpoints;
-
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Moq;
 using System.Security.Claims;
+
+namespace StarGate.Api.Tests.Endpoints;
 
 /// <summary>
 /// Base class for endpoint tests providing common test utilities.

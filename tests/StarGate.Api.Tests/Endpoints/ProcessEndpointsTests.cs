@@ -1,5 +1,3 @@
-namespace StarGate.Api.Tests.Endpoints;
-
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
@@ -11,6 +9,8 @@ using StarGate.Core.Domain;
 using StarGate.Core.Exceptions;
 using System.Reflection;
 using System.Security.Claims;
+
+namespace StarGate.Api.Tests.Endpoints;
 
 public class ProcessEndpointsTests : EndpointTestBase
 {
