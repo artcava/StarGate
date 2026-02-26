@@ -15,7 +15,7 @@ public class RateLimitOptions
     /// <summary>
     /// Default rate limit configuration.
     /// </summary>
-    public required RateLimitPolicy DefaultPolicy { get; init; }
+    public RateLimitPolicy DefaultPolicy { get; init; } = new();
 
     /// <summary>
     /// Rate limit policies per endpoint.
