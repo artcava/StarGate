@@ -1,11 +1,11 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using Xunit;
 
 namespace StarGate.Security.Tests;
 
@@ -17,9 +17,9 @@ public abstract class SecurityTestBase : IClassFixture<WebApplicationFactory<Pro
     protected WebApplicationFactory<Program> Factory { get; }
     protected HttpClient Client { get; }
     
-    private const string TestSecretKey = "test-secret-key-at-least-32-characters-long-for-jwt-signing";
-    private const string TestIssuer = "test-issuer";
-    private const string TestAudience = "test-audience";
+    private const string _testSecretKey = "test-secret-key-at-least-32-characters-long-for-jwt-signing";
+    private const string _testIssuer = "test-issuer";
+    private const string _testAudience = "test-audience";
 
     protected SecurityTestBase(WebApplicationFactory<Program> factory)
     {
@@ -33,9 +33,9 @@ public abstract class SecurityTestBase : IClassFixture<WebApplicationFactory<Pro
                 config.AddInMemoryCollection(new Dictionary<string, string?>
                 {
                     // JWT Configuration
-                    ["Jwt:Issuer"] = TestIssuer,
-                    ["Jwt:Audience"] = TestAudience,
-                    ["Jwt:SecretKey"] = TestSecretKey,
+                    ["Jwt:Issuer"] = _testIssuer,
+                    ["Jwt:Audience"] = _testAudience,
+                    ["Jwt:SecretKey"] = _testSecretKey,
                     ["Jwt:ValidateLifetime"] = "true",
                     ["Jwt:RequireHttpsMetadata"] = "false",
                     ["Jwt:ClockSkew"] = "00:00:30",
@@ -87,12 +87,12 @@ public abstract class SecurityTestBase : IClassFixture<WebApplicationFactory<Pro
             claims.Add(new Claim("scope", string.Join(" ", scopes)));
         }
 
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(TestSecretKey));
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_testSecretKey));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
         var token = new JwtSecurityToken(
-            issuer: TestIssuer,
-            audience: TestAudience,
+            issuer: _testIssuer,
+            audience: _testAudience,
             claims: claims,
             expires: DateTime.UtcNow.Add(expiration ?? TimeSpan.FromHours(1)),
             signingCredentials: credentials);
