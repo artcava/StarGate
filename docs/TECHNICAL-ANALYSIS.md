@@ -324,9 +324,9 @@ StarGate/
 #### Sprint 5.2: Security
 - [x] Configure JWT authentication
 - [x] Implement authorization policies
-- [ ] Add rate limiting
-- [ ] Configure CORS
-- [ ] Security testing
+- [x] Add rate limiting
+- [x] Configure CORS
+- [x] Security testing
 
 ### Phase 6: Business Logic (Week 8)
 
