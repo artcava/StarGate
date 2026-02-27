@@ -101,9 +101,10 @@ public interface IProcessService
     /// <param name="processId">Process identifier.</param>
     /// <param name="newStatus">New status to set.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The updated process.</returns>
     /// <exception cref="StarGate.Core.Exceptions.ProcessNotFoundException">If process not found.</exception>
     /// <exception cref="StarGate.Core.Exceptions.InvalidStateTransitionException">If state transition is not allowed.</exception>
-    public Task UpdateProcessStatusAsync(
+    public Task<Process> UpdateProcessStatusAsync(
         Guid processId,
         ProcessStatus newStatus,
         CancellationToken cancellationToken = default);
@@ -114,9 +115,10 @@ public interface IProcessService
     /// </summary>
     /// <param name="processId">Process identifier.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The updated process.</returns>
     /// <exception cref="StarGate.Core.Exceptions.ProcessNotFoundException">If process not found.</exception>
     /// <exception cref="StarGate.Core.Exceptions.InvalidStateTransitionException">If state transition is not allowed.</exception>
-    public Task TransitionToProcessingAsync(
+    public Task<Process> TransitionToProcessingAsync(
         Guid processId,
         CancellationToken cancellationToken = default);
 
@@ -126,9 +128,10 @@ public interface IProcessService
     /// </summary>
     /// <param name="processId">Process identifier.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The completed process.</returns>
     /// <exception cref="StarGate.Core.Exceptions.ProcessNotFoundException">If process not found.</exception>
     /// <exception cref="StarGate.Core.Exceptions.InvalidStateTransitionException">If state transition is not allowed.</exception>
-    public Task CompleteProcessAsync(
+    public Task<Process> CompleteProcessAsync(
         Guid processId,
         CancellationToken cancellationToken = default);
 
@@ -141,8 +144,9 @@ public interface IProcessService
     /// <param name="errorMessage">Human-readable error message.</param>
     /// <param name="canRetry">Indicates if the error is retryable.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The updated process.</returns>
     /// <exception cref="StarGate.Core.Exceptions.ProcessNotFoundException">If process not found.</exception>
-    public Task FailProcessAsync(
+    public Task<Process> FailProcessAsync(
         Guid processId,
         string errorCode,
         string errorMessage,
@@ -156,9 +160,10 @@ public interface IProcessService
     /// <param name="processId">Process identifier.</param>
     /// <param name="reason">Reason for rejection.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The rejected process.</returns>
     /// <exception cref="StarGate.Core.Exceptions.ProcessNotFoundException">If process not found.</exception>
     /// <exception cref="StarGate.Core.Exceptions.InvalidStateTransitionException">If state transition is not allowed.</exception>
-    public Task RejectProcessAsync(
+    public Task<Process> RejectProcessAsync(
         Guid processId,
         string reason,
         CancellationToken cancellationToken = default);
@@ -172,9 +177,10 @@ public interface IProcessService
     /// <param name="processId">Process identifier.</param>
     /// <param name="progress">Progress percentage (0-100).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The updated process.</returns>
     /// <exception cref="StarGate.Core.Exceptions.ProcessNotFoundException">If process not found.</exception>
     /// <exception cref="System.ArgumentOutOfRangeException">If progress is not between 0 and 100.</exception>
-    public Task UpdateProcessProgressAsync(
+    public Task<Process> UpdateProcessProgressAsync(
         Guid processId,
         int progress,
         CancellationToken cancellationToken = default);
@@ -190,8 +196,9 @@ public interface IProcessService
     /// <param name="message">Human-readable error message.</param>
     /// <param name="retryable">Indicates if this error is retryable.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The updated process.</returns>
     /// <exception cref="StarGate.Core.Exceptions.ProcessNotFoundException">If process not found.</exception>
-    public Task RecordProcessErrorAsync(
+    public Task<Process> RecordProcessErrorAsync(
         Guid processId,
         string errorCode,
         string message,
@@ -203,8 +210,9 @@ public interface IProcessService
     /// </summary>
     /// <param name="processId">Process identifier.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The updated process.</returns>
     /// <exception cref="StarGate.Core.Exceptions.ProcessNotFoundException">If process not found.</exception>
-    public Task IncrementRetryCountAsync(
+    public Task<Process> IncrementRetryCountAsync(
         Guid processId,
         CancellationToken cancellationToken = default);
 
@@ -215,8 +223,9 @@ public interface IProcessService
     /// </summary>
     /// <param name="processId">Process identifier.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The process (updated if timed out, unchanged otherwise).</returns>
     /// <exception cref="StarGate.Core.Exceptions.ProcessNotFoundException">If process not found.</exception>
-    public Task CheckTimeoutAsync(
+    public Task<Process> CheckTimeoutAsync(
         Guid processId,
         CancellationToken cancellationToken = default);
 }
