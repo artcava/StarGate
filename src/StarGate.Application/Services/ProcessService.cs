@@ -221,7 +221,7 @@ public class ProcessService : IProcessService
                 {
                     Status = ProcessStatus.Failed,
                     UpdatedAt = DateTime.UtcNow,
-                    CompletedAt = DateTime.UtcNow
+                    FailedAt = DateTime.UtcNow
                 };
 
                 await _processRepository.UpdateAsync(failedProcess, cancellationToken);
@@ -411,7 +411,7 @@ public class ProcessService : IProcessService
     }
 
     /// <inheritdoc />
-    public async Task UpdateProcessStatusAsync(
+    public async Task<Process> UpdateProcessStatusAsync(
         Guid processId,
         ProcessStatus newStatus,
         CancellationToken cancellationToken = default)
@@ -426,37 +426,304 @@ public class ProcessService : IProcessService
         // Validate status transition
         ValidateStatusTransition(process.Status, newStatus);
 
+        // Update status and timestamp
+        var previousStatus = process.Status;
         var now = DateTime.UtcNow;
 
-        // Create updated process with new status (immutable pattern)
-        var updatedProcess = newStatus switch
+        // Update status-specific fields
+        var updatedProcess = UpdateStatusSpecificFields(process, newStatus, now);
+
+        await _processRepository.UpdateAsync(updatedProcess, cancellationToken);
+
+        _logger.LogInformation(
+            "Process status updated: ProcessId={ProcessId}, From={FromStatus}, To={ToStatus}",
+            processId,
+            previousStatus,
+            newStatus);
+
+        return updatedProcess;
+    }
+
+    /// <inheritdoc />
+    public async Task<Process> UpdateProcessProgressAsync(
+        Guid processId,
+        int progress,
+        CancellationToken cancellationToken = default)
+    {
+        if (progress < 0 || progress > 100)
         {
-            ProcessStatus.Completed => process with
-            {
-                Status = newStatus,
-                UpdatedAt = now,
-                CompletedAt = now,
-                Progress = 100
-            },
-            ProcessStatus.Failed => process with
-            {
-                Status = newStatus,
-                UpdatedAt = now,
-                CompletedAt = now
-            },
-            _ => process with
-            {
-                Status = newStatus,
-                UpdatedAt = now
-            }
+            throw new ArgumentOutOfRangeException(
+                nameof(progress),
+                progress,
+                "Progress must be between 0 and 100");
+        }
+
+        _logger.LogDebug(
+            "Updating process progress: ProcessId={ProcessId}, Progress={Progress}",
+            processId,
+            progress);
+
+        var process = await GetProcessAsync(processId, cancellationToken);
+
+        var updatedProcess = process with
+        {
+            Progress = progress,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        await _processRepository.UpdateAsync(updatedProcess, cancellationToken);
+
+        _logger.LogDebug(
+            "Process progress updated: ProcessId={ProcessId}, Progress={Progress}",
+            processId,
+            progress);
+
+        return updatedProcess;
+    }
+
+    /// <inheritdoc />
+    public async Task<Process> RecordProcessErrorAsync(
+        Guid processId,
+        string errorCode,
+        string message,
+        bool retryable = false,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogWarning(
+            "Recording process error: ProcessId={ProcessId}, ErrorCode={ErrorCode}, Message={Message}, Retryable={Retryable}",
+            processId,
+            errorCode,
+            message,
+            retryable);
+
+        var process = await GetProcessAsync(processId, cancellationToken);
+
+        var updatedProcess = process.AddError(errorCode, message, retryable) with
+        {
+            UpdatedAt = DateTime.UtcNow
         };
 
         await _processRepository.UpdateAsync(updatedProcess, cancellationToken);
 
         _logger.LogInformation(
-            "Process status updated successfully: ProcessId={ProcessId}, NewStatus={NewStatus}",
+            "Process error recorded: ProcessId={ProcessId}, ErrorCode={ErrorCode}, TotalErrors={TotalErrors}",
             processId,
-            newStatus);
+            errorCode,
+            updatedProcess.Errors?.Count ?? 0);
+
+        return updatedProcess;
+    }
+
+    /// <inheritdoc />
+    public async Task<Process> IncrementRetryCountAsync(
+        Guid processId,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation(
+            "Incrementing retry count: ProcessId={ProcessId}",
+            processId);
+
+        var process = await GetProcessAsync(processId, cancellationToken);
+
+        var updatedProcess = process with
+        {
+            RetryCount = process.RetryCount + 1,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        await _processRepository.UpdateAsync(updatedProcess, cancellationToken);
+
+        _logger.LogInformation(
+            "Retry count incremented: ProcessId={ProcessId}, RetryCount={RetryCount}, MaxRetries={MaxRetries}",
+            processId,
+            updatedProcess.RetryCount,
+            updatedProcess.MaxRetries);
+
+        return updatedProcess;
+    }
+
+    /// <inheritdoc />
+    public async Task<Process> TransitionToProcessingAsync(
+        Guid processId,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation(
+            "Transitioning process to Processing: ProcessId={ProcessId}",
+            processId);
+
+        var process = await GetProcessAsync(processId, cancellationToken);
+
+        ValidateStatusTransition(process.Status, ProcessStatus.Processing);
+
+        var updatedProcess = process with
+        {
+            Status = ProcessStatus.Processing,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        await _processRepository.UpdateAsync(updatedProcess, cancellationToken);
+
+        _logger.LogInformation(
+            "Process transitioned to Processing: ProcessId={ProcessId}",
+            processId);
+
+        return updatedProcess;
+    }
+
+    /// <inheritdoc />
+    public async Task<Process> CompleteProcessAsync(
+        Guid processId,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation(
+            "Completing process: ProcessId={ProcessId}",
+            processId);
+
+        var process = await GetProcessAsync(processId, cancellationToken);
+
+        ValidateStatusTransition(process.Status, ProcessStatus.Completed);
+
+        var now = DateTime.UtcNow;
+        var updatedProcess = process with
+        {
+            Status = ProcessStatus.Completed,
+            Progress = 100,
+            CompletedAt = now,
+            UpdatedAt = now
+        };
+
+        await _processRepository.UpdateAsync(updatedProcess, cancellationToken);
+
+        _logger.LogInformation(
+            "Process completed successfully: ProcessId={ProcessId}, Duration={Duration}ms",
+            processId,
+            (updatedProcess.CompletedAt!.Value - process.CreatedAt).TotalMilliseconds);
+
+        return updatedProcess;
+    }
+
+    /// <inheritdoc />
+    public async Task<Process> FailProcessAsync(
+        Guid processId,
+        string errorCode,
+        string errorMessage,
+        bool canRetry = false,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogWarning(
+            "Failing process: ProcessId={ProcessId}, ErrorCode={ErrorCode}, CanRetry={CanRetry}",
+            processId,
+            errorCode,
+            canRetry);
+
+        var process = await GetProcessAsync(processId, cancellationToken);
+
+        // Record error
+        var processWithError = process.AddError(errorCode, errorMessage, canRetry);
+
+        // Determine if retry should happen
+        var shouldRetry = canRetry &&
+                         process.Retryable &&
+                         !process.IsRetryLimitExceeded;
+
+        var now = DateTime.UtcNow;
+        Process updatedProcess;
+
+        if (shouldRetry)
+        {
+            ValidateStatusTransition(process.Status, ProcessStatus.Retrying);
+            updatedProcess = processWithError with
+            {
+                Status = ProcessStatus.Retrying,
+                RetryCount = process.RetryCount + 1,
+                UpdatedAt = now
+            };
+
+            _logger.LogInformation(
+                "Process will retry: ProcessId={ProcessId}, RetryCount={RetryCount}/{MaxRetries}",
+                processId,
+                updatedProcess.RetryCount,
+                updatedProcess.MaxRetries);
+        }
+        else
+        {
+            ValidateStatusTransition(process.Status, ProcessStatus.Failed);
+            updatedProcess = processWithError with
+            {
+                Status = ProcessStatus.Failed,
+                FailedAt = now,
+                UpdatedAt = now
+            };
+
+            var reason = !canRetry ? "non-retryable error" :
+                        !process.Retryable ? "process not retryable" :
+                        "retry limit exceeded";
+
+            _logger.LogWarning(
+                "Process failed permanently: ProcessId={ProcessId}, Reason={Reason}, RetryCount={RetryCount}",
+                processId,
+                reason,
+                updatedProcess.RetryCount);
+        }
+
+        await _processRepository.UpdateAsync(updatedProcess, cancellationToken);
+
+        return updatedProcess;
+    }
+
+    /// <inheritdoc />
+    public async Task<Process> RejectProcessAsync(
+        Guid processId,
+        string reason,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogWarning(
+            "Rejecting process: ProcessId={ProcessId}, Reason={Reason}",
+            processId,
+            reason);
+
+        var process = await GetProcessAsync(processId, cancellationToken);
+
+        ValidateStatusTransition(process.Status, ProcessStatus.Rejected);
+
+        var updatedProcess = process.AddError("PROCESS_REJECTED", reason, retryable: false) with
+        {
+            Status = ProcessStatus.Rejected,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        await _processRepository.UpdateAsync(updatedProcess, cancellationToken);
+
+        _logger.LogInformation(
+            "Process rejected: ProcessId={ProcessId}",
+            processId);
+
+        return updatedProcess;
+    }
+
+    /// <inheritdoc />
+    public async Task<Process> CheckTimeoutAsync(
+        Guid processId,
+        CancellationToken cancellationToken = default)
+    {
+        var process = await GetProcessAsync(processId, cancellationToken);
+
+        if (!process.IsTimedOut)
+        {
+            return process;
+        }
+
+        _logger.LogWarning(
+            "Process timed out: ProcessId={ProcessId}, TimeoutAt={TimeoutAt}",
+            processId,
+            process.TimeoutAt);
+
+        return await FailProcessAsync(
+            processId,
+            "PROCESS_TIMEOUT",
+            $"Process exceeded timeout of {(process.TimeoutAt!.Value - process.CreatedAt).TotalSeconds} seconds",
+            canRetry: true,
+            cancellationToken);
     }
 
     /// <summary>
@@ -467,13 +734,33 @@ public class ProcessService : IProcessService
     /// <exception cref="InvalidStateTransitionException">If transition is not allowed.</exception>
     private void ValidateStatusTransition(ProcessStatus currentStatus, ProcessStatus newStatus)
     {
-        // Define valid transitions based on actual ProcessStatus enum
         var validTransitions = new Dictionary<ProcessStatus, ProcessStatus[]>
         {
-            [ProcessStatus.Accepted] = new[] { ProcessStatus.Processing, ProcessStatus.Failed },
-            [ProcessStatus.Processing] = new[] { ProcessStatus.Completed, ProcessStatus.Failed },
+            [ProcessStatus.Pending] = new[]
+            {
+                ProcessStatus.Accepted,
+                ProcessStatus.Rejected
+            },
+            [ProcessStatus.Accepted] = new[]
+            {
+                ProcessStatus.Processing,
+                ProcessStatus.Failed,
+                ProcessStatus.Rejected
+            },
+            [ProcessStatus.Processing] = new[]
+            {
+                ProcessStatus.Completed,
+                ProcessStatus.Failed,
+                ProcessStatus.Retrying
+            },
+            [ProcessStatus.Retrying] = new[]
+            {
+                ProcessStatus.Processing,
+                ProcessStatus.Failed
+            },
+            [ProcessStatus.Failed] = Array.Empty<ProcessStatus>(), // Terminal state
             [ProcessStatus.Completed] = Array.Empty<ProcessStatus>(), // Terminal state
-            [ProcessStatus.Failed] = Array.Empty<ProcessStatus>() // Terminal state (retry would create new process)
+            [ProcessStatus.Rejected] = Array.Empty<ProcessStatus>() // Terminal state
         };
 
         if (!validTransitions.ContainsKey(currentStatus))
@@ -491,5 +778,37 @@ public class ProcessService : IProcessService
                 newStatus,
                 $"Cannot transition from {currentStatus} to {newStatus}");
         }
+    }
+
+    /// <summary>
+    /// Updates status-specific fields based on the new status.
+    /// </summary>
+    /// <param name="process">Current process.</param>
+    /// <param name="newStatus">New status to transition to.</param>
+    /// <param name="now">Current UTC timestamp.</param>
+    /// <returns>Updated process with status-specific fields set.</returns>
+    private Process UpdateStatusSpecificFields(Process process, ProcessStatus newStatus, DateTime now)
+    {
+        return newStatus switch
+        {
+            ProcessStatus.Completed => process with
+            {
+                Status = newStatus,
+                CompletedAt = now,
+                Progress = 100,
+                UpdatedAt = now
+            },
+            ProcessStatus.Failed => process with
+            {
+                Status = newStatus,
+                FailedAt = now,
+                UpdatedAt = now
+            },
+            _ => process with
+            {
+                Status = newStatus,
+                UpdatedAt = now
+            }
+        };
     }
 }

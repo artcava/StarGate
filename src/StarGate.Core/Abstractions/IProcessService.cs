@@ -8,6 +8,8 @@ namespace StarGate.Core.Abstractions;
 /// </summary>
 public interface IProcessService
 {
+    // ============ Creation ============
+
     /// <summary>
     /// Creates a new process with automatic GUID generation.
     /// Handles idempotency to prevent duplicate process creation.
@@ -40,6 +42,8 @@ public interface IProcessService
         string clientId,
         SubmitProcessRequest request,
         CancellationToken cancellationToken = default);
+
+    // ============ Retrieval ============
 
     /// <summary>
     /// Retrieves a process by its unique identifier.
@@ -88,6 +92,8 @@ public interface IProcessService
         string clientProcessId,
         CancellationToken cancellationToken = default);
 
+    // ============ State Management ============
+
     /// <summary>
     /// Updates the status of a process with validation of state transitions.
     /// Automatically updates timestamps based on the new status.
@@ -95,10 +101,131 @@ public interface IProcessService
     /// <param name="processId">Process identifier.</param>
     /// <param name="newStatus">New status to set.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The updated process.</returns>
     /// <exception cref="StarGate.Core.Exceptions.ProcessNotFoundException">If process not found.</exception>
     /// <exception cref="StarGate.Core.Exceptions.InvalidStateTransitionException">If state transition is not allowed.</exception>
-    public Task UpdateProcessStatusAsync(
+    public Task<Process> UpdateProcessStatusAsync(
         Guid processId,
         ProcessStatus newStatus,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Transitions a process to Processing state.
+    /// Validates that current state allows this transition.
+    /// </summary>
+    /// <param name="processId">Process identifier.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The updated process.</returns>
+    /// <exception cref="StarGate.Core.Exceptions.ProcessNotFoundException">If process not found.</exception>
+    /// <exception cref="StarGate.Core.Exceptions.InvalidStateTransitionException">If state transition is not allowed.</exception>
+    public Task<Process> TransitionToProcessingAsync(
+        Guid processId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Completes a process successfully.
+    /// Sets status to Completed, progress to 100, and records completion timestamp.
+    /// </summary>
+    /// <param name="processId">Process identifier.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The completed process.</returns>
+    /// <exception cref="StarGate.Core.Exceptions.ProcessNotFoundException">If process not found.</exception>
+    /// <exception cref="StarGate.Core.Exceptions.InvalidStateTransitionException">If state transition is not allowed.</exception>
+    public Task<Process> CompleteProcessAsync(
+        Guid processId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Fails a process with error details.
+    /// Determines whether to transition to Retrying or Failed based on retry policy.
+    /// </summary>
+    /// <param name="processId">Process identifier.</param>
+    /// <param name="errorCode">Error code for categorization.</param>
+    /// <param name="errorMessage">Human-readable error message.</param>
+    /// <param name="canRetry">Indicates if the error is retryable.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The updated process.</returns>
+    /// <exception cref="StarGate.Core.Exceptions.ProcessNotFoundException">If process not found.</exception>
+    public Task<Process> FailProcessAsync(
+        Guid processId,
+        string errorCode,
+        string errorMessage,
+        bool canRetry = false,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Rejects a process due to validation failure.
+    /// Transitions from Pending to Rejected state.
+    /// </summary>
+    /// <param name="processId">Process identifier.</param>
+    /// <param name="reason">Reason for rejection.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The rejected process.</returns>
+    /// <exception cref="StarGate.Core.Exceptions.ProcessNotFoundException">If process not found.</exception>
+    /// <exception cref="StarGate.Core.Exceptions.InvalidStateTransitionException">If state transition is not allowed.</exception>
+    public Task<Process> RejectProcessAsync(
+        Guid processId,
+        string reason,
+        CancellationToken cancellationToken = default);
+
+    // ============ Progress Tracking ============
+
+    /// <summary>
+    /// Updates the progress of a process.
+    /// Progress must be between 0 and 100.
+    /// </summary>
+    /// <param name="processId">Process identifier.</param>
+    /// <param name="progress">Progress percentage (0-100).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The updated process.</returns>
+    /// <exception cref="StarGate.Core.Exceptions.ProcessNotFoundException">If process not found.</exception>
+    /// <exception cref="System.ArgumentOutOfRangeException">If progress is not between 0 and 100.</exception>
+    public Task<Process> UpdateProcessProgressAsync(
+        Guid processId,
+        int progress,
+        CancellationToken cancellationToken = default);
+
+    // ============ Error Handling ============
+
+    /// <summary>
+    /// Records an error for a process without changing its status.
+    /// Useful for tracking non-fatal errors or warnings.
+    /// </summary>
+    /// <param name="processId">Process identifier.</param>
+    /// <param name="errorCode">Error code for categorization.</param>
+    /// <param name="message">Human-readable error message.</param>
+    /// <param name="retryable">Indicates if this error is retryable.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The updated process.</returns>
+    /// <exception cref="StarGate.Core.Exceptions.ProcessNotFoundException">If process not found.</exception>
+    public Task<Process> RecordProcessErrorAsync(
+        Guid processId,
+        string errorCode,
+        string message,
+        bool retryable = false,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Increments the retry count for a process.
+    /// </summary>
+    /// <param name="processId">Process identifier.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The updated process.</returns>
+    /// <exception cref="StarGate.Core.Exceptions.ProcessNotFoundException">If process not found.</exception>
+    public Task<Process> IncrementRetryCountAsync(
+        Guid processId,
+        CancellationToken cancellationToken = default);
+
+    // ============ Timeout Management ============
+
+    /// <summary>
+    /// Checks if a process has timed out and fails it if necessary.
+    /// </summary>
+    /// <param name="processId">Process identifier.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The process (updated if timed out, unchanged otherwise).</returns>
+    /// <exception cref="StarGate.Core.Exceptions.ProcessNotFoundException">If process not found.</exception>
+    public Task<Process> CheckTimeoutAsync(
+        Guid processId,
         CancellationToken cancellationToken = default);
 }
