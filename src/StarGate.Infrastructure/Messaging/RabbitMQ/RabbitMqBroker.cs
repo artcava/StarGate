@@ -20,8 +20,8 @@ public class RabbitMqBroker : IMessageBroker, IDisposable
     private readonly RabbitMqOptions _options;
     private readonly ILogger<RabbitMqBroker> _logger;
     private bool _disposed;
-    private const string ExchangeName = "stargate.processes";
-    private const string ExchangeType = "topic";
+    private const string _exchangeName = "stargate.processes";
+    private const string _exchangeType = "topic";
 
     public RabbitMqBroker(
         IConnection connection,
@@ -185,7 +185,7 @@ public class RabbitMqBroker : IMessageBroker, IDisposable
             properties.Timestamp = new AmqpTimestamp(DateTimeOffset.UtcNow.ToUnixTimeSeconds());
 
             _channel.BasicPublish(
-                exchange: ExchangeName,
+                exchange: _exchangeName,
                 routingKey: routingKey,
                 basicProperties: properties,
                 body: messageBody);
@@ -228,7 +228,7 @@ public class RabbitMqBroker : IMessageBroker, IDisposable
 
             // Use delayed exchange or dead-letter exchange pattern
             _channel.BasicPublish(
-                exchange: ExchangeName,
+                exchange: _exchangeName,
                 routingKey: routingKey,
                 basicProperties: properties,
                 body: messageBody);
@@ -274,8 +274,8 @@ public class RabbitMqBroker : IMessageBroker, IDisposable
         {
             // Declare topic exchange for process routing
             _channel.ExchangeDeclare(
-                exchange: ExchangeName,
-                type: ExchangeType,
+                exchange: _exchangeName,
+                type: _exchangeType,
                 durable: true,
                 autoDelete: false);
 
@@ -310,7 +310,7 @@ public class RabbitMqBroker : IMessageBroker, IDisposable
             _logger.LogInformation(
                 "RabbitMQ infrastructure declared: Exchange={Exchange}, TopicExchange={TopicExchange}, DLX={DLX}, DLQ={DLQ}",
                 _options.ProcessExchange,
-                ExchangeName,
+                _exchangeName,
                 _options.DeadLetterExchange,
                 _options.DeadLetterQueue);
         }
