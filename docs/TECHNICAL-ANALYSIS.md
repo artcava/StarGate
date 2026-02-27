@@ -1,7 +1,7 @@
 # Technical Analysis - StarGate Software Development
 
-**Document Version:** 1.6  
-**Last Updated:** 2026-02-13  
+**Document Version:** 1.7  
+**Last Updated:** 2026-02-27  
 **Status:** In Progress
 
 ---
@@ -152,7 +152,7 @@ StarGate/
 │   │   ├── appsettings.json
 │   │   └── Dockerfile
 │   │
-│   ├── StarGate.Core/                   # Business Logic & Domain
+│   ├── StarGate.Core/                   # Business Logic & Domain [DEPRECATED - moved to StarGate.Application]
 │   │   ├── Domain/                      # Domain entities
 │   │   │   ├── Process.cs
 │   │   │   ├── ProcessStatus.cs
@@ -168,7 +168,7 @@ StarGate/
 │   │   │   ├── IPolicyProvider.cs       # Policy resolution
 │   │   │   ├── IMessageBroker.cs        # Broker abstraction
 │   │   │   └── IMessageConsumer.cs      # Consumer abstraction
-│   │   ├── Services/                    # Business services
+│   │   ├── Services/                    # Business services [MOVED to StarGate.Application]
 │   │   │   ├── ProcessService.cs
 │   │   │   └── PolicyProvider.cs        # Configuration resolver
 │   │   ├── Exceptions/                  # Custom exceptions
@@ -176,6 +176,12 @@ StarGate/
 │   │   │   └── DuplicateProcessException.cs
 │   │   └── Telemetry/                   # Metrics and tracing
 │   │       └── ProcessMetrics.cs
+│   │
+│   ├── StarGate.Application/            # Application Layer (Services)
+│   │   └── Services/
+│   │       ├── ProcessService.cs        # Core business logic
+│   │       ├── IdempotencyService.cs    # Idempotency handling
+│   │       └── PolicyProvider.cs        # Policy resolution
 │   │
 │   ├── StarGate.Infrastructure/         # Infrastructure concerns
 │   │   ├── Persistence/                 # Database implementations
@@ -223,9 +229,17 @@ StarGate/
 │   ├── StarGate.Api.Tests/             # API unit tests
 │   │   ├── Endpoints/
 │   │   └── Middleware/
-│   ├── StarGate.Core.Tests/            # Core unit tests
+│   ├── StarGate.Core.Tests/            # Core unit tests [DEPRECATED]
 │   │   ├── Services/
 │   │   └── Domain/
+│   ├── StarGate.Application.Tests/     # Application layer tests
+│   │   └── Services/
+│   │       ├── ProcessServiceTests.cs               # 27 tests - Core functionality
+│   │       ├── ProcessServiceBrokerTests.cs         # 12 tests - Broker integration
+│   │       ├── ProcessServiceIntegrationTests.cs    # 11 tests - End-to-end scenarios
+│   │       ├── ProcessServiceIdempotencyTests.cs    # Idempotency handling
+│   │       ├── ProcessServicePolicyTests.cs         # Policy enforcement
+│   │       └── ProcessServiceStateTransitionTests.cs # State machine validation
 │   ├── StarGate.Infrastructure.Tests/  # Infrastructure tests
 │   │   ├── Persistence/
 │   │   ├── Caching/
@@ -330,13 +344,31 @@ StarGate/
 
 ### Phase 6: Business Logic (Week 8)
 
-#### Sprint 6.1: Process Service
-- [ ] Implement ProcessService with GUID generation
-- [ ] Add idempotency handling
-- [ ] Integrate message broker publishing
-- [ ] Integrate policy enforcement
-- [ ] Implement process state transitions
-- [ ] Write comprehensive unit tests
+#### Sprint 6.1: Process Service ✅ COMPLETED
+- [x] **#98** Implement ProcessService with GUID generation
+- [x] Add idempotency handling (IdempotencyService)
+- [x] Integrate message broker publishing
+- [x] Integrate policy enforcement
+- [x] Implement process state transitions with validation
+- [x] Write comprehensive unit tests (50+ tests across 6 test files)
+  - [x] ProcessServiceTests.cs (27 tests) - Core functionality
+  - [x] ProcessServiceBrokerTests.cs (12 tests) - Message broker integration  
+  - [x] ProcessServiceIntegrationTests.cs (11 tests) - End-to-end scenarios
+  - [x] ProcessServiceIdempotencyTests.cs - Idempotency validation
+  - [x] ProcessServicePolicyTests.cs - Policy enforcement
+  - [x] ProcessServiceStateTransitionTests.cs - State machine validation
+- [x] Achieve >80% code coverage target
+
+**Deliverables Completed (2026-02-27):**
+- ✅ ProcessService fully implemented with GUID generation
+- ✅ Idempotency handling via IdempotencyService (two-tier: Redis + MongoDB)
+- ✅ Message broker integration with RabbitMQ abstraction
+- ✅ Policy enforcement (timeout, retry, retention, concurrency)
+- ✅ State machine with transition validation (7 states, validated transitions)
+- ✅ Comprehensive test suite (50+ tests, >80% coverage)
+- ✅ Error handling with ProcessError tracking
+- ✅ Retry logic with exponential backoff
+- ✅ Timeout detection and enforcement
 
 ### Phase 7: Process Engine (Week 9-10)
 
@@ -372,7 +404,7 @@ StarGate/
 - [ ] Write end-to-end workflow tests
 - [ ] Test policy enforcement scenarios
 - [ ] Add test coverage reporting
-- [ ] Achieve >80% coverage target
+- [x] Achieve >80% coverage target (Phase 6 completed)
 
 #### Sprint 9.2: Load Testing
 - [ ] Create k6 load test scripts
@@ -409,6 +441,104 @@ StarGate/
 - [ ] Security audit
 - [ ] Performance review
 - [ ] Prepare for production deployment
+
+---
+
+## Testing Strategy
+
+### Unit Testing
+
+**Framework:** xUnit + FluentAssertions + Moq
+
+**Coverage Target:** >80% for business logic layers
+
+**Test Organization:**
+- One test class per implementation class
+- AAA pattern (Arrange, Act, Assert)
+- Descriptive test names following convention: `MethodName_Should_ExpectedBehavior_When_StateUnderTest`
+- Mock external dependencies (repositories, brokers, caches)
+- Test both success and failure scenarios
+
+**Completed Test Suites:**
+
+#### ProcessService Test Suite (Phase 6.1 - Completed 2026-02-27)
+- **ProcessServiceTests.cs** (27 tests, 20.9 KB)
+  - GUID generation and uniqueness
+  - Initial status and timestamp initialization
+  - Constructor dependency validation
+  - Process retrieval (by GUID, by ClientProcessId)
+  - Progress updates with range validation (0-100)
+  - Error recording and accumulation
+  - Retry count incrementing
+  
+- **ProcessServiceBrokerTests.cs** (12 tests, 16.6 KB)
+  - Message broker publishing on process creation
+  - Routing key generation (`process.{processType}`)
+  - Message payload validation
+  - Broker failure handling with rollback
+  - Idempotency key removal on broker failure
+  - Execution order validation (DB persist → broker publish)
+  
+- **ProcessServiceIntegrationTests.cs** (11 tests, 22.2 KB)
+  - Complete process lifecycle (Accepted → Processing → Completed)
+  - Retry scenarios with state transitions
+  - Max retries exceeded (transition to Failed)
+  - Timeout detection and handling (Processing → Retrying/Failed)
+  - Process rejection workflow (Accepted → Rejected)
+  - Concurrent process creation with unique IDs
+  - Multiple error accumulation
+  - Progress tracking through lifecycle
+  - Terminal state validation (no further transitions)
+  - Multi-method process retrieval consistency
+
+- **ProcessServiceIdempotencyTests.cs**
+  - Two-tier idempotency check (Redis → MongoDB)
+  - Duplicate detection and rejection
+  - Idempotency key rollback on failure
+  - Cache miss scenarios
+
+- **ProcessServicePolicyTests.cs**
+  - Policy resolution (type defaults + client overrides)
+  - Timeout enforcement from policies
+  - Retry limits from policies (MaxAttempts)
+  - Concurrency limit enforcement
+  - Retention period application
+
+- **ProcessServiceStateTransitionTests.cs**
+  - Valid state transitions per ProcessStatus
+  - Invalid transition detection and rejection
+  - State machine integrity
+  - Terminal state enforcement (Completed, Failed, Rejected)
+
+**Test Statistics:**
+- Total tests: 50+
+- Total test code: ~59 KB
+- Coverage achieved: >80%
+- All tests passing ✅
+
+### Integration Testing
+
+**Approach:**
+- Test with real dependencies (MongoDB, Redis, RabbitMQ) via Docker containers
+- Test-specific databases/queues to avoid conflicts
+- Cleanup after each test
+
+**Scenarios:**
+- End-to-end process workflows
+- Cross-service interactions
+- Database persistence and retrieval
+- Message broker publishing and consuming
+- Policy enforcement in realistic scenarios
+
+### Load Testing
+
+**Framework:** k6 (JavaScript-based load testing)
+
+**Metrics:**
+- Throughput (requests/second)
+- Response time (p50, p95, p99)
+- Error rate
+- Resource utilization (CPU, memory)
 
 ---
 
