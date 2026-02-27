@@ -20,8 +20,9 @@ public class RabbitMqBroker : IMessageBroker, IDisposable
     private readonly RabbitMqOptions _options;
     private readonly ILogger<RabbitMqBroker> _logger;
     private bool _disposed;
-    private const string _exchangeName = "stargate.processes";
-    private const string _exchangeType = "topic";
+    private const string ExchangeName = "stargate.processes";
+    private const string TopicExchangeType = "topic";
+    private const string DirectExchangeType = "direct";
 
     public RabbitMqBroker(
         IConnection connection,
@@ -185,7 +186,7 @@ public class RabbitMqBroker : IMessageBroker, IDisposable
             properties.Timestamp = new AmqpTimestamp(DateTimeOffset.UtcNow.ToUnixTimeSeconds());
 
             _channel.BasicPublish(
-                exchange: _exchangeName,
+                exchange: ExchangeName,
                 routingKey: routingKey,
                 basicProperties: properties,
                 body: messageBody);
@@ -228,7 +229,7 @@ public class RabbitMqBroker : IMessageBroker, IDisposable
 
             // Use delayed exchange or dead-letter exchange pattern
             _channel.BasicPublish(
-                exchange: _exchangeName,
+                exchange: ExchangeName,
                 routingKey: routingKey,
                 basicProperties: properties,
                 body: messageBody);
@@ -274,15 +275,15 @@ public class RabbitMqBroker : IMessageBroker, IDisposable
         {
             // Declare topic exchange for process routing
             _channel.ExchangeDeclare(
-                exchange: _exchangeName,
-                type: _exchangeType,
+                exchange: ExchangeName,
+                type: TopicExchangeType,
                 durable: true,
                 autoDelete: false);
 
             // Declare dead letter exchange
             _channel.ExchangeDeclare(
                 exchange: _options.DeadLetterExchange,
-                type: RabbitMQ.Client.ExchangeType.Direct,
+                type: DirectExchangeType,
                 durable: true,
                 autoDelete: false);
 
@@ -303,14 +304,14 @@ public class RabbitMqBroker : IMessageBroker, IDisposable
             // Declare main process exchange
             _channel.ExchangeDeclare(
                 exchange: _options.ProcessExchange,
-                type: RabbitMQ.Client.ExchangeType.Direct,
+                type: DirectExchangeType,
                 durable: true,
                 autoDelete: false);
 
             _logger.LogInformation(
                 "RabbitMQ infrastructure declared: Exchange={Exchange}, TopicExchange={TopicExchange}, DLX={DLX}, DLQ={DLQ}",
                 _options.ProcessExchange,
-                _exchangeName,
+                ExchangeName,
                 _options.DeadLetterExchange,
                 _options.DeadLetterQueue);
         }
