@@ -3,6 +3,7 @@ using StarGate.Api.Endpoints;
 using StarGate.Api.Extensions;
 using StarGate.Api.Infrastructure;
 using StarGate.Api.Middleware;
+using StarGate.Api.Services;
 using StarGate.Api.Validators;
 using StarGate.Application;
 using StarGate.Core.Abstractions;
@@ -39,6 +40,12 @@ builder.Services.AddApplicationServices(builder.Configuration);
 
 // Add health checks
 builder.Services.AddApplicationHealthChecks(builder.Configuration);
+
+// Add JWT token generator for development (only in Development environment)
+if (builder.Environment.IsDevelopment())
+{
+    builder.Services.AddSingleton<IJwtTokenGenerator, JwtTokenGenerator>();
+}
 
 var app = builder.Build();
 
@@ -83,6 +90,12 @@ app.MapGet("/ratelimit-test", () => Results.Ok(new { message = "Rate limit test 
 
 app.MapPolicyCacheEndpoints();
 app.MapProcessEndpoints();
+
+// Map authentication endpoints (Development only)
+if (app.Environment.IsDevelopment())
+{
+    app.MapAuthEndpoints();
+}
 
 // Map health check endpoints (before authentication)
 app.MapHealthCheckEndpoints();
