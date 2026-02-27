@@ -203,7 +203,7 @@ public class ProcessService : IProcessService
             [ProcessStatus.Pending] = new[] { ProcessStatus.Accepted, ProcessStatus.Rejected },
             [ProcessStatus.Accepted] = new[] { ProcessStatus.Processing, ProcessStatus.Failed },
             [ProcessStatus.Processing] = new[] { ProcessStatus.Completed, ProcessStatus.Failed, ProcessStatus.Retrying },
-            [ProcessStatus.Retrying] = new[] { ProcessStatus.Processing, Proces sStatus.Failed },
+            [ProcessStatus.Retrying] = new[] { ProcessStatus.Processing, ProcessStatus.Failed },
             [ProcessStatus.Failed] = new[] { ProcessStatus.Retrying },
             [ProcessStatus.Completed] = Array.Empty<ProcessStatus>(),
             [ProcessStatus.Rejected] = Array.Empty<ProcessStatus>()
