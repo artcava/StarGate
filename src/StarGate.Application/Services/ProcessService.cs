@@ -85,10 +85,10 @@ public class ProcessService : IProcessService
         }
 
         _logger.LogDebug(
-            "Policy retrieved: ClientId={ClientId}, ProcessType={ProcessType}, MaxRetries={MaxRetries}, Timeout={Timeout}, MaxConcurrent={MaxConcurrent}",
+            "Policy retrieved: ClientId={ClientId}, ProcessType={ProcessType}, MaxAttempts={MaxAttempts}, Timeout={Timeout}, MaxConcurrent={MaxConcurrent}",
             clientId,
             processType,
-            policy.RetryPolicy.MaxRetries,
+            policy.RetryPolicy.MaxAttempts,
             policy.Timeout,
             policy.MaxConcurrentProcesses);
 
@@ -167,8 +167,8 @@ public class ProcessService : IProcessService
                 IdempotencyKey = idempotencyKey,
                 Status = ProcessStatus.Accepted, // Initial status
                 Progress = 0,
-                Retryable = policy.RetryPolicy.MaxRetries > 0,
-                MaxRetries = policy.RetryPolicy.MaxRetries,
+                Retryable = policy.RetryPolicy.MaxAttempts > 0,
+                MaxRetries = policy.RetryPolicy.MaxAttempts,
                 RetryCount = 0,
                 TimeoutAt = timeoutAt,
                 RetentionExpiresAt = retentionExpiresAt,
@@ -185,7 +185,7 @@ public class ProcessService : IProcessService
                 clientId,
                 processType,
                 timeoutAt,
-                policy.RetryPolicy.MaxRetries);
+                policy.RetryPolicy.MaxAttempts);
 
             // Publish message to broker for asynchronous processing
             try

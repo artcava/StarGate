@@ -235,7 +235,7 @@ public class ProcessServicePolicyTests
         // Arrange
         var clientId = "test-client";
         var processType = "order";
-        var policy = CreateTestPolicy(maxRetries: 3);
+        var policy = CreateTestPolicy(maxAttempts: 3);
         Process? capturedProcess = null;
 
         SetupSuccessfulCreation(policy);
@@ -266,7 +266,7 @@ public class ProcessServicePolicyTests
         // Arrange
         var clientId = "test-client";
         var processType = "order";
-        var policy = CreateTestPolicy(maxRetries: 0);
+        var policy = CreateTestPolicy(maxAttempts: 0);
         Process? capturedProcess = null;
 
         SetupSuccessfulCreation(policy);
@@ -355,7 +355,7 @@ public class ProcessServicePolicyTests
     }
 
     private EffectivePolicy CreateTestPolicy(
-        int maxRetries = 3,
+        int maxAttempts = 3,
         int timeoutSeconds = 3600,
         int? maxConcurrent = 10,
         int retentionDays = 30)
@@ -367,10 +367,11 @@ public class ProcessServicePolicyTests
             Timeout = TimeSpan.FromSeconds(timeoutSeconds),
             RetryPolicy = new RetryPolicy
             {
-                MaxRetries = maxRetries,
-                InitialDelaySeconds = 5,
-                MaxDelaySeconds = 300,
-                BackoffMultiplier = 2.0
+                Enabled = maxAttempts > 0,
+                MaxAttempts = maxAttempts,
+                InitialDelay = TimeSpan.FromSeconds(5),
+                MaxDelay = TimeSpan.FromSeconds(300),
+                BackoffStrategy = BackoffStrategy.Exponential
             },
             ResultRetention = TimeSpan.FromDays(retentionDays),
             MaxConcurrentProcesses = maxConcurrent,
