@@ -1,3 +1,4 @@
+using StarGate.Contracts.Requests;
 using StarGate.Core.Domain;
 
 namespace StarGate.Core.Abstractions;
@@ -29,6 +30,18 @@ public interface IProcessService
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Submits a new process (alias for CreateProcessAsync for API compatibility).
+    /// </summary>
+    /// <param name="clientId">Client identifier.</param>
+    /// <param name="request">Process submission request.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The created process with generated GUID.</returns>
+    public Task<Process> SubmitProcessAsync(
+        string clientId,
+        SubmitProcessRequest request,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Retrieves a process by its unique identifier.
     /// </summary>
     /// <param name="processId">Process identifier (GUID).</param>
@@ -36,6 +49,16 @@ public interface IProcessService
     /// <returns>The process entity.</returns>
     /// <exception cref="StarGate.Core.Exceptions.ProcessNotFoundException">If process not found.</exception>
     public Task<Process> GetProcessAsync(
+        Guid processId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Retrieves a process by its unique identifier (alias for GetProcessAsync for API compatibility).
+    /// </summary>
+    /// <param name="processId">Process identifier (GUID).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The process entity, or null if not found.</returns>
+    public Task<Process?> GetProcessByIdAsync(
         Guid processId,
         CancellationToken cancellationToken = default);
 
@@ -49,6 +72,18 @@ public interface IProcessService
     /// <exception cref="System.ArgumentException">If required parameters are null or whitespace.</exception>
     /// <exception cref="StarGate.Core.Exceptions.ProcessNotFoundException">If process not found.</exception>
     public Task<Process> GetProcessByClientIdAsync(
+        string clientId,
+        string clientProcessId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Retrieves a process by client identifier and client process identifier (alias for API compatibility).
+    /// </summary>
+    /// <param name="clientId">Client identifier.</param>
+    /// <param name="clientProcessId">Client-provided process identifier.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The process entity, or null if not found.</returns>
+    public Task<Process?> GetProcessByClientProcessIdAsync(
         string clientId,
         string clientProcessId,
         CancellationToken cancellationToken = default);
