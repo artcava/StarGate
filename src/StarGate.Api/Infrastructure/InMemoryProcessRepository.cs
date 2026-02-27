@@ -14,7 +14,7 @@ public class InMemoryProcessRepository : IProcessRepository
     private readonly ConcurrentDictionary<string, Guid> _processesByClientId = new();
     private readonly ConcurrentDictionary<string, Guid> _processesByIdempotencyKey = new();
 
-    public Task<Process> CreateAsync(Process process, CancellationToken cancellationToken = default)
+    public Task<Process> CreateAsync(Process process, CancellationToken ct = default)
     {
         if (!_processesById.TryAdd(process.ProcessId, process))
         {
@@ -30,13 +30,13 @@ public class InMemoryProcessRepository : IProcessRepository
         return Task.FromResult(process);
     }
 
-    public Task<Process> UpdateAsync(Process process, CancellationToken cancellationToken = default)
+    public Task<Process> UpdateAsync(Process process, CancellationToken ct = default)
     {
         _processesById[process.ProcessId] = process;
         return Task.FromResult(process);
     }
 
-    public Task<Process?> GetByIdAsync(Guid processId, CancellationToken cancellationToken = default)
+    public Task<Process?> GetByIdAsync(Guid processId, CancellationToken ct = default)
     {
         _processesById.TryGetValue(processId, out var process);
         return Task.FromResult(process);
@@ -45,7 +45,7 @@ public class InMemoryProcessRepository : IProcessRepository
     public Task<Process?> GetByClientProcessIdAsync(
         string clientId,
         string clientProcessId,
-        CancellationToken cancellationToken = default)
+        CancellationToken ct = default)
     {
         var clientKey = GetClientKey(clientId, clientProcessId);
         
@@ -61,7 +61,7 @@ public class InMemoryProcessRepository : IProcessRepository
     public Task<Process?> GetByIdempotencyKeyAsync(
         string clientId,
         string idempotencyKey,
-        CancellationToken cancellationToken = default)
+        CancellationToken ct = default)
     {
         var key = GetIdempotencyKey(clientId, idempotencyKey);
         
@@ -74,42 +74,83 @@ public class InMemoryProcessRepository : IProcessRepository
         return Task.FromResult<Process?>(null);
     }
 
-    public Task<IEnumerable<Process>> GetByClientIdAsync(
-        string clientId,
-        CancellationToken cancellationToken = default)
-    {
-        var processes = _processesById.Values
-            .Where(p => p.ClientId == clientId)
-            .ToList();
-
-        return Task.FromResult<IEnumerable<Process>>(processes);
-    }
-
-    public Task<IEnumerable<Process>> GetByStatusAsync(
+    public Task<IReadOnlyList<Process>> GetByStatusAsync(
         ProcessStatus status,
-        CancellationToken cancellationToken = default)
+        int limit = 100,
+        CancellationToken ct = default)
     {
         var processes = _processesById.Values
             .Where(p => p.Status == status)
+            .OrderBy(p => p.CreatedAt)
+            .Take(Math.Min(limit, 1000))
             .ToList();
 
-        return Task.FromResult<IEnumerable<Process>>(processes);
+        return Task.FromResult<IReadOnlyList<Process>>(processes);
     }
 
-    public Task<bool> DeleteAsync(Guid processId, CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<Process>> GetByClientIdAsync(
+        string clientId,
+        int skip = 0,
+        int limit = 100,
+        CancellationToken ct = default)
     {
-        if (_processesById.TryRemove(processId, out var process))
-        {
-            var clientKey = GetClientKey(process.ClientId, process.ClientProcessId);
-            _processesByClientId.TryRemove(clientKey, out _);
+        var processes = _processesById.Values
+            .Where(p => p.ClientId == clientId)
+            .OrderByDescending(p => p.CreatedAt)
+            .Skip(skip)
+            .Take(Math.Min(limit, 1000))
+            .ToList();
 
-            var idempotencyKey = GetIdempotencyKey(process.ClientId, process.IdempotencyKey);
-            _processesByIdempotencyKey.TryRemove(idempotencyKey, out _);
+        return Task.FromResult<IReadOnlyList<Process>>(processes);
+    }
 
-            return Task.FromResult(true);
-        }
+    public Task<int> CountActiveProcessesAsync(
+        string clientId,
+        string processType,
+        CancellationToken ct = default)
+    {
+        var count = _processesById.Values
+            .Count(p => 
+                p.ClientId == clientId && 
+                p.ProcessType == processType &&
+                (p.Status == ProcessStatus.Accepted || p.Status == ProcessStatus.Processing));
 
-        return Task.FromResult(false);
+        return Task.FromResult(count);
+    }
+
+    public Task<int> CountRunningProcessesByTypeAsync(
+        string processType,
+        string clientId,
+        CancellationToken ct = default)
+    {
+        var count = _processesById.Values
+            .Count(p => 
+                p.ProcessType == processType &&
+                p.ClientId == clientId &&
+                (p.Status == ProcessStatus.Accepted || p.Status == ProcessStatus.Processing));
+
+        return Task.FromResult(count);
+    }
+
+    public Task<IReadOnlyList<Process>> GetExpiredProcessesAsync(
+        DateTime expirationDate,
+        CancellationToken ct = default)
+    {
+        var terminalStatuses = new[] 
+        { 
+            ProcessStatus.Completed, 
+            ProcessStatus.Failed 
+        };
+
+        var processes = _processesById.Values
+            .Where(p => 
+                terminalStatuses.Contains(p.Status) &&
+                p.RetentionExpiresAt.HasValue &&
+                p.RetentionExpiresAt.Value <= expirationDate)
+            .Take(1000)
+            .ToList();
+
+        return Task.FromResult<IReadOnlyList<Process>>(processes);
     }
 
     private static string GetClientKey(string clientId, string clientProcessId) 
