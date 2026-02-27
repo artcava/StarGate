@@ -57,7 +57,7 @@ public class ProblemDetailsFactoryTests
     public void CreateProblemDetails_Should_Map_PolicyViolationException_To429()
     {
         // Arrange
-        var exception = new PolicyViolationException("Rate limit exceeded");
+        var exception = new PolicyViolationException("test-client", "order", "Rate limit exceeded");
 
         // Act
         var problemDetails = ProblemDetailsFactory.CreateProblemDetails(
