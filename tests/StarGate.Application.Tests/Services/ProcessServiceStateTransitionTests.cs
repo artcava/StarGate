@@ -61,9 +61,12 @@ public class ProcessServiceStateTransitionTests
             .Returns(Task.CompletedTask);
 
         // Act
-        await _service.UpdateProcessStatusAsync(process.ProcessId, to);
+        var result = await _service.UpdateProcessStatusAsync(process.ProcessId, to);
 
         // Assert
+        result.Should().NotBeNull();
+        result.ProcessId.Should().Be(process.ProcessId);
+        result.Status.Should().Be(to);
         _repositoryMock.Verify(
             r => r.UpdateAsync(
                 It.Is<Process>(p => p.ProcessId == process.ProcessId && p.Status == to),
@@ -110,7 +113,6 @@ public class ProcessServiceStateTransitionTests
     {
         // Arrange
         var process = CreateTestProcess(status: ProcessStatus.Processing);
-        Process? updatedProcess = null;
 
         _repositoryMock
             .Setup(r => r.GetByIdAsync(process.ProcessId, It.IsAny<CancellationToken>()))
@@ -118,18 +120,17 @@ public class ProcessServiceStateTransitionTests
 
         _repositoryMock
             .Setup(r => r.UpdateAsync(It.IsAny<Process>(), It.IsAny<CancellationToken>()))
-            .Callback<Process, CancellationToken>((p, ct) => updatedProcess = p)
             .Returns(Task.CompletedTask);
 
         // Act
-        await _service.CompleteProcessAsync(process.ProcessId);
+        var result = await _service.CompleteProcessAsync(process.ProcessId);
 
         // Assert
-        updatedProcess.Should().NotBeNull();
-        updatedProcess!.Status.Should().Be(ProcessStatus.Completed);
-        updatedProcess.Progress.Should().Be(100);
-        updatedProcess.CompletedAt.Should().NotBeNull();
-        updatedProcess.CompletedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
+        result.Should().NotBeNull();
+        result.Status.Should().Be(ProcessStatus.Completed);
+        result.Progress.Should().Be(100);
+        result.CompletedAt.Should().NotBeNull();
+        result.CompletedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
     }
 
     [Fact]
@@ -161,29 +162,26 @@ public class ProcessServiceStateTransitionTests
             maxRetries: 3,
             retryCount: 1);
 
-        Process? updatedProcess = null;
-
         _repositoryMock
             .Setup(r => r.GetByIdAsync(process.ProcessId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(process);
 
         _repositoryMock
             .Setup(r => r.UpdateAsync(It.IsAny<Process>(), It.IsAny<CancellationToken>()))
-            .Callback<Process, CancellationToken>((p, ct) => updatedProcess = p)
             .Returns(Task.CompletedTask);
 
         // Act
-        await _service.FailProcessAsync(
+        var result = await _service.FailProcessAsync(
             process.ProcessId,
             "TEST_ERROR",
             "Test error message",
             canRetry: true);
 
         // Assert
-        updatedProcess.Should().NotBeNull();
-        updatedProcess!.Status.Should().Be(ProcessStatus.Retrying);
-        updatedProcess.RetryCount.Should().Be(2);
-        updatedProcess.Errors.Should().ContainSingle()
+        result.Should().NotBeNull();
+        result.Status.Should().Be(ProcessStatus.Retrying);
+        result.RetryCount.Should().Be(2);
+        result.Errors.Should().ContainSingle()
             .Which.ErrorCode.Should().Be("TEST_ERROR");
     }
 
@@ -196,28 +194,25 @@ public class ProcessServiceStateTransitionTests
             maxRetries: 3,
             retryCount: 3); // At limit
 
-        Process? updatedProcess = null;
-
         _repositoryMock
             .Setup(r => r.GetByIdAsync(process.ProcessId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(process);
 
         _repositoryMock
             .Setup(r => r.UpdateAsync(It.IsAny<Process>(), It.IsAny<CancellationToken>()))
-            .Callback<Process, CancellationToken>((p, ct) => updatedProcess = p)
             .Returns(Task.CompletedTask);
 
         // Act
-        await _service.FailProcessAsync(
+        var result = await _service.FailProcessAsync(
             process.ProcessId,
             "TEST_ERROR",
             "Test error message",
             canRetry: true);
 
         // Assert
-        updatedProcess.Should().NotBeNull();
-        updatedProcess!.Status.Should().Be(ProcessStatus.Failed);
-        updatedProcess.FailedAt.Should().NotBeNull();
+        result.Should().NotBeNull();
+        result.Status.Should().Be(ProcessStatus.Failed);
+        result.FailedAt.Should().NotBeNull();
     }
 
     [Fact]
@@ -228,27 +223,24 @@ public class ProcessServiceStateTransitionTests
             status: ProcessStatus.Processing,
             retryable: false);
 
-        Process? updatedProcess = null;
-
         _repositoryMock
             .Setup(r => r.GetByIdAsync(process.ProcessId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(process);
 
         _repositoryMock
             .Setup(r => r.UpdateAsync(It.IsAny<Process>(), It.IsAny<CancellationToken>()))
-            .Callback<Process, CancellationToken>((p, ct) => updatedProcess = p)
             .Returns(Task.CompletedTask);
 
         // Act
-        await _service.FailProcessAsync(
+        var result = await _service.FailProcessAsync(
             process.ProcessId,
             "FATAL_ERROR",
             "Fatal error",
             canRetry: true);
 
         // Assert
-        updatedProcess.Should().NotBeNull();
-        updatedProcess!.Status.Should().Be(ProcessStatus.Failed);
+        result.Should().NotBeNull();
+        result.Status.Should().Be(ProcessStatus.Failed);
     }
 
     [Fact]
@@ -260,28 +252,25 @@ public class ProcessServiceStateTransitionTests
             maxRetries: 3,
             retryCount: 0);
 
-        Process? updatedProcess = null;
-
         _repositoryMock
             .Setup(r => r.GetByIdAsync(process.ProcessId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(process);
 
         _repositoryMock
             .Setup(r => r.UpdateAsync(It.IsAny<Process>(), It.IsAny<CancellationToken>()))
-            .Callback<Process, CancellationToken>((p, ct) => updatedProcess = p)
             .Returns(Task.CompletedTask);
 
         // Act
-        await _service.FailProcessAsync(
+        var result = await _service.FailProcessAsync(
             process.ProcessId,
             "NON_RETRYABLE_ERROR",
             "Non-retryable error",
             canRetry: false);
 
         // Assert
-        updatedProcess.Should().NotBeNull();
-        updatedProcess!.Status.Should().Be(ProcessStatus.Failed);
-        updatedProcess.FailedAt.Should().NotBeNull();
+        result.Should().NotBeNull();
+        result.Status.Should().Be(ProcessStatus.Failed);
+        result.FailedAt.Should().NotBeNull();
     }
 
     #endregion
@@ -293,7 +282,6 @@ public class ProcessServiceStateTransitionTests
     {
         // Arrange
         var process = CreateTestProcess(status: ProcessStatus.Pending);
-        Process? updatedProcess = null;
 
         _repositoryMock
             .Setup(r => r.GetByIdAsync(process.ProcessId, It.IsAny<CancellationToken>()))
@@ -301,16 +289,15 @@ public class ProcessServiceStateTransitionTests
 
         _repositoryMock
             .Setup(r => r.UpdateAsync(It.IsAny<Process>(), It.IsAny<CancellationToken>()))
-            .Callback<Process, CancellationToken>((p, ct) => updatedProcess = p)
             .Returns(Task.CompletedTask);
 
         // Act
-        await _service.RejectProcessAsync(process.ProcessId, "Validation failed");
+        var result = await _service.RejectProcessAsync(process.ProcessId, "Validation failed");
 
         // Assert
-        updatedProcess.Should().NotBeNull();
-        updatedProcess!.Status.Should().Be(ProcessStatus.Rejected);
-        updatedProcess.Errors.Should().ContainSingle()
+        result.Should().NotBeNull();
+        result.Status.Should().Be(ProcessStatus.Rejected);
+        result.Errors.Should().ContainSingle()
             .Which.ErrorCode.Should().Be("PROCESS_REJECTED");
     }
 
@@ -361,7 +348,6 @@ public class ProcessServiceStateTransitionTests
     {
         // Arrange
         var process = CreateTestProcess(status: ProcessStatus.Processing);
-        Process? updatedProcess = null;
 
         _repositoryMock
             .Setup(r => r.GetByIdAsync(process.ProcessId, It.IsAny<CancellationToken>()))
@@ -369,15 +355,14 @@ public class ProcessServiceStateTransitionTests
 
         _repositoryMock
             .Setup(r => r.UpdateAsync(It.IsAny<Process>(), It.IsAny<CancellationToken>()))
-            .Callback<Process, CancellationToken>((p, ct) => updatedProcess = p)
             .Returns(Task.CompletedTask);
 
         // Act
-        await _service.UpdateProcessProgressAsync(process.ProcessId, validProgress);
+        var result = await _service.UpdateProcessProgressAsync(process.ProcessId, validProgress);
 
         // Assert
-        updatedProcess.Should().NotBeNull();
-        updatedProcess!.Progress.Should().Be(validProgress);
+        result.Should().NotBeNull();
+        result.Progress.Should().Be(validProgress);
     }
 
     #endregion
@@ -392,28 +377,25 @@ public class ProcessServiceStateTransitionTests
             status: ProcessStatus.Processing,
             timeoutAt: DateTime.UtcNow.AddSeconds(-10)); // Already timed out
 
-        Process? updatedProcess = null;
-
         _repositoryMock
             .Setup(r => r.GetByIdAsync(process.ProcessId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(process);
 
         _repositoryMock
             .Setup(r => r.UpdateAsync(It.IsAny<Process>(), It.IsAny<CancellationToken>()))
-            .Callback<Process, CancellationToken>((p, ct) => updatedProcess = p)
             .Returns(Task.CompletedTask);
 
         // Act
-        await _service.CheckTimeoutAsync(process.ProcessId);
+        var result = await _service.CheckTimeoutAsync(process.ProcessId);
 
         // Assert
-        updatedProcess.Should().NotBeNull();
-        updatedProcess!.Errors.Should().ContainSingle()
+        result.Should().NotBeNull();
+        result.Errors.Should().ContainSingle()
             .Which.ErrorCode.Should().Be("PROCESS_TIMEOUT");
     }
 
     [Fact]
-    public async Task CheckTimeoutAsync_Should_DoNothing_WhenNotTimedOut()
+    public async Task CheckTimeoutAsync_Should_ReturnUnchanged_WhenNotTimedOut()
     {
         // Arrange
         var process = CreateTestProcess(
@@ -425,16 +407,19 @@ public class ProcessServiceStateTransitionTests
             .ReturnsAsync(process);
 
         // Act
-        await _service.CheckTimeoutAsync(process.ProcessId);
+        var result = await _service.CheckTimeoutAsync(process.ProcessId);
 
         // Assert
+        result.Should().NotBeNull();
+        result.ProcessId.Should().Be(process.ProcessId);
+        result.Status.Should().Be(ProcessStatus.Processing);
         _repositoryMock.Verify(
             r => r.UpdateAsync(It.IsAny<Process>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
     [Fact]
-    public async Task CheckTimeoutAsync_Should_DoNothing_WhenTimeoutAtIsNull()
+    public async Task CheckTimeoutAsync_Should_ReturnUnchanged_WhenTimeoutAtIsNull()
     {
         // Arrange
         var process = CreateTestProcess(
@@ -446,9 +431,11 @@ public class ProcessServiceStateTransitionTests
             .ReturnsAsync(process);
 
         // Act
-        await _service.CheckTimeoutAsync(process.ProcessId);
+        var result = await _service.CheckTimeoutAsync(process.ProcessId);
 
         // Assert
+        result.Should().NotBeNull();
+        result.ProcessId.Should().Be(process.ProcessId);
         _repositoryMock.Verify(
             r => r.UpdateAsync(It.IsAny<Process>(), It.IsAny<CancellationToken>()),
             Times.Never);
@@ -463,7 +450,6 @@ public class ProcessServiceStateTransitionTests
     {
         // Arrange
         var process = CreateTestProcess(status: ProcessStatus.Processing);
-        Process? updatedProcess = null;
 
         _repositoryMock
             .Setup(r => r.GetByIdAsync(process.ProcessId, It.IsAny<CancellationToken>()))
@@ -471,22 +457,21 @@ public class ProcessServiceStateTransitionTests
 
         _repositoryMock
             .Setup(r => r.UpdateAsync(It.IsAny<Process>(), It.IsAny<CancellationToken>()))
-            .Callback<Process, CancellationToken>((p, ct) => updatedProcess = p)
             .Returns(Task.CompletedTask);
 
         // Act
-        await _service.RecordProcessErrorAsync(
+        var result = await _service.RecordProcessErrorAsync(
             process.ProcessId,
             "ERROR_CODE",
             "Error message",
             retryable: true);
 
         // Assert
-        updatedProcess.Should().NotBeNull();
-        updatedProcess!.Errors.Should().ContainSingle();
-        updatedProcess.Errors![0].ErrorCode.Should().Be("ERROR_CODE");
-        updatedProcess.Errors[0].Message.Should().Be("Error message");
-        updatedProcess.Errors[0].Retryable.Should().BeTrue();
+        result.Should().NotBeNull();
+        result.Errors.Should().ContainSingle();
+        result.Errors![0].ErrorCode.Should().Be("ERROR_CODE");
+        result.Errors[0].Message.Should().Be("Error message");
+        result.Errors[0].Retryable.Should().BeTrue();
     }
 
     [Fact]
@@ -494,27 +479,29 @@ public class ProcessServiceStateTransitionTests
     {
         // Arrange
         var process = CreateTestProcess(status: ProcessStatus.Processing);
-        var processRef = process;
+        var processWithError1 = process.AddError("ERROR_1", "First error", true);
+        var processWithError2 = processWithError1.AddError("ERROR_2", "Second error", false);
 
         _repositoryMock
-            .Setup(r => r.GetByIdAsync(process.ProcessId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(() => processRef);
+            .SetupSequence(r => r.GetByIdAsync(process.ProcessId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(process)
+            .ReturnsAsync(processWithError1)
+            .ReturnsAsync(processWithError2);
 
         _repositoryMock
             .Setup(r => r.UpdateAsync(It.IsAny<Process>(), It.IsAny<CancellationToken>()))
-            .Callback<Process, CancellationToken>((p, ct) => processRef = p)
             .Returns(Task.CompletedTask);
 
         // Act
-        await _service.RecordProcessErrorAsync(process.ProcessId, "ERROR_1", "First error", true);
-        await _service.RecordProcessErrorAsync(process.ProcessId, "ERROR_2", "Second error", false);
-        await _service.RecordProcessErrorAsync(process.ProcessId, "ERROR_3", "Third error", true);
+        var result1 = await _service.RecordProcessErrorAsync(process.ProcessId, "ERROR_1", "First error", true);
+        var result2 = await _service.RecordProcessErrorAsync(process.ProcessId, "ERROR_2", "Second error", false);
+        var result3 = await _service.RecordProcessErrorAsync(process.ProcessId, "ERROR_3", "Third error", true);
 
         // Assert
-        processRef.Errors.Should().HaveCount(3);
-        processRef.Errors![0].ErrorCode.Should().Be("ERROR_1");
-        processRef.Errors[1].ErrorCode.Should().Be("ERROR_2");
-        processRef.Errors[2].ErrorCode.Should().Be("ERROR_3");
+        result3.Errors.Should().HaveCount(3);
+        result3.Errors![0].ErrorCode.Should().Be("ERROR_1");
+        result3.Errors[1].ErrorCode.Should().Be("ERROR_2");
+        result3.Errors[2].ErrorCode.Should().Be("ERROR_3");
     }
 
     #endregion
@@ -529,23 +516,20 @@ public class ProcessServiceStateTransitionTests
             status: ProcessStatus.Retrying,
             retryCount: 2);
 
-        Process? updatedProcess = null;
-
         _repositoryMock
             .Setup(r => r.GetByIdAsync(process.ProcessId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(process);
 
         _repositoryMock
             .Setup(r => r.UpdateAsync(It.IsAny<Process>(), It.IsAny<CancellationToken>()))
-            .Callback<Process, CancellationToken>((p, ct) => updatedProcess = p)
             .Returns(Task.CompletedTask);
 
         // Act
-        await _service.IncrementRetryCountAsync(process.ProcessId);
+        var result = await _service.IncrementRetryCountAsync(process.ProcessId);
 
         // Assert
-        updatedProcess.Should().NotBeNull();
-        updatedProcess!.RetryCount.Should().Be(3);
+        result.Should().NotBeNull();
+        result.RetryCount.Should().Be(3);
     }
 
     #endregion
@@ -557,7 +541,6 @@ public class ProcessServiceStateTransitionTests
     {
         // Arrange
         var process = CreateTestProcess(status: ProcessStatus.Accepted);
-        Process? updatedProcess = null;
 
         _repositoryMock
             .Setup(r => r.GetByIdAsync(process.ProcessId, It.IsAny<CancellationToken>()))
@@ -565,15 +548,14 @@ public class ProcessServiceStateTransitionTests
 
         _repositoryMock
             .Setup(r => r.UpdateAsync(It.IsAny<Process>(), It.IsAny<CancellationToken>()))
-            .Callback<Process, CancellationToken>((p, ct) => updatedProcess = p)
             .Returns(Task.CompletedTask);
 
         // Act
-        await _service.TransitionToProcessingAsync(process.ProcessId);
+        var result = await _service.TransitionToProcessingAsync(process.ProcessId);
 
         // Assert
-        updatedProcess.Should().NotBeNull();
-        updatedProcess!.Status.Should().Be(ProcessStatus.Processing);
+        result.Should().NotBeNull();
+        result.Status.Should().Be(ProcessStatus.Processing);
     }
 
     [Fact]
@@ -581,7 +563,6 @@ public class ProcessServiceStateTransitionTests
     {
         // Arrange
         var process = CreateTestProcess(status: ProcessStatus.Retrying);
-        Process? updatedProcess = null;
 
         _repositoryMock
             .Setup(r => r.GetByIdAsync(process.ProcessId, It.IsAny<CancellationToken>()))
@@ -589,15 +570,14 @@ public class ProcessServiceStateTransitionTests
 
         _repositoryMock
             .Setup(r => r.UpdateAsync(It.IsAny<Process>(), It.IsAny<CancellationToken>()))
-            .Callback<Process, CancellationToken>((p, ct) => updatedProcess = p)
             .Returns(Task.CompletedTask);
 
         // Act
-        await _service.TransitionToProcessingAsync(process.ProcessId);
+        var result = await _service.TransitionToProcessingAsync(process.ProcessId);
 
         // Assert
-        updatedProcess.Should().NotBeNull();
-        updatedProcess!.Status.Should().Be(ProcessStatus.Processing);
+        result.Should().NotBeNull();
+        result.Status.Should().Be(ProcessStatus.Processing);
     }
 
     #endregion
