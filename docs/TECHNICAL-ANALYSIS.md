@@ -254,9 +254,9 @@ StarGate/
 #### Sprint 1.1: Project Setup
 - [x] **#1** Create solution structure with all projects
 - [x] **#2** Configure `.editorconfig` and code analysis
-- [ ] Setup CI/CD pipeline (GitHub Actions)
-- [ ] Configure Docker Compose for local development
-- [ ] Document setup instructions in README
+- [x] Setup CI/CD pipeline (GitHub Actions)
+- [x] Configure Docker Compose for local development
+- [x] Document setup instructions in README
 
 #### Sprint 1.2: Domain Model
 - [x] **#6** Implement core domain entities (Process, ProcessStatus, ProcessError)
