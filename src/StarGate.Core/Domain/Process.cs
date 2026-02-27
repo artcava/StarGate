@@ -34,7 +34,7 @@ public record Process
 
     /// <summary>
     /// Current status of the process.
-    /// Indicates the lifecycle state: Accepted, Processing, Completed, or Failed.
+    /// Indicates the lifecycle state: Pending, Accepted, Processing, Completed, Failed, Retrying, or Rejected.
     /// </summary>
     public required ProcessStatus Status { get; init; }
 
@@ -65,10 +65,17 @@ public record Process
     public JsonDocument? Result { get; init; }
 
     /// <summary>
-    /// Error details (populated when failed).
-    /// Contains structured error information when the process fails.
+    /// Error details (populated when failed) - DEPRECATED.
+    /// Use Errors list for comprehensive error tracking.
+    /// Maintained for backward compatibility.
     /// </summary>
     public ProcessError? Error { get; init; }
+
+    /// <summary>
+    /// List of errors encountered during process execution.
+    /// Tracks all errors including retryable and non-retryable failures.
+    /// </summary>
+    public List<ProcessErrorEntry>? Errors { get; init; }
 
     /// <summary>
     /// Timestamp when process was created (UTC).
@@ -83,10 +90,16 @@ public record Process
     public required DateTime UpdatedAt { get; init; }
 
     /// <summary>
-    /// Timestamp when process completed or failed (UTC).
-    /// Records the final state transition time.
+    /// Timestamp when process completed successfully (UTC).
+    /// Records the completion time for successful processes.
     /// </summary>
     public DateTime? CompletedAt { get; init; }
+
+    /// <summary>
+    /// Timestamp when process failed permanently (UTC).
+    /// Records the failure time for permanently failed processes.
+    /// </summary>
+    public DateTime? FailedAt { get; init; }
 
     /// <summary>
     /// Idempotency key to prevent duplicate submissions.
@@ -125,7 +138,7 @@ public record Process
     /// Timestamp when the process expires and can be deleted (calculated from retention policy).
     /// Derived from CreatedAt + policy.RetentionDays.
     /// Used by cleanup jobs to identify processes eligible for deletion.
-    /// Only applies to terminal states: Completed, Failed, Cancelled.
+    /// Only applies to terminal states: Completed, Failed, Rejected.
     /// </summary>
     public DateTime? RetentionExpiresAt { get; init; }
 
@@ -140,4 +153,66 @@ public record Process
     /// True when current UTC time has passed the TimeoutAt threshold.
     /// </summary>
     public bool IsTimedOut => TimeoutAt.HasValue && DateTime.UtcNow > TimeoutAt.Value;
+
+    /// <summary>
+    /// Checks if the process is in a terminal state.
+    /// Terminal states: Completed, Failed, Rejected - no further transitions possible.
+    /// </summary>
+    public bool IsTerminal => Status is ProcessStatus.Completed or ProcessStatus.Failed or ProcessStatus.Rejected;
+
+    /// <summary>
+    /// Checks if the process is active (can be executed).
+    /// Active states: Accepted, Processing, Retrying.
+    /// </summary>
+    public bool IsActive => Status is ProcessStatus.Accepted or ProcessStatus.Processing or ProcessStatus.Retrying;
+
+    /// <summary>
+    /// Adds an error to the process.
+    /// Note: Since Process is immutable, this returns a new instance with the error added.
+    /// </summary>
+    /// <param name="errorCode">Error code for categorization.</param>
+    /// <param name="message">Human-readable error message.</param>
+    /// <param name="retryable">Indicates if this error is retryable.</param>
+    /// <returns>New Process instance with the error added.</returns>
+    public Process AddError(string errorCode, string message, bool retryable)
+    {
+        var errorList = new List<ProcessErrorEntry>(Errors ?? new List<ProcessErrorEntry>())
+        {
+            new ProcessErrorEntry
+            {
+                ErrorCode = errorCode,
+                Message = message,
+                Retryable = retryable,
+                Timestamp = DateTime.UtcNow
+            }
+        };
+
+        return this with { Errors = errorList };
+    }
+}
+
+/// <summary>
+/// Represents a single error entry in the process error history.
+/// </summary>
+public class ProcessErrorEntry
+{
+    /// <summary>
+    /// Error code for categorization (e.g., "TIMEOUT", "VALIDATION_ERROR").
+    /// </summary>
+    public required string ErrorCode { get; init; }
+
+    /// <summary>
+    /// Human-readable error message.
+    /// </summary>
+    public required string Message { get; init; }
+
+    /// <summary>
+    /// Indicates if this error is retryable.
+    /// </summary>
+    public required bool Retryable { get; init; }
+
+    /// <summary>
+    /// Timestamp when this error occurred (UTC).
+    /// </summary>
+    public required DateTime Timestamp { get; init; }
 }
