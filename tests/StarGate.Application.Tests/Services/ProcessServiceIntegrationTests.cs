@@ -175,69 +175,51 @@ public class ProcessServiceIntegrationTests
 
         var processingProcess = await _service.TransitionToProcessingAsync(process.ProcessId);
 
-        // Simulate failures: MaxRetries=3 means we can retry 3 times
-        // Initial attempt (RetryCount=0) + 3 retries = 4 total failures before giving up
-        // After 3rd retry failure (RetryCount=3), IsRetryLimitExceeded=true -> Failed
+        // FailProcessAsync checks IsRetryLimitExceeded BEFORE incrementing RetryCount
+        // So with MaxRetries=3, we need 4 failures:
+        // Fail #1: RetryCount=0, check(0>=3)=false -> increment to 1 -> Retrying
+        // Fail #2: RetryCount=1, check(1>=3)=false -> increment to 2 -> Retrying  
+        // Fail #3: RetryCount=2, check(2>=3)=false -> increment to 3 -> Retrying
+        // Fail #4: RetryCount=3, check(3>=3)=true -> Failed (no increment)
+        
         Process currentProcess = processingProcess;
         
-        // 1st failure: RetryCount 0->1, should Retry (1 < 3)
-        _repositoryMock
-            .Setup(r => r.GetByIdAsync(process.ProcessId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(currentProcess);
+        for (int i = 1; i <= 4; i++)
+        {
+            _repositoryMock
+                .Setup(r => r.GetByIdAsync(process.ProcessId, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(currentProcess);
 
-        currentProcess = await _service.FailProcessAsync(
-            process.ProcessId,
-            "TEMPORARY_ERROR",
-            "Attempt 1 failed",
-            canRetry: true);
+            currentProcess = await _service.FailProcessAsync(
+                process.ProcessId,
+                "TEMPORARY_ERROR",
+                $"Attempt {i} failed",
+                canRetry: true);
 
-        currentProcess.Status.Should().Be(ProcessStatus.Retrying);
-        currentProcess.RetryCount.Should().Be(1);
+            if (i < 4)
+            {
+                // First 3 failures should go to Retrying
+                currentProcess.Status.Should().Be(ProcessStatus.Retrying, $"failure #{i} should retry");
+                currentProcess.RetryCount.Should().Be(i, $"after failure #{i}");
 
-        // Transition back to Processing for 2nd attempt
-        _repositoryMock
-            .Setup(r => r.GetByIdAsync(process.ProcessId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(currentProcess);
+                // Transition back to Processing for next attempt
+                _repositoryMock
+                    .Setup(r => r.GetByIdAsync(process.ProcessId, It.IsAny<CancellationToken>()))
+                    .ReturnsAsync(currentProcess);
 
-        currentProcess = await _service.TransitionToProcessingAsync(process.ProcessId);
+                currentProcess = await _service.TransitionToProcessingAsync(process.ProcessId);
+                currentProcess.Status.Should().Be(ProcessStatus.Processing);
+            }
+            else
+            {
+                // 4th failure: limit exceeded, should be Failed
+                currentProcess.Status.Should().Be(ProcessStatus.Failed);
+                currentProcess.RetryCount.Should().Be(3);
+                currentProcess.FailedAt.Should().NotBeNull();
+            }
+        }
 
-        // 2nd failure: RetryCount 1->2, should Retry (2 < 3)
-        _repositoryMock
-            .Setup(r => r.GetByIdAsync(process.ProcessId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(currentProcess);
-
-        currentProcess = await _service.FailProcessAsync(
-            process.ProcessId,
-            "TEMPORARY_ERROR",
-            "Attempt 2 failed",
-            canRetry: true);
-
-        currentProcess.Status.Should().Be(ProcessStatus.Retrying);
-        currentProcess.RetryCount.Should().Be(2);
-
-        // Transition back to Processing for 3rd attempt
-        _repositoryMock
-            .Setup(r => r.GetByIdAsync(process.ProcessId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(currentProcess);
-
-        currentProcess = await _service.TransitionToProcessingAsync(process.ProcessId);
-
-        // 3rd failure: RetryCount 2->3, limit reached (3 >= 3) -> Failed
-        _repositoryMock
-            .Setup(r => r.GetByIdAsync(process.ProcessId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(currentProcess);
-
-        currentProcess = await _service.FailProcessAsync(
-            process.ProcessId,
-            "TEMPORARY_ERROR",
-            "Attempt 3 failed",
-            canRetry: true);
-
-        // Assert final state
-        currentProcess.Status.Should().Be(ProcessStatus.Failed);
-        currentProcess.RetryCount.Should().Be(3);
-        currentProcess.FailedAt.Should().NotBeNull();
-        currentProcess.Errors.Should().HaveCount(3);
+        currentProcess.Errors.Should().HaveCount(4);
     }
 
     [Fact]
