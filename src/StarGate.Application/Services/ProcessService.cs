@@ -70,7 +70,7 @@ public class ProcessService : IProcessService
         var processId = Guid.NewGuid();
         var now = DateTime.UtcNow;
 
-        // Create new process entity
+        // Create new process entity (immutable record)
         var process = new Process
         {
             ProcessId = processId,
@@ -78,12 +78,13 @@ public class ProcessService : IProcessService
             ProcessType = processType,
             ClientProcessId = clientProcessId,
             IdempotencyKey = idempotencyKey,
-            Status = ProcessStatus.Pending,
+            Status = ProcessStatus.Accepted, // Initial status
             Progress = 0,
             Retryable = true,
-            Metadata = metadata ?? new Dictionary<string, string>(),
             CreatedAt = now,
-            UpdatedAt = now
+            UpdatedAt = now,
+            RetryCount = 0,
+            MaxRetries = 0 // Will be set by policy later
         };
 
         // Persist the process
@@ -164,24 +165,32 @@ public class ProcessService : IProcessService
         // Validate status transition
         ValidateStatusTransition(process.Status, newStatus);
 
-        // Update status and timestamp
-        process.Status = newStatus;
-        process.UpdatedAt = DateTime.UtcNow;
+        var now = DateTime.UtcNow;
 
-        // Update completion timestamps based on status
-        switch (newStatus)
+        // Create updated process with new status (immutable pattern)
+        var updatedProcess = newStatus switch
         {
-            case ProcessStatus.Completed:
-                process.CompletedAt = DateTime.UtcNow;
-                process.Progress = 100;
-                break;
+            ProcessStatus.Completed => process with
+            {
+                Status = newStatus,
+                UpdatedAt = now,
+                CompletedAt = now,
+                Progress = 100
+            },
+            ProcessStatus.Failed => process with
+            {
+                Status = newStatus,
+                UpdatedAt = now,
+                CompletedAt = now
+            },
+            _ => process with
+            {
+                Status = newStatus,
+                UpdatedAt = now
+            }
+        };
 
-            case ProcessStatus.Failed:
-                process.FailedAt = DateTime.UtcNow;
-                break;
-        }
-
-        await _processRepository.UpdateAsync(process, cancellationToken);
+        await _processRepository.UpdateAsync(updatedProcess, cancellationToken);
 
         _logger.LogInformation(
             "Process status updated successfully: ProcessId={ProcessId}, NewStatus={NewStatus}",
@@ -197,16 +206,13 @@ public class ProcessService : IProcessService
     /// <exception cref="InvalidStateTransitionException">If transition is not allowed.</exception>
     private void ValidateStatusTransition(ProcessStatus currentStatus, ProcessStatus newStatus)
     {
-        // Define valid transitions based on process state machine
+        // Define valid transitions based on actual ProcessStatus enum
         var validTransitions = new Dictionary<ProcessStatus, ProcessStatus[]>
         {
-            [ProcessStatus.Pending] = new[] { ProcessStatus.Accepted, ProcessStatus.Rejected },
             [ProcessStatus.Accepted] = new[] { ProcessStatus.Processing, ProcessStatus.Failed },
-            [ProcessStatus.Processing] = new[] { ProcessStatus.Completed, ProcessStatus.Failed, ProcessStatus.Retrying },
-            [ProcessStatus.Retrying] = new[] { ProcessStatus.Processing, ProcessStatus.Failed },
-            [ProcessStatus.Failed] = new[] { ProcessStatus.Retrying },
-            [ProcessStatus.Completed] = Array.Empty<ProcessStatus>(),
-            [ProcessStatus.Rejected] = Array.Empty<ProcessStatus>()
+            [ProcessStatus.Processing] = new[] { ProcessStatus.Completed, ProcessStatus.Failed },
+            [ProcessStatus.Completed] = Array.Empty<ProcessStatus>(), // Terminal state
+            [ProcessStatus.Failed] = Array.Empty<ProcessStatus>() // Terminal state (retry would create new process)
         };
 
         if (!validTransitions.ContainsKey(currentStatus))
