@@ -6,6 +6,7 @@ using StarGate.Core.Abstractions;
 using StarGate.Core.Domain;
 using StarGate.Core.Domain.Configuration;
 using StarGate.Core.Exceptions;
+using StarGate.Core.Messages;
 using Xunit;
 
 namespace StarGate.Application.Tests.Services;
