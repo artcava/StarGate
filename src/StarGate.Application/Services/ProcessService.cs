@@ -3,17 +3,20 @@ using StarGate.Contracts.Requests;
 using StarGate.Core.Abstractions;
 using StarGate.Core.Domain;
 using StarGate.Core.Exceptions;
+using StarGate.Core.Messages;
 
 namespace StarGate.Application.Services;
 
 /// <summary>
 /// Service for managing process lifecycle and operations.
-/// Implements GUID generation, idempotency handling, and status transition validation.
+/// Implements GUID generation, idempotency handling, status transition validation,
+/// and message broker publishing for asynchronous processing.
 /// </summary>
 public class ProcessService : IProcessService
 {
     private readonly IProcessRepository _processRepository;
     private readonly IIdempotencyService _idempotencyService;
+    private readonly IMessageBroker _messageBroker;
     private readonly ILogger<ProcessService> _logger;
 
     /// <summary>
@@ -21,15 +24,18 @@ public class ProcessService : IProcessService
     /// </summary>
     /// <param name="processRepository">Repository for process persistence.</param>
     /// <param name="idempotencyService">Service for idempotency key management.</param>
+    /// <param name="messageBroker">Message broker for asynchronous processing.</param>
     /// <param name="logger">Logger instance.</param>
     /// <exception cref="ArgumentNullException">If any parameter is null.</exception>
     public ProcessService(
         IProcessRepository processRepository,
         IIdempotencyService idempotencyService,
+        IMessageBroker messageBroker,
         ILogger<ProcessService> logger)
     {
         _processRepository = processRepository ?? throw new ArgumentNullException(nameof(processRepository));
         _idempotencyService = idempotencyService ?? throw new ArgumentNullException(nameof(idempotencyService));
+        _messageBroker = messageBroker ?? throw new ArgumentNullException(nameof(messageBroker));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -136,7 +142,62 @@ public class ProcessService : IProcessService
                 clientId,
                 processType);
 
+            // Publish message to broker for asynchronous processing
+            try
+            {
+                var message = ProcessMessage.FromProcess(process);
+                var routingKey = $"process.{processType}";
+
+                _logger.LogDebug(
+                    "Publishing process message: ProcessId={ProcessId}, RoutingKey={RoutingKey}",
+                    processId,
+                    routingKey);
+
+                await _messageBroker.PublishAsync(
+                    message,
+                    routingKey,
+                    cancellationToken);
+
+                _logger.LogInformation(
+                    "Process message published successfully: ProcessId={ProcessId}, RoutingKey={RoutingKey}",
+                    processId,
+                    routingKey);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Failed to publish process message: ProcessId={ProcessId}, ProcessType={ProcessType}",
+                    processId,
+                    processType);
+
+                // Update process status to Failed and add error details
+                var failedProcess = process with
+                {
+                    Status = ProcessStatus.Failed,
+                    UpdatedAt = DateTime.UtcNow,
+                    CompletedAt = DateTime.UtcNow
+                };
+
+                await _processRepository.UpdateAsync(failedProcess, cancellationToken);
+
+                // Rollback idempotency key to allow retry
+                await _idempotencyService.RemoveIdempotencyKeyAsync(
+                    clientId,
+                    idempotencyKey,
+                    cancellationToken);
+
+                throw new MessageBrokerException(
+                    $"Failed to publish process message for ProcessId={processId}. Process marked as Failed and idempotency key removed for retry.",
+                    ex);
+            }
+
             return process;
+        }
+        catch (MessageBrokerException)
+        {
+            // Re-throw broker exceptions (already handled above)
+            throw;
         }
         catch (Exception ex)
         {
