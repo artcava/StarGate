@@ -41,6 +41,34 @@ public interface IMessageBroker
         CancellationToken ct = default) where T : class;
 
     /// <summary>
+    /// Publishes a message to the broker using a routing key.
+    /// </summary>
+    /// <typeparam name="T">Type of message payload (must be reference type).</typeparam>
+    /// <param name="message">Message to publish.</param>
+    /// <param name="routingKey">Routing key for topic-based routing.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Task representing the asynchronous operation.</returns>
+    Task PublishAsync<T>(
+        T message,
+        string routingKey,
+        CancellationToken cancellationToken = default) where T : class;
+
+    /// <summary>
+    /// Publishes a message with delay.
+    /// </summary>
+    /// <typeparam name="T">Type of message payload (must be reference type).</typeparam>
+    /// <param name="message">Message to publish.</param>
+    /// <param name="routingKey">Routing key for topic-based routing.</param>
+    /// <param name="delay">Delay before message delivery.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Task representing the asynchronous operation.</returns>
+    Task PublishWithDelayAsync<T>(
+        T message,
+        string routingKey,
+        TimeSpan delay,
+        CancellationToken cancellationToken = default) where T : class;
+
+    /// <summary>
     /// Creates a consumer for a specific queue.
     /// Consumer must be started with StartConsumingAsync to begin receiving messages.
     /// Dispose consumer when done to release resources.
