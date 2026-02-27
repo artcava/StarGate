@@ -3,6 +3,8 @@ using RabbitMQ.Client.Exceptions;
 using StarGate.Core.Abstractions;
 using StarGate.Core.Exceptions;
 using Microsoft.Extensions.Logging;
+using System.Text;
+using System.Text.Json;
 
 namespace StarGate.Infrastructure.Messaging.RabbitMQ;
 
@@ -18,6 +20,8 @@ public class RabbitMqBroker : IMessageBroker, IDisposable
     private readonly RabbitMqOptions _options;
     private readonly ILogger<RabbitMqBroker> _logger;
     private bool _disposed;
+    private const string ExchangeName = "stargate.processes";
+    private const string ExchangeType = "topic";
 
     public RabbitMqBroker(
         IConnection connection,
@@ -164,20 +168,121 @@ public class RabbitMqBroker : IMessageBroker, IDisposable
         }
     }
 
+    public Task PublishAsync<T>(
+        T message,
+        string routingKey,
+        CancellationToken cancellationToken = default) where T : class
+    {
+        ArgumentNullException.ThrowIfNull(message);
+        ArgumentException.ThrowIfNullOrWhiteSpace(routingKey);
+
+        try
+        {
+            var messageBody = SerializeMessage(message);
+            var properties = _channel.CreateBasicProperties();
+            properties.Persistent = true;
+            properties.ContentType = "application/json";
+            properties.Timestamp = new AmqpTimestamp(DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+
+            _channel.BasicPublish(
+                exchange: ExchangeName,
+                routingKey: routingKey,
+                basicProperties: properties,
+                body: messageBody);
+
+            _logger.LogDebug(
+                "Message published: RoutingKey={RoutingKey}, MessageType={MessageType}",
+                routingKey,
+                typeof(T).Name);
+
+            return Task.CompletedTask;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to publish message: RoutingKey={RoutingKey}, MessageType={MessageType}",
+                routingKey,
+                typeof(T).Name);
+
+            throw;
+        }
+    }
+
+    public async Task PublishWithDelayAsync<T>(
+        T message,
+        string routingKey,
+        TimeSpan delay,
+        CancellationToken cancellationToken = default) where T : class
+    {
+        ArgumentNullException.ThrowIfNull(message);
+        ArgumentException.ThrowIfNullOrWhiteSpace(routingKey);
+
+        try
+        {
+            var messageBody = SerializeMessage(message);
+            var properties = _channel.CreateBasicProperties();
+            properties.Persistent = true;
+            properties.ContentType = "application/json";
+            properties.Expiration = ((int)delay.TotalMilliseconds).ToString();
+
+            // Use delayed exchange or dead-letter exchange pattern
+            _channel.BasicPublish(
+                exchange: ExchangeName,
+                routingKey: routingKey,
+                basicProperties: properties,
+                body: messageBody);
+
+            _logger.LogDebug(
+                "Delayed message published: RoutingKey={RoutingKey}, Delay={Delay}",
+                routingKey,
+                delay);
+
+            await Task.CompletedTask;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to publish delayed message: RoutingKey={RoutingKey}",
+                routingKey);
+
+            throw;
+        }
+    }
+
     public IMessageConsumer CreateConsumer(string queueName, CancellationToken cancellationToken = default)
     {
         // Consumer implementation is part of Phase 3.2
         throw new NotImplementedException("Consumer functionality will be implemented in Phase 3.2");
     }
 
+    private static byte[] SerializeMessage<T>(T message) where T : class
+    {
+        var json = JsonSerializer.Serialize(message, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            WriteIndented = false
+        });
+
+        return Encoding.UTF8.GetBytes(json);
+    }
+
     private void DeclareInfrastructure()
     {
         try
         {
+            // Declare topic exchange for process routing
+            _channel.ExchangeDeclare(
+                exchange: ExchangeName,
+                type: ExchangeType,
+                durable: true,
+                autoDelete: false);
+
             // Declare dead letter exchange
             _channel.ExchangeDeclare(
                 exchange: _options.DeadLetterExchange,
-                type: ExchangeType.Direct,
+                type: RabbitMQ.Client.ExchangeType.Direct,
                 durable: true,
                 autoDelete: false);
 
@@ -198,13 +303,14 @@ public class RabbitMqBroker : IMessageBroker, IDisposable
             // Declare main process exchange
             _channel.ExchangeDeclare(
                 exchange: _options.ProcessExchange,
-                type: ExchangeType.Direct,
+                type: RabbitMQ.Client.ExchangeType.Direct,
                 durable: true,
                 autoDelete: false);
 
             _logger.LogInformation(
-                "RabbitMQ infrastructure declared: Exchange={Exchange}, DLX={DLX}, DLQ={DLQ}",
+                "RabbitMQ infrastructure declared: Exchange={Exchange}, TopicExchange={TopicExchange}, DLX={DLX}, DLQ={DLQ}",
                 _options.ProcessExchange,
+                ExchangeName,
                 _options.DeadLetterExchange,
                 _options.DeadLetterQueue);
         }
