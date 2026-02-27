@@ -175,7 +175,7 @@ public class ProcessServiceIntegrationTests
 
         var processingProcess = await _service.TransitionToProcessingAsync(process.ProcessId);
 
-        // Simulate 3 retries (max)
+        // Simulate 3 failures with retries
         Process currentProcess = processingProcess;
         for (int i = 1; i <= 3; i++)
         {
@@ -191,30 +191,32 @@ public class ProcessServiceIntegrationTests
 
             if (i < 3)
             {
+                // First two attempts should transition to Retrying
                 currentProcess.Status.Should().Be(ProcessStatus.Retrying);
                 currentProcess.RetryCount.Should().Be(i);
-            }
 
-            // Transition back to processing for next retry
-            if (i < 3)
-            {
+                // Transition back to processing for next attempt
                 _repositoryMock
                     .Setup(r => r.GetByIdAsync(process.ProcessId, It.IsAny<CancellationToken>()))
                     .ReturnsAsync(currentProcess);
 
                 currentProcess = await _service.TransitionToProcessingAsync(process.ProcessId);
+                currentProcess.Status.Should().Be(ProcessStatus.Processing);
+            }
+            else
+            {
+                // After 3rd failure with RetryCount=3 and MaxRetries=3, should be Failed
+                currentProcess.Status.Should().Be(ProcessStatus.Failed);
+                currentProcess.RetryCount.Should().Be(3);
+                currentProcess.FailedAt.Should().NotBeNull();
             }
         }
 
-        // After max retries, should transition to Failed
-        currentProcess.Status.Should().Be(ProcessStatus.Failed);
-        currentProcess.RetryCount.Should().Be(3);
-        currentProcess.FailedAt.Should().NotBeNull();
         currentProcess.Errors.Should().HaveCount(3);
     }
 
     [Fact]
-    public async Task ProcessTimeout_Should_TransitionToFailed_WithTimeoutError()
+    public async Task ProcessTimeout_Should_TransitionToRetrying_WithTimeoutError()
     {
         // Arrange
         var clientId = "test-client";
@@ -230,8 +232,19 @@ public class ProcessServiceIntegrationTests
             clientProcessId,
             idempotencyKey);
 
+        // Transition to Processing first (required for timeout to work)
+        _repositoryMock
+            .Setup(r => r.GetByIdAsync(process.ProcessId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(process);
+
+        _repositoryMock
+            .Setup(r => r.UpdateAsync(It.IsAny<Process>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Process p, CancellationToken ct) => p);
+
+        var processingProcess = await _service.TransitionToProcessingAsync(process.ProcessId);
+
         // Simulate timeout by setting TimeoutAt in the past
-        var timedOutProcess = process with
+        var timedOutProcess = processingProcess with
         {
             TimeoutAt = DateTime.UtcNow.AddHours(-1)
         };
@@ -239,10 +252,6 @@ public class ProcessServiceIntegrationTests
         _repositoryMock
             .Setup(r => r.GetByIdAsync(process.ProcessId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(timedOutProcess);
-
-        _repositoryMock
-            .Setup(r => r.UpdateAsync(It.IsAny<Process>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((Process p, CancellationToken ct) => p);
 
         // Act
         var result = await _service.CheckTimeoutAsync(process.ProcessId);
