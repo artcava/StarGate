@@ -232,7 +232,10 @@ public class ProcessEndpointsTests : EndpointTestBase
                 It.IsAny<string>(),
                 It.IsAny<SubmitProcessRequest>(),
                 It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new PolicyViolationException("Rate limit exceeded for client test-client and process type DataTransformation"));
+            .ThrowsAsync(new PolicyViolationException(
+                "test-client",
+                "DataTransformation",
+                "Rate limit exceeded for client test-client and process type DataTransformation"));
 
         var user = CreateDefaultUser(request.ClientId);
 

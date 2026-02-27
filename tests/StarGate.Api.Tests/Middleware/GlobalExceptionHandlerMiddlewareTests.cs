@@ -69,7 +69,7 @@ public class GlobalExceptionHandlerMiddlewareTests
     public async Task TryHandleAsync_Should_Return429_ForPolicyViolationException()
     {
         // Arrange
-        var exception = new PolicyViolationException("Max concurrent executions exceeded");
+        var exception = new PolicyViolationException("test-client", "order", "Max concurrent executions exceeded");
 
         // Act
         var handled = await _middleware.TryHandleAsync(

@@ -10,13 +10,14 @@ namespace StarGate.Application.Services;
 /// <summary>
 /// Service for managing process lifecycle and operations.
 /// Implements GUID generation, idempotency handling, status transition validation,
-/// and message broker publishing for asynchronous processing.
+/// policy enforcement, and message broker publishing for asynchronous processing.
 /// </summary>
 public class ProcessService : IProcessService
 {
     private readonly IProcessRepository _processRepository;
     private readonly IIdempotencyService _idempotencyService;
     private readonly IMessageBroker _messageBroker;
+    private readonly IPolicyProvider _policyProvider;
     private readonly ILogger<ProcessService> _logger;
 
     /// <summary>
@@ -25,17 +26,20 @@ public class ProcessService : IProcessService
     /// <param name="processRepository">Repository for process persistence.</param>
     /// <param name="idempotencyService">Service for idempotency key management.</param>
     /// <param name="messageBroker">Message broker for asynchronous processing.</param>
+    /// <param name="policyProvider">Provider for policy resolution and enforcement.</param>
     /// <param name="logger">Logger instance.</param>
     /// <exception cref="ArgumentNullException">If any parameter is null.</exception>
     public ProcessService(
         IProcessRepository processRepository,
         IIdempotencyService idempotencyService,
         IMessageBroker messageBroker,
+        IPolicyProvider policyProvider,
         ILogger<ProcessService> logger)
     {
         _processRepository = processRepository ?? throw new ArgumentNullException(nameof(processRepository));
         _idempotencyService = idempotencyService ?? throw new ArgumentNullException(nameof(idempotencyService));
         _messageBroker = messageBroker ?? throw new ArgumentNullException(nameof(messageBroker));
+        _policyProvider = policyProvider ?? throw new ArgumentNullException(nameof(policyProvider));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -59,6 +63,37 @@ public class ProcessService : IProcessService
             processType,
             clientProcessId,
             idempotencyKey);
+
+        // Retrieve effective policy for this client and process type
+        EffectivePolicy policy;
+        try
+        {
+            policy = await _policyProvider.GetEffectivePolicyAsync(
+                clientId,
+                processType,
+                cancellationToken);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "No policy found for ClientId={ClientId}, ProcessType={ProcessType}",
+                clientId,
+                processType);
+
+            throw new PolicyNotFoundException(clientId, processType);
+        }
+
+        _logger.LogDebug(
+            "Policy retrieved: ClientId={ClientId}, ProcessType={ProcessType}, MaxAttempts={MaxAttempts}, Timeout={Timeout}, MaxConcurrent={MaxConcurrent}",
+            clientId,
+            processType,
+            policy.RetryPolicy.MaxAttempts,
+            policy.Timeout,
+            policy.MaxConcurrentProcesses);
+
+        // Check concurrency limit before proceeding
+        await EnforceConcurrencyLimitAsync(clientId, processType, policy, cancellationToken);
 
         // Two-tier idempotency check strategy:
         // 1. Fast path: Check Redis cache first
@@ -116,7 +151,13 @@ public class ProcessService : IProcessService
         {
             var now = DateTime.UtcNow;
 
-            // Create new process entity (immutable record)
+            // Calculate timeout based on policy
+            var timeoutAt = now.Add(policy.Timeout);
+
+            // Calculate retention expiration based on policy
+            var retentionExpiresAt = now.Add(policy.ResultRetention);
+
+            // Create new process entity (immutable record) with policy-based settings
             var process = new Process
             {
                 ProcessId = processId,
@@ -126,21 +167,25 @@ public class ProcessService : IProcessService
                 IdempotencyKey = idempotencyKey,
                 Status = ProcessStatus.Accepted, // Initial status
                 Progress = 0,
-                Retryable = true,
-                CreatedAt = now,
-                UpdatedAt = now,
+                Retryable = policy.RetryPolicy.MaxAttempts > 0,
+                MaxRetries = policy.RetryPolicy.MaxAttempts,
                 RetryCount = 0,
-                MaxRetries = 0 // Will be set by policy later
+                TimeoutAt = timeoutAt,
+                RetentionExpiresAt = retentionExpiresAt,
+                CreatedAt = now,
+                UpdatedAt = now
             };
 
             // Persist the process
             await _processRepository.CreateAsync(process, cancellationToken);
 
             _logger.LogInformation(
-                "Process created successfully: ProcessId={ProcessId}, ClientId={ClientId}, ProcessType={ProcessType}",
+                "Process created successfully: ProcessId={ProcessId}, ClientId={ClientId}, ProcessType={ProcessType}, TimeoutAt={TimeoutAt}, MaxRetries={MaxRetries}",
                 processId,
                 clientId,
-                processType);
+                processType,
+                timeoutAt,
+                policy.RetryPolicy.MaxAttempts);
 
             // Publish message to broker for asynchronous processing
             try
@@ -214,6 +259,60 @@ public class ProcessService : IProcessService
                 cancellationToken);
 
             throw;
+        }
+    }
+
+    /// <summary>
+    /// Enforces concurrency limit policy for a client and process type.
+    /// Checks if the number of active processes exceeds the policy limit.
+    /// Active processes are those in Accepted or Processing status.
+    /// </summary>
+    /// <param name="clientId">Client identifier.</param>
+    /// <param name="processType">Process type.</param>
+    /// <param name="policy">Effective policy containing concurrency limit.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <exception cref="PolicyViolationException">When concurrency limit is exceeded.</exception>
+    private async Task EnforceConcurrencyLimitAsync(
+        string clientId,
+        string processType,
+        EffectivePolicy policy,
+        CancellationToken cancellationToken)
+    {
+        // No limit if MaxConcurrentProcesses is null or <= 0
+        if (policy.MaxConcurrentProcesses is null or <= 0)
+        {
+            _logger.LogDebug(
+                "No concurrency limit enforced: ClientId={ClientId}, ProcessType={ProcessType}",
+                clientId,
+                processType);
+            return;
+        }
+
+        var activeProcessCount = await _processRepository.CountActiveProcessesAsync(
+            clientId,
+            processType,
+            cancellationToken);
+
+        _logger.LogDebug(
+            "Checking concurrency limit: ClientId={ClientId}, ProcessType={ProcessType}, Active={Active}, Limit={Limit}",
+            clientId,
+            processType,
+            activeProcessCount,
+            policy.MaxConcurrentProcesses);
+
+        if (activeProcessCount >= policy.MaxConcurrentProcesses)
+        {
+            _logger.LogWarning(
+                "Concurrency limit exceeded: ClientId={ClientId}, ProcessType={ProcessType}, Active={Active}, Limit={Limit}",
+                clientId,
+                processType,
+                activeProcessCount,
+                policy.MaxConcurrentProcesses);
+
+            throw new PolicyViolationException(
+                clientId,
+                processType,
+                $"Maximum concurrent processes limit exceeded ({activeProcessCount}/{policy.MaxConcurrentProcesses})");
         }
     }
 
