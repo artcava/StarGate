@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using StarGate.Api.Models;
 using StarGate.Api.Services;
+using System.Security.Claims;
 
 namespace StarGate.Api.Endpoints;
 
@@ -25,6 +26,14 @@ public static class AuthEndpoints
             .Produces<GenerateTokenResponse>(StatusCodes.Status200OK)
             .Produces<ProblemDetails>(StatusCodes.Status400BadRequest)
             .AllowAnonymous();
+
+        group.MapGet("/validate", ValidateToken)
+            .WithName("ValidateToken")
+            .WithSummary("Validate and inspect JWT token")
+            .WithDescription("Returns the decoded claims from the provided JWT token. Requires authentication.")
+            .Produces<TokenValidationResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .RequireAuthorization();
 
         return app;
     }
@@ -98,4 +107,57 @@ public static class AuthEndpoints
                 statusCode: StatusCodes.Status500InternalServerError);
         }
     }
+
+    private static IResult ValidateToken(
+        ClaimsPrincipal user,
+        [FromServices] ILogger<Program> logger)
+    {
+        try
+        {
+            var clientId = user.FindFirst("client_id")?.Value;
+            var subject = user.FindFirst(ClaimTypes.NameIdentifier)?.Value 
+                ?? user.FindFirst("sub")?.Value;
+            
+            var processTypes = user.FindAll("process_type")
+                .Select(c => c.Value)
+                .ToList();
+
+            var allClaims = user.Claims
+                .Select(c => new { c.Type, c.Value })
+                .ToDictionary(c => c.Type, c => c.Value);
+
+            logger.LogInformation(
+                "Token validation successful for client {ClientId}",
+                clientId);
+
+            return Results.Ok(new TokenValidationResponse
+            {
+                IsValid = true,
+                ClientId = clientId,
+                Subject = subject,
+                ProcessTypes = processTypes,
+                Claims = allClaims
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error validating token");
+            return Results.Problem(
+                title: "Token Validation Failed",
+                detail: "An error occurred while validating the token",
+                statusCode: StatusCodes.Status500InternalServerError);
+        }
+    }
+}
+
+/// <summary>
+/// Response for token validation endpoint.
+/// </summary>
+public class TokenValidationResponse
+{
+    public bool IsValid { get; set; }
+    public string? ClientId { get; set; }
+    public string? Subject { get; set; }
+    public List<string> ProcessTypes { get; set; } = new();
+    public Dictionary<string, string> Claims { get; set; } = new();
 }

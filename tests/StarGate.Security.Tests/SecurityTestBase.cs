@@ -121,7 +121,8 @@ public abstract class SecurityTestBase : IClassFixture<WebApplicationFactory<Pro
 
     protected string GenerateExpiredToken(string clientId)
     {
-        return GenerateJwtToken(clientId, expiration: TimeSpan.FromSeconds(-10));
+        // Token expired 60 seconds ago - beyond the 30-second clock skew tolerance
+        return GenerateJwtToken(clientId, expiration: TimeSpan.FromSeconds(-60));
     }
 
     protected HttpRequestMessage CreateAuthenticatedRequest(

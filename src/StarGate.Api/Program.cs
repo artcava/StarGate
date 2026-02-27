@@ -34,6 +34,7 @@ builder.Services.AddValidatorsFromAssemblyContaining<CreateProcessRequestValidat
 // TODO: Replace with actual Infrastructure layer services when available
 builder.Services.AddSingleton<IPolicyRepository, InMemoryPolicyRepository>();
 builder.Services.AddSingleton<ICacheStore, InMemoryCacheStore>();
+builder.Services.AddSingleton<IProcessRepository, InMemoryProcessRepository>();
 
 // Add Application layer services
 builder.Services.AddApplicationServices(builder.Configuration);

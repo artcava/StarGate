@@ -124,33 +124,38 @@ public class MongoProcessRepository : IProcessRepository
 
     /// <inheritdoc />
     public async Task<Process?> GetByIdempotencyKeyAsync(
+        string clientId,
         string idempotencyKey,
         CancellationToken ct = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(clientId);
         ArgumentException.ThrowIfNullOrWhiteSpace(idempotencyKey);
 
         _logger.LogDebug(
-            "Retrieving process by idempotency key {IdempotencyKey}",
+            "Retrieving process by ClientId {ClientId} and IdempotencyKey {IdempotencyKey}",
+            clientId,
             idempotencyKey);
 
-        var filter = Builders<ProcessDocument>.Filter.Eq(
-            p => p.IdempotencyKey,
-            idempotencyKey);
+        var filter = Builders<ProcessDocument>.Filter.And(
+            Builders<ProcessDocument>.Filter.Eq(p => p.ClientId, clientId),
+            Builders<ProcessDocument>.Filter.Eq(p => p.IdempotencyKey, idempotencyKey));
 
         var document = await _collection.Find(filter).FirstOrDefaultAsync(ct);
 
         if (document == null)
         {
             _logger.LogDebug(
-                "Process not found for idempotency key {IdempotencyKey}",
+                "Process not found for ClientId {ClientId} and IdempotencyKey {IdempotencyKey}",
+                clientId,
                 idempotencyKey);
             return null;
         }
 
         var process = ProcessMapper.MapToDomain(document);
         _logger.LogDebug(
-            "Process {ProcessId} found for idempotency key {IdempotencyKey}",
+            "Process {ProcessId} found for ClientId {ClientId} and IdempotencyKey {IdempotencyKey}",
             process.ProcessId,
+            clientId,
             idempotencyKey);
 
         return process;
