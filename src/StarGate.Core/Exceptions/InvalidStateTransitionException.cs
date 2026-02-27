@@ -1,6 +1,6 @@
-namespace StarGate.Core.Exceptions;
-
 using StarGate.Core.Domain;
+
+namespace StarGate.Core.Exceptions;
 
 /// <summary>
 /// Exception thrown when attempting an invalid process status transition.
