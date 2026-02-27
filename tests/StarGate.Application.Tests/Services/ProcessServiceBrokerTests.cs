@@ -113,7 +113,8 @@ public class ProcessServiceBrokerTests
         capturedMessage.ClientId.Should().Be(clientId);
         capturedMessage.ProcessType.Should().Be(processType);
         capturedMessage.ClientProcessId.Should().Be(clientProcessId);
-        capturedMessage.Status.Should().Be(ProcessStatus.Accepted);
+        capturedMessage.Priority.Should().Be(5);
+        capturedMessage.Timestamp.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(2));
     }
 
     [Fact]
@@ -387,7 +388,7 @@ public class ProcessServiceBrokerTests
     }
 
     [Fact]
-    public async Task CreateProcessAsync_Should_IncludeAllProcessFields_InBrokerMessage()
+    public async Task CreateProcessAsync_Should_IncludeRoutingFields_InBrokerMessage()
     {
         // Arrange
         var clientId = "test-client";
@@ -411,15 +412,13 @@ public class ProcessServiceBrokerTests
 
         // Assert
         capturedMessage.Should().NotBeNull();
-        capturedMessage!.ProcessId.Should().NotBeEmpty();
-        capturedMessage.ClientId.Should().NotBeNullOrEmpty();
-        capturedMessage.ProcessType.Should().NotBeNullOrEmpty();
-        capturedMessage.ClientProcessId.Should().NotBeNullOrEmpty();
-        capturedMessage.Status.Should().Be(ProcessStatus.Accepted);
-        capturedMessage.Progress.Should().Be(0);
-        capturedMessage.Retryable.Should().BeTrue();
-        capturedMessage.MaxRetries.Should().Be(3);
-        capturedMessage.CreatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(2));
+        capturedMessage!.ProcessId.Should().Be(result.ProcessId);
+        capturedMessage.ProcessId.Should().NotBeEmpty();
+        capturedMessage.ClientId.Should().Be(clientId);
+        capturedMessage.ProcessType.Should().Be(processType);
+        capturedMessage.ClientProcessId.Should().Be(clientProcessId);
+        capturedMessage.Priority.Should().Be(5);
+        capturedMessage.Timestamp.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(2));
     }
 
     private void SetupSuccessfulCreation()
