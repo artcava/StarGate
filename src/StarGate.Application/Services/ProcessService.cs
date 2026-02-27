@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using StarGate.Contracts.Requests;
 using StarGate.Core.Abstractions;
 using StarGate.Core.Domain;
 using StarGate.Core.Exceptions;
@@ -100,6 +101,21 @@ public class ProcessService : IProcessService
     }
 
     /// <inheritdoc />
+    public async Task<Process> SubmitProcessAsync(
+        string clientId,
+        SubmitProcessRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        return await CreateProcessAsync(
+            clientId,
+            request.ProcessType,
+            request.ClientProcessId,
+            request.IdempotencyKey,
+            null, // metadata not used in current implementation
+            cancellationToken);
+    }
+
+    /// <inheritdoc />
     public async Task<Process> GetProcessAsync(
         Guid processId,
         CancellationToken cancellationToken = default)
@@ -115,6 +131,15 @@ public class ProcessService : IProcessService
         }
 
         return process;
+    }
+
+    /// <inheritdoc />
+    public async Task<Process?> GetProcessByIdAsync(
+        Guid processId,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogDebug("Retrieving process: ProcessId={ProcessId}", processId);
+        return await _processRepository.GetByIdAsync(processId, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -147,6 +172,26 @@ public class ProcessService : IProcessService
         }
 
         return process;
+    }
+
+    /// <inheritdoc />
+    public async Task<Process?> GetProcessByClientProcessIdAsync(
+        string clientId,
+        string clientProcessId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(clientId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(clientProcessId);
+
+        _logger.LogDebug(
+            "Retrieving process: ClientId={ClientId}, ClientProcessId={ClientProcessId}",
+            clientId,
+            clientProcessId);
+
+        return await _processRepository.GetByClientProcessIdAsync(
+            clientId,
+            clientProcessId,
+            cancellationToken);
     }
 
     /// <inheritdoc />
