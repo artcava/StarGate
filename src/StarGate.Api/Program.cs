@@ -7,6 +7,7 @@ using StarGate.Api.Services;
 using StarGate.Api.Validators;
 using StarGate.Application;
 using StarGate.Core.Abstractions;
+using StarGate.Infrastructure.Messaging;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -36,6 +37,10 @@ builder.Services.AddSingleton<IPolicyRepository, InMemoryPolicyRepository>();
 builder.Services.AddSingleton<ICacheStore, InMemoryCacheStore>();
 builder.Services.AddSingleton<IProcessRepository, InMemoryProcessRepository>();
 builder.Services.AddSingleton<IIdempotencyService, InMemoryIdempotencyService>();
+
+// Register Message Broker (NullMessageBroker for testing/development)
+// TODO: Replace with RabbitMqBroker when infrastructure is configured
+builder.Services.AddSingleton<IMessageBroker, NullMessageBroker>();
 
 // Add Application layer services
 builder.Services.AddApplicationServices(builder.Configuration);

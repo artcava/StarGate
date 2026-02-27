@@ -42,6 +42,32 @@ public class NullMessageBroker : IMessageBroker
         return Task.CompletedTask;
     }
 
+    public Task PublishAsync<T>(
+        T message,
+        string routingKey,
+        CancellationToken cancellationToken = default) where T : class
+    {
+        _logger.LogWarning(
+            "NullMessageBroker: Ignoring message publication with routing key {RoutingKey}",
+            routingKey);
+
+        return Task.CompletedTask;
+    }
+
+    public Task PublishWithDelayAsync<T>(
+        T message,
+        string routingKey,
+        TimeSpan delay,
+        CancellationToken cancellationToken = default) where T : class
+    {
+        _logger.LogWarning(
+            "NullMessageBroker: Ignoring delayed message publication with routing key {RoutingKey}, delay {Delay}",
+            routingKey,
+            delay);
+
+        return Task.CompletedTask;
+    }
+
     public IMessageConsumer CreateConsumer(string queueName, CancellationToken cancellationToken = default)
     {
         _logger.LogWarning(

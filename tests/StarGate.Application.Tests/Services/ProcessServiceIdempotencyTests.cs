@@ -13,16 +13,19 @@ public class ProcessServiceIdempotencyTests
 {
     private readonly Mock<IProcessRepository> _repositoryMock;
     private readonly Mock<IIdempotencyService> _idempotencyMock;
+    private readonly Mock<IMessageBroker> _brokerMock;
     private readonly ProcessService _service;
 
     public ProcessServiceIdempotencyTests()
     {
         _repositoryMock = new Mock<IProcessRepository>();
         _idempotencyMock = new Mock<IIdempotencyService>();
+        _brokerMock = new Mock<IMessageBroker>();
 
         _service = new ProcessService(
             _repositoryMock.Object,
             _idempotencyMock.Object,
+            _brokerMock.Object,
             NullLogger<ProcessService>.Instance);
     }
 
@@ -235,6 +238,13 @@ public class ProcessServiceIdempotencyTests
             .Callback(() => callOrder.Add("create-process"))
             .ReturnsAsync((Process p, CancellationToken ct) => p);
 
+        _brokerMock
+            .Setup(b => b.PublishAsync(
+                It.IsAny<object>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
         // Act
         await _service.CreateProcessAsync(
             clientId,
@@ -352,6 +362,13 @@ public class ProcessServiceIdempotencyTests
             .Callback<Process, CancellationToken>((p, ct) => createdProcess = p)
             .ReturnsAsync((Process p, CancellationToken ct) => p);
 
+        _brokerMock
+            .Setup(b => b.PublishAsync(
+                It.IsAny<object>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
         // Act
         var result = await _service.CreateProcessAsync(
             clientId,
@@ -438,5 +455,12 @@ public class ProcessServiceIdempotencyTests
                 It.IsAny<Process>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync((Process p, CancellationToken ct) => p);
+
+        _brokerMock
+            .Setup(b => b.PublishAsync(
+                It.IsAny<object>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
     }
 }
