@@ -20,6 +20,9 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        // Register ProcessService (scoped per request)
+        services.AddScoped<IProcessService, ProcessService>();
+
         // Configure PolicyProvider options from appsettings.json
         services.Configure<PolicyProviderOptions>(options =>
         {
