@@ -128,4 +128,16 @@ public record Process
     /// Only applies to terminal states: Completed, Failed, Cancelled.
     /// </summary>
     public DateTime? RetentionExpiresAt { get; init; }
+
+    /// <summary>
+    /// Checks if the process has exceeded its retry limit.
+    /// True when RetryCount has reached or exceeded MaxRetries.
+    /// </summary>
+    public bool IsRetryLimitExceeded => RetryCount >= MaxRetries;
+
+    /// <summary>
+    /// Checks if the process has timed out.
+    /// True when current UTC time has passed the TimeoutAt threshold.
+    /// </summary>
+    public bool IsTimedOut => TimeoutAt.HasValue && DateTime.UtcNow > TimeoutAt.Value;
 }
