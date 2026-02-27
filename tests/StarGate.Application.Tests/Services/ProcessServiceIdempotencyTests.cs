@@ -4,6 +4,7 @@ using Moq;
 using StarGate.Application.Services;
 using StarGate.Core.Abstractions;
 using StarGate.Core.Domain;
+using StarGate.Core.Domain.Configuration;
 using StarGate.Core.Exceptions;
 using Xunit;
 
@@ -14,6 +15,7 @@ public class ProcessServiceIdempotencyTests
     private readonly Mock<IProcessRepository> _repositoryMock;
     private readonly Mock<IIdempotencyService> _idempotencyMock;
     private readonly Mock<IMessageBroker> _brokerMock;
+    private readonly Mock<IPolicyProvider> _policyMock;
     private readonly ProcessService _service;
 
     public ProcessServiceIdempotencyTests()
@@ -21,11 +23,13 @@ public class ProcessServiceIdempotencyTests
         _repositoryMock = new Mock<IProcessRepository>();
         _idempotencyMock = new Mock<IIdempotencyService>();
         _brokerMock = new Mock<IMessageBroker>();
+        _policyMock = new Mock<IPolicyProvider>();
 
         _service = new ProcessService(
             _repositoryMock.Object,
             _idempotencyMock.Object,
             _brokerMock.Object,
+            _policyMock.Object,
             NullLogger<ProcessService>.Instance);
     }
 
@@ -38,6 +42,8 @@ public class ProcessServiceIdempotencyTests
         var clientProcessId = "order-123";
         var idempotencyKey = "idempotency-123";
         var existingProcessId = Guid.NewGuid();
+
+        SetupPolicy();
 
         _idempotencyMock
             .Setup(i => i.GetProcessIdByIdempotencyKeyAsync(
@@ -92,6 +98,8 @@ public class ProcessServiceIdempotencyTests
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
+
+        SetupPolicy();
 
         _idempotencyMock
             .Setup(i => i.GetProcessIdByIdempotencyKeyAsync(
@@ -153,6 +161,8 @@ public class ProcessServiceIdempotencyTests
             UpdatedAt = DateTime.UtcNow
         };
 
+        SetupPolicy();
+
         _idempotencyMock
             .Setup(i => i.GetProcessIdByIdempotencyKeyAsync(
                 clientId,
@@ -206,6 +216,8 @@ public class ProcessServiceIdempotencyTests
         var clientProcessId = "order-123";
         var idempotencyKey = "idempotency-123";
         var callOrder = new List<string>();
+
+        SetupPolicy();
 
         _idempotencyMock
             .Setup(i => i.GetProcessIdByIdempotencyKeyAsync(
@@ -266,6 +278,8 @@ public class ProcessServiceIdempotencyTests
         var processType = "order";
         var clientProcessId = "order-123";
         var idempotencyKey = "idempotency-123";
+
+        SetupPolicy();
 
         _idempotencyMock
             .Setup(i => i.GetProcessIdByIdempotencyKeyAsync(
@@ -332,28 +346,7 @@ public class ProcessServiceIdempotencyTests
         var idempotencyKey = "idempotency-123";
         Process? createdProcess = null;
 
-        _idempotencyMock
-            .Setup(i => i.GetProcessIdByIdempotencyKeyAsync(
-                It.IsAny<string>(),
-                It.IsAny<string>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync((Guid?)null);
-
-        _repositoryMock
-            .Setup(r => r.GetByIdempotencyKeyAsync(
-                It.IsAny<string>(),
-                It.IsAny<string>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync((Process?)null);
-
-        _idempotencyMock
-            .Setup(i => i.StoreIdempotencyKeyAsync(
-                It.IsAny<string>(),
-                It.IsAny<string>(),
-                It.IsAny<Guid>(),
-                It.IsAny<TimeSpan?>(),
-                It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
+        SetupSuccessfulCreation();
 
         _repositoryMock
             .Setup(r => r.CreateAsync(
@@ -361,13 +354,6 @@ public class ProcessServiceIdempotencyTests
                 It.IsAny<CancellationToken>()))
             .Callback<Process, CancellationToken>((p, ct) => createdProcess = p)
             .ReturnsAsync((Process p, CancellationToken ct) => p);
-
-        _brokerMock
-            .Setup(b => b.PublishAsync(
-                It.IsAny<object>(),
-                It.IsAny<string>(),
-                It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
 
         // Act
         var result = await _service.CreateProcessAsync(
@@ -425,8 +411,51 @@ public class ProcessServiceIdempotencyTests
         processIds.Should().AllSatisfy(id => id.Should().NotBeEmpty());
     }
 
+    private void SetupPolicy()
+    {
+        var policy = new EffectivePolicy
+        {
+            ProcessType = "order",
+            ClientId = "test-client",
+            Timeout = TimeSpan.FromHours(1),
+            RetryPolicy = new RetryPolicy
+            {
+                Enabled = true,
+                MaxAttempts = 3,
+                InitialDelay = TimeSpan.FromSeconds(5),
+                MaxDelay = TimeSpan.FromMinutes(5),
+                BackoffStrategy = BackoffStrategy.Exponential
+            },
+            ResultRetention = TimeSpan.FromDays(30),
+            MaxConcurrentProcesses = null,
+            Source = new PolicySource
+            {
+                TimeoutFromOverride = false,
+                RetryPolicyFromOverride = false,
+                ResultRetentionFromOverride = false,
+                ConcurrencyLimitFromOverride = false
+            }
+        };
+
+        _policyMock
+            .Setup(p => p.GetEffectivePolicyAsync(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(policy);
+
+        _repositoryMock
+            .Setup(r => r.CountActiveProcessesAsync(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(0);
+    }
+
     private void SetupSuccessfulCreation()
     {
+        SetupPolicy();
+
         _idempotencyMock
             .Setup(i => i.GetProcessIdByIdempotencyKeyAsync(
                 It.IsAny<string>(),
