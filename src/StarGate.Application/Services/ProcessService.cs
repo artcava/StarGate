@@ -13,19 +13,23 @@ namespace StarGate.Application.Services;
 public class ProcessService : IProcessService
 {
     private readonly IProcessRepository _processRepository;
+    private readonly IIdempotencyService _idempotencyService;
     private readonly ILogger<ProcessService> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ProcessService"/> class.
     /// </summary>
     /// <param name="processRepository">Repository for process persistence.</param>
+    /// <param name="idempotencyService">Service for idempotency key management.</param>
     /// <param name="logger">Logger instance.</param>
     /// <exception cref="ArgumentNullException">If any parameter is null.</exception>
     public ProcessService(
         IProcessRepository processRepository,
+        IIdempotencyService idempotencyService,
         ILogger<ProcessService> logger)
     {
         _processRepository = processRepository ?? throw new ArgumentNullException(nameof(processRepository));
+        _idempotencyService = idempotencyService ?? throw new ArgumentNullException(nameof(idempotencyService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -50,7 +54,25 @@ public class ProcessService : IProcessService
             clientProcessId,
             idempotencyKey);
 
-        // Check for idempotency (duplicate)
+        // Two-tier idempotency check strategy:
+        // 1. Fast path: Check Redis cache first
+        var cachedProcessId = await _idempotencyService.GetProcessIdByIdempotencyKeyAsync(
+            clientId,
+            idempotencyKey,
+            cancellationToken);
+
+        if (cachedProcessId.HasValue)
+        {
+            _logger.LogWarning(
+                "Idempotency key found in cache: IdempotencyKey={IdempotencyKey}, ClientId={ClientId}, ProcessId={ProcessId}",
+                idempotencyKey,
+                clientId,
+                cachedProcessId.Value);
+
+            throw new DuplicateProcessException(idempotencyKey);
+        }
+
+        // 2. Fallback: Check database if not in cache
         var existingProcess = await _processRepository.GetByIdempotencyKeyAsync(
             clientId,
             idempotencyKey,
@@ -59,45 +81,79 @@ public class ProcessService : IProcessService
         if (existingProcess is not null)
         {
             _logger.LogWarning(
-                "Process with IdempotencyKey={IdempotencyKey} already exists for ClientId={ClientId}: ProcessId={ProcessId}",
+                "Idempotency key found in database (cache miss): IdempotencyKey={IdempotencyKey}, ClientId={ClientId}, ProcessId={ProcessId}",
                 idempotencyKey,
                 clientId,
                 existingProcess.ProcessId);
+
+            // Repopulate cache from database
+            await _idempotencyService.StoreIdempotencyKeyAsync(
+                clientId,
+                idempotencyKey,
+                existingProcess.ProcessId,
+                cancellationToken: cancellationToken);
 
             throw new DuplicateProcessException(idempotencyKey);
         }
 
         // Generate new GUID for the process
         var processId = Guid.NewGuid();
-        var now = DateTime.UtcNow;
 
-        // Create new process entity (immutable record)
-        var process = new Process
-        {
-            ProcessId = processId,
-            ClientId = clientId,
-            ProcessType = processType,
-            ClientProcessId = clientProcessId,
-            IdempotencyKey = idempotencyKey,
-            Status = ProcessStatus.Accepted, // Initial status
-            Progress = 0,
-            Retryable = true,
-            CreatedAt = now,
-            UpdatedAt = now,
-            RetryCount = 0,
-            MaxRetries = 0 // Will be set by policy later
-        };
-
-        // Persist the process
-        await _processRepository.CreateAsync(process, cancellationToken);
-
-        _logger.LogInformation(
-            "Process created successfully: ProcessId={ProcessId}, ClientId={ClientId}, ProcessType={ProcessType}",
-            processId,
+        // Reserve idempotency key BEFORE creating process (prevents race conditions)
+        await _idempotencyService.StoreIdempotencyKeyAsync(
             clientId,
-            processType);
+            idempotencyKey,
+            processId,
+            cancellationToken: cancellationToken);
 
-        return process;
+        try
+        {
+            var now = DateTime.UtcNow;
+
+            // Create new process entity (immutable record)
+            var process = new Process
+            {
+                ProcessId = processId,
+                ClientId = clientId,
+                ProcessType = processType,
+                ClientProcessId = clientProcessId,
+                IdempotencyKey = idempotencyKey,
+                Status = ProcessStatus.Accepted, // Initial status
+                Progress = 0,
+                Retryable = true,
+                CreatedAt = now,
+                UpdatedAt = now,
+                RetryCount = 0,
+                MaxRetries = 0 // Will be set by policy later
+            };
+
+            // Persist the process
+            await _processRepository.CreateAsync(process, cancellationToken);
+
+            _logger.LogInformation(
+                "Process created successfully: ProcessId={ProcessId}, ClientId={ClientId}, ProcessType={ProcessType}",
+                processId,
+                clientId,
+                processType);
+
+            return process;
+        }
+        catch (Exception ex)
+        {
+            // Rollback: Remove idempotency key if process creation fails
+            _logger.LogError(
+                ex,
+                "Failed to create process, rolling back idempotency key: ProcessId={ProcessId}, IdempotencyKey={IdempotencyKey}",
+                processId,
+                idempotencyKey);
+
+            await _idempotencyService.RemoveIdempotencyKeyAsync(
+                clientId,
+                idempotencyKey,
+                cancellationToken);
+
+            throw;
+        }
     }
 
     /// <inheritdoc />
