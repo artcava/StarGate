@@ -1,0 +1,266 @@
+using System.Security.Claims;
+using FluentValidation;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using StarGate.Api.Extensions;
+using StarGate.Api.Models;
+using StarGate.Contracts.Requests;
+using StarGate.Core.Abstractions;
+using StarGate.Core.Domain;
+using StarGate.Core.Exceptions;
+
+namespace StarGate.Api.Endpoints;
+
+/// <summary>
+/// API endpoints for process management.
+/// </summary>
+public static class ProcessEndpoints
+{
+    public static void MapProcessEndpoints(this IEndpointRouteBuilder app)
+    {
+        var group = app.MapGroup("/api/processes")
+            .WithTags("Processes")
+            .RequireAuthorization(); // Require authentication for all endpoints
+
+        // POST /api/processes - Create a new process
+        group.MapPost("/", CreateProcessAsync)
+            .WithName("CreateProcess")
+            .RequireRateLimiting("CreateProcess") // Apply rate limiting policy
+            .AddValidation<CreateProcessRequest>()
+            .Produces<ProcessResponse>(StatusCodes.Status201Created)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status409Conflict)
+            .Produces(StatusCodes.Status429TooManyRequests)
+            .Produces(StatusCodes.Status500InternalServerError);
+
+        // GET /api/processes/{processId} - Get process by ID
+        group.MapGet("/{processId:guid}", GetProcessByIdAsync)
+            .WithName("GetProcessById")
+            .RequireRateLimiting("ReadProcess") // Apply rate limiting policy
+            .Produces<ProcessResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status429TooManyRequests)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status500InternalServerError);
+
+        // GET /api/processes/client/{clientId}/{clientProcessId} - Get process by client identifiers
+        group.MapGet("/client/{clientId}/{clientProcessId}", GetProcessByClientIdAsync)
+            .WithName("GetProcessByClientId")
+            .RequireRateLimiting("ReadProcess") // Apply rate limiting policy
+            .Produces<ProcessResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status429TooManyRequests)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status500InternalServerError);
+    }
+
+    private static async Task<IResult> CreateProcessAsync(
+        [FromBody] CreateProcessRequest request,
+        [FromServices] IProcessService processService,
+        [FromServices] ILogger<Program> logger,
+        ClaimsPrincipal user,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Extract client ID from JWT claims
+            var clientIdFromToken = user.GetClientId();
+
+            // Validate that request.ClientId matches token
+            if (clientIdFromToken != null && request.ClientId != clientIdFromToken)
+            {
+                logger.LogWarning(
+                    "Client ID mismatch: Token={TokenClientId}, Request={RequestClientId}",
+                    clientIdFromToken,
+                    request.ClientId);
+
+                return Results.Problem(
+                    title: "Forbidden",
+                    detail: "Client ID in request does not match authenticated client",
+                    statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            logger.LogInformation(
+                "Creating process: ClientId={ClientId}, ProcessType={ProcessType}, ClientProcessId={ClientProcessId}",
+                request.ClientId,
+                request.ProcessType,
+                request.ClientProcessId);
+
+            // Check if process already exists (idempotency)
+            var existingProcess = await processService.GetProcessByClientProcessIdAsync(
+                request.ClientId,
+                request.ClientProcessId,
+                cancellationToken);
+
+            if (existingProcess != null)
+            {
+                logger.LogWarning(
+                    "Duplicate process detected: ClientId={ClientId}, ClientProcessId={ClientProcessId}",
+                    request.ClientId,
+                    request.ClientProcessId);
+
+                return Results.Problem(
+                    title: "Duplicate Process",
+                    detail: $"A process with ClientProcessId '{request.ClientProcessId}' already exists for this client",
+                    statusCode: StatusCodes.Status409Conflict);
+            }
+
+            // Map CreateProcessRequest to SubmitProcessRequest (record constructor)
+            var submitRequest = new SubmitProcessRequest(
+                ClientProcessId: request.ClientProcessId,
+                ProcessType: request.ProcessType,
+                Payload: request.Metadata ?? new Dictionary<string, string>(),
+                IdempotencyKey: request.IdempotencyKey
+            );
+
+            var process = await processService.SubmitProcessAsync(
+                request.ClientId,
+                submitRequest,
+                cancellationToken);
+
+            var response = ProcessResponse.FromDomain(process);
+
+            logger.LogInformation(
+                "Process created successfully: ProcessId={ProcessId}",
+                process.ProcessId);
+
+            return Results.Created($"/api/processes/{process.ProcessId}", response);
+        }
+        catch (PolicyViolationException ex)
+        {
+            logger.LogWarning(
+                ex,
+                "Policy violation for ClientId={ClientId}, ProcessType={ProcessType}",
+                request.ClientId,
+                request.ProcessType);
+
+            return Results.Problem(
+                title: "Policy Violation",
+                detail: ex.Message,
+                statusCode: StatusCodes.Status429TooManyRequests);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(
+                ex,
+                "Error creating process: ClientId={ClientId}, ProcessType={ProcessType}",
+                request.ClientId,
+                request.ProcessType);
+
+            return Results.Problem(
+                title: "Internal Server Error",
+                detail: "An unexpected error occurred while creating the process",
+                statusCode: StatusCodes.Status500InternalServerError);
+        }
+    }
+
+    private static async Task<IResult> GetProcessByIdAsync(
+        Guid processId,
+        [FromServices] IProcessService processService,
+        [FromServices] ILogger<Program> logger,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            logger.LogDebug("Retrieving process: ProcessId={ProcessId}", processId);
+
+            var process = await processService.GetProcessByIdAsync(processId, cancellationToken);
+            
+            if (process == null)
+            {
+                logger.LogWarning("Process not found: ProcessId={ProcessId}", processId);
+
+                return Results.Problem(
+                    title: "Process Not Found",
+                    detail: $"Process with ID '{processId}' not found",
+                    statusCode: StatusCodes.Status404NotFound);
+            }
+
+            var response = ProcessResponse.FromDomain(process);
+            return Results.Ok(response);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(
+                ex,
+                "Error retrieving process: ProcessId={ProcessId}",
+                processId);
+
+            return Results.Problem(
+                title: "Internal Server Error",
+                detail: "An unexpected error occurred while retrieving the process",
+                statusCode: StatusCodes.Status500InternalServerError);
+        }
+    }
+
+    private static async Task<IResult> GetProcessByClientIdAsync(
+        string clientId,
+        string clientProcessId,
+        [FromServices] IProcessService processService,
+        [FromServices] ILogger<Program> logger,
+        ClaimsPrincipal user,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Extract client ID from JWT claims
+            var clientIdFromToken = user.GetClientId();
+
+            // Validate that clientId parameter matches token
+            if (clientIdFromToken != null && clientId != clientIdFromToken)
+            {
+                logger.LogWarning(
+                    "Client ID mismatch: Token={TokenClientId}, Request={RequestClientId}",
+                    clientIdFromToken,
+                    clientId);
+
+                return Results.Problem(
+                    title: "Forbidden",
+                    detail: "Client ID in request does not match authenticated client",
+                    statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            logger.LogDebug(
+                "Retrieving process: ClientId={ClientId}, ClientProcessId={ClientProcessId}",
+                clientId,
+                clientProcessId);
+
+            var process = await processService.GetProcessByClientProcessIdAsync(
+                clientId,
+                clientProcessId,
+                cancellationToken);
+
+            if (process == null)
+            {
+                logger.LogWarning(
+                    "Process not found: ClientId={ClientId}, ClientProcessId={ClientProcessId}",
+                    clientId,
+                    clientProcessId);
+
+                return Results.Problem(
+                    title: "Process Not Found",
+                    detail: $"Process with ClientId '{clientId}' and ClientProcessId '{clientProcessId}' not found",
+                    statusCode: StatusCodes.Status404NotFound);
+            }
+
+            var response = ProcessResponse.FromDomain(process);
+            return Results.Ok(response);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(
+                ex,
+                "Error retrieving process: ClientId={ClientId}, ClientProcessId={ClientProcessId}",
+                clientId,
+                clientProcessId);
+
+            return Results.Problem(
+                title: "Internal Server Error",
+                detail: "An unexpected error occurred while retrieving the process",
+                statusCode: StatusCodes.Status500InternalServerError);
+        }
+    }
+}

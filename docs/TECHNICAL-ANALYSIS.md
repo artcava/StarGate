@@ -254,9 +254,9 @@ StarGate/
 #### Sprint 1.1: Project Setup
 - [x] **#1** Create solution structure with all projects
 - [x] **#2** Configure `.editorconfig` and code analysis
-- [ ] Setup CI/CD pipeline (GitHub Actions)
-- [ ] Configure Docker Compose for local development
-- [ ] Document setup instructions in README
+- [x] Setup CI/CD pipeline (GitHub Actions)
+- [x] Configure Docker Compose for local development
+- [x] Document setup instructions in README
 
 #### Sprint 1.2: Domain Model
 - [x] **#6** Implement core domain entities (Process, ProcessStatus, ProcessError)
@@ -315,18 +315,18 @@ StarGate/
 ### Phase 5: API Gateway (Week 6-7)
 
 #### Sprint 5.1: API Endpoints
-- [ ] Implement ProcessEndpoints (POST, GET)
-- [ ] Add request validation
-- [ ] Implement global exception handler
-- [ ] Add health check endpoints
-- [ ] Write unit tests for endpoints
+- [x] Implement ProcessEndpoints (POST, GET)
+- [x] Add request validation
+- [x] Implement global exception handler
+- [x] Add health check endpoints
+- [x] Write unit tests for endpoints
 
 #### Sprint 5.2: Security
-- [ ] Configure JWT authentication
-- [ ] Implement authorization policies
-- [ ] Add rate limiting
-- [ ] Configure CORS
-- [ ] Security testing
+- [x] Configure JWT authentication
+- [x] Implement authorization policies
+- [x] Add rate limiting
+- [x] Configure CORS
+- [x] Security testing
 
 ### Phase 6: Business Logic (Week 8)
 
