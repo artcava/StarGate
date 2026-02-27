@@ -15,7 +15,7 @@ public interface IJwtTokenGenerator
     /// <summary>
     /// Generates a JWT token with the specified claims.
     /// </summary>
-    string GenerateToken(string clientId, IEnumerable<string> processTypes, int expirationMinutes = 60);
+    public string GenerateToken(string clientId, IEnumerable<string> processTypes, int expirationMinutes = 60);
 }
 
 /// <summary>
