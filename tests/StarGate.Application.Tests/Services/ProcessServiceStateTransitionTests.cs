@@ -56,10 +56,6 @@ public class ProcessServiceStateTransitionTests
             .Setup(r => r.GetByIdAsync(process.ProcessId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(process);
 
-        _repositoryMock
-            .Setup(r => r.UpdateAsync(It.IsAny<Process>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-
         // Act
         var result = await _service.UpdateProcessStatusAsync(process.ProcessId, to);
 
@@ -118,10 +114,6 @@ public class ProcessServiceStateTransitionTests
             .Setup(r => r.GetByIdAsync(process.ProcessId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(process);
 
-        _repositoryMock
-            .Setup(r => r.UpdateAsync(It.IsAny<Process>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-
         // Act
         var result = await _service.CompleteProcessAsync(process.ProcessId);
 
@@ -166,10 +158,6 @@ public class ProcessServiceStateTransitionTests
             .Setup(r => r.GetByIdAsync(process.ProcessId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(process);
 
-        _repositoryMock
-            .Setup(r => r.UpdateAsync(It.IsAny<Process>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-
         // Act
         var result = await _service.FailProcessAsync(
             process.ProcessId,
@@ -198,10 +186,6 @@ public class ProcessServiceStateTransitionTests
             .Setup(r => r.GetByIdAsync(process.ProcessId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(process);
 
-        _repositoryMock
-            .Setup(r => r.UpdateAsync(It.IsAny<Process>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-
         // Act
         var result = await _service.FailProcessAsync(
             process.ProcessId,
@@ -227,10 +211,6 @@ public class ProcessServiceStateTransitionTests
             .Setup(r => r.GetByIdAsync(process.ProcessId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(process);
 
-        _repositoryMock
-            .Setup(r => r.UpdateAsync(It.IsAny<Process>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-
         // Act
         var result = await _service.FailProcessAsync(
             process.ProcessId,
@@ -255,10 +235,6 @@ public class ProcessServiceStateTransitionTests
         _repositoryMock
             .Setup(r => r.GetByIdAsync(process.ProcessId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(process);
-
-        _repositoryMock
-            .Setup(r => r.UpdateAsync(It.IsAny<Process>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
 
         // Act
         var result = await _service.FailProcessAsync(
@@ -286,10 +262,6 @@ public class ProcessServiceStateTransitionTests
         _repositoryMock
             .Setup(r => r.GetByIdAsync(process.ProcessId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(process);
-
-        _repositoryMock
-            .Setup(r => r.UpdateAsync(It.IsAny<Process>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
 
         // Act
         var result = await _service.RejectProcessAsync(process.ProcessId, "Validation failed");
@@ -353,10 +325,6 @@ public class ProcessServiceStateTransitionTests
             .Setup(r => r.GetByIdAsync(process.ProcessId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(process);
 
-        _repositoryMock
-            .Setup(r => r.UpdateAsync(It.IsAny<Process>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-
         // Act
         var result = await _service.UpdateProcessProgressAsync(process.ProcessId, validProgress);
 
@@ -380,10 +348,6 @@ public class ProcessServiceStateTransitionTests
         _repositoryMock
             .Setup(r => r.GetByIdAsync(process.ProcessId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(process);
-
-        _repositoryMock
-            .Setup(r => r.UpdateAsync(It.IsAny<Process>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
 
         // Act
         var result = await _service.CheckTimeoutAsync(process.ProcessId);
@@ -455,10 +419,6 @@ public class ProcessServiceStateTransitionTests
             .Setup(r => r.GetByIdAsync(process.ProcessId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(process);
 
-        _repositoryMock
-            .Setup(r => r.UpdateAsync(It.IsAny<Process>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-
         // Act
         var result = await _service.RecordProcessErrorAsync(
             process.ProcessId,
@@ -488,10 +448,6 @@ public class ProcessServiceStateTransitionTests
             .ReturnsAsync(processWithError1)
             .ReturnsAsync(processWithError2);
 
-        _repositoryMock
-            .Setup(r => r.UpdateAsync(It.IsAny<Process>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-
         // Act
         var result1 = await _service.RecordProcessErrorAsync(process.ProcessId, "ERROR_1", "First error", true);
         var result2 = await _service.RecordProcessErrorAsync(process.ProcessId, "ERROR_2", "Second error", false);
@@ -520,10 +476,6 @@ public class ProcessServiceStateTransitionTests
             .Setup(r => r.GetByIdAsync(process.ProcessId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(process);
 
-        _repositoryMock
-            .Setup(r => r.UpdateAsync(It.IsAny<Process>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-
         // Act
         var result = await _service.IncrementRetryCountAsync(process.ProcessId);
 
@@ -546,10 +498,6 @@ public class ProcessServiceStateTransitionTests
             .Setup(r => r.GetByIdAsync(process.ProcessId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(process);
 
-        _repositoryMock
-            .Setup(r => r.UpdateAsync(It.IsAny<Process>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
-
         // Act
         var result = await _service.TransitionToProcessingAsync(process.ProcessId);
 
@@ -567,10 +515,6 @@ public class ProcessServiceStateTransitionTests
         _repositoryMock
             .Setup(r => r.GetByIdAsync(process.ProcessId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(process);
-
-        _repositoryMock
-            .Setup(r => r.UpdateAsync(It.IsAny<Process>(), It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
 
         // Act
         var result = await _service.TransitionToProcessingAsync(process.ProcessId);
