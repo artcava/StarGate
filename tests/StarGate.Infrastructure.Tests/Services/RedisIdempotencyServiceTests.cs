@@ -1,11 +1,11 @@
-namespace StarGate.Infrastructure.Tests.Services;
-
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using StackExchange.Redis;
 using StarGate.Infrastructure.Services;
 using Xunit;
+
+namespace StarGate.Infrastructure.Tests.Services;
 
 public class RedisIdempotencyServiceTests
 {

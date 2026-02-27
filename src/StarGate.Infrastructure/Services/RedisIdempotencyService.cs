@@ -1,8 +1,8 @@
-namespace StarGate.Infrastructure.Services;
-
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 using StarGate.Core.Abstractions;
+
+namespace StarGate.Infrastructure.Services;
 
 /// <summary>
 /// Redis-based implementation of idempotency service.

@@ -1,5 +1,3 @@
-namespace StarGate.Application.Tests.Services;
-
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -8,6 +6,8 @@ using StarGate.Core.Abstractions;
 using StarGate.Core.Domain;
 using StarGate.Core.Exceptions;
 using Xunit;
+
+namespace StarGate.Application.Tests.Services;
 
 public class ProcessServiceIdempotencyTests
 {

@@ -13,7 +13,7 @@ public interface IIdempotencyService
     /// <param name="idempotencyKey">The unique idempotency key.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The process ID if the key exists, null otherwise.</returns>
-    Task<Guid?> GetProcessIdByIdempotencyKeyAsync(
+    public Task<Guid?> GetProcessIdByIdempotencyKeyAsync(
         string clientId,
         string idempotencyKey,
         CancellationToken cancellationToken = default);
@@ -27,7 +27,7 @@ public interface IIdempotencyService
     /// <param name="processId">The process ID to associate with the key.</param>
     /// <param name="expiration">Optional expiration time (defaults to 24 hours).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    Task StoreIdempotencyKeyAsync(
+    public Task StoreIdempotencyKeyAsync(
         string clientId,
         string idempotencyKey,
         Guid processId,
@@ -40,7 +40,7 @@ public interface IIdempotencyService
     /// <param name="clientId">The client identifier.</param>
     /// <param name="idempotencyKey">The unique idempotency key.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    Task RemoveIdempotencyKeyAsync(
+    public Task RemoveIdempotencyKeyAsync(
         string clientId,
         string idempotencyKey,
         CancellationToken cancellationToken = default);
