@@ -48,7 +48,7 @@ public interface IMessageBroker
     /// <param name="routingKey">Routing key for topic-based routing.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Task representing the asynchronous operation.</returns>
-    Task PublishAsync<T>(
+    public Task PublishAsync<T>(
         T message,
         string routingKey,
         CancellationToken cancellationToken = default) where T : class;
@@ -62,7 +62,7 @@ public interface IMessageBroker
     /// <param name="delay">Delay before message delivery.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Task representing the asynchronous operation.</returns>
-    Task PublishWithDelayAsync<T>(
+    public Task PublishWithDelayAsync<T>(
         T message,
         string routingKey,
         TimeSpan delay,

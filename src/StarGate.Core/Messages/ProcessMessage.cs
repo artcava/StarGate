@@ -1,6 +1,6 @@
-namespace StarGate.Core.Messages;
-
 using System.Text.Json.Serialization;
+
+namespace StarGate.Core.Messages;
 
 /// <summary>
 /// Message sent to the broker when a process is ready for execution.
