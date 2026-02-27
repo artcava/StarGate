@@ -35,6 +35,7 @@ builder.Services.AddValidatorsFromAssemblyContaining<CreateProcessRequestValidat
 builder.Services.AddSingleton<IPolicyRepository, InMemoryPolicyRepository>();
 builder.Services.AddSingleton<ICacheStore, InMemoryCacheStore>();
 builder.Services.AddSingleton<IProcessRepository, InMemoryProcessRepository>();
+builder.Services.AddSingleton<IIdempotencyService, InMemoryIdempotencyService>();
 
 // Add Application layer services
 builder.Services.AddApplicationServices(builder.Configuration);
