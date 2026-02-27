@@ -1,7 +1,7 @@
-namespace StarGate.Api.Infrastructure;
-
 using System.Collections.Concurrent;
 using StarGate.Core.Abstractions;
+
+namespace StarGate.Api.Infrastructure;
 
 /// <summary>
 /// In-memory implementation of idempotency service for testing purposes.
@@ -10,7 +10,7 @@ using StarGate.Core.Abstractions;
 public class InMemoryIdempotencyService : IIdempotencyService
 {
     private readonly ConcurrentDictionary<string, (Guid ProcessId, DateTime Expiration)> _store = new();
-    private static readonly TimeSpan DefaultExpiration = TimeSpan.FromHours(24);
+    private static readonly TimeSpan _defaultExpiration = TimeSpan.FromHours(24);
 
     public Task<Guid?> GetProcessIdByIdempotencyKeyAsync(
         string clientId,
@@ -42,7 +42,7 @@ public class InMemoryIdempotencyService : IIdempotencyService
         CancellationToken cancellationToken = default)
     {
         var key = BuildKey(clientId, idempotencyKey);
-        var expirationTime = DateTime.UtcNow + (expiration ?? DefaultExpiration);
+        var expirationTime = DateTime.UtcNow + (expiration ?? _defaultExpiration);
 
         _store[key] = (processId, expirationTime);
 
