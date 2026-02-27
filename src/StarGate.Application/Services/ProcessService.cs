@@ -411,7 +411,7 @@ public class ProcessService : IProcessService
     }
 
     /// <inheritdoc />
-    public async Task UpdateProcessStatusAsync(
+    public async Task<Process> UpdateProcessStatusAsync(
         Guid processId,
         ProcessStatus newStatus,
         CancellationToken cancellationToken = default)
@@ -440,10 +440,12 @@ public class ProcessService : IProcessService
             processId,
             previousStatus,
             newStatus);
+
+        return updatedProcess;
     }
 
     /// <inheritdoc />
-    public async Task UpdateProcessProgressAsync(
+    public async Task<Process> UpdateProcessProgressAsync(
         Guid processId,
         int progress,
         CancellationToken cancellationToken = default)
@@ -475,10 +477,12 @@ public class ProcessService : IProcessService
             "Process progress updated: ProcessId={ProcessId}, Progress={Progress}",
             processId,
             progress);
+
+        return updatedProcess;
     }
 
     /// <inheritdoc />
-    public async Task RecordProcessErrorAsync(
+    public async Task<Process> RecordProcessErrorAsync(
         Guid processId,
         string errorCode,
         string message,
@@ -506,10 +510,12 @@ public class ProcessService : IProcessService
             processId,
             errorCode,
             updatedProcess.Errors?.Count ?? 0);
+
+        return updatedProcess;
     }
 
     /// <inheritdoc />
-    public async Task IncrementRetryCountAsync(
+    public async Task<Process> IncrementRetryCountAsync(
         Guid processId,
         CancellationToken cancellationToken = default)
     {
@@ -532,10 +538,12 @@ public class ProcessService : IProcessService
             processId,
             updatedProcess.RetryCount,
             updatedProcess.MaxRetries);
+
+        return updatedProcess;
     }
 
     /// <inheritdoc />
-    public async Task TransitionToProcessingAsync(
+    public async Task<Process> TransitionToProcessingAsync(
         Guid processId,
         CancellationToken cancellationToken = default)
     {
@@ -558,10 +566,12 @@ public class ProcessService : IProcessService
         _logger.LogInformation(
             "Process transitioned to Processing: ProcessId={ProcessId}",
             processId);
+
+        return updatedProcess;
     }
 
     /// <inheritdoc />
-    public async Task CompleteProcessAsync(
+    public async Task<Process> CompleteProcessAsync(
         Guid processId,
         CancellationToken cancellationToken = default)
     {
@@ -588,10 +598,12 @@ public class ProcessService : IProcessService
             "Process completed successfully: ProcessId={ProcessId}, Duration={Duration}ms",
             processId,
             (updatedProcess.CompletedAt!.Value - process.CreatedAt).TotalMilliseconds);
+
+        return updatedProcess;
     }
 
     /// <inheritdoc />
-    public async Task FailProcessAsync(
+    public async Task<Process> FailProcessAsync(
         Guid processId,
         string errorCode,
         string errorMessage,
@@ -655,10 +667,12 @@ public class ProcessService : IProcessService
         }
 
         await _processRepository.UpdateAsync(updatedProcess, cancellationToken);
+
+        return updatedProcess;
     }
 
     /// <inheritdoc />
-    public async Task RejectProcessAsync(
+    public async Task<Process> RejectProcessAsync(
         Guid processId,
         string reason,
         CancellationToken cancellationToken = default)
@@ -683,10 +697,12 @@ public class ProcessService : IProcessService
         _logger.LogInformation(
             "Process rejected: ProcessId={ProcessId}",
             processId);
+
+        return updatedProcess;
     }
 
     /// <inheritdoc />
-    public async Task CheckTimeoutAsync(
+    public async Task<Process> CheckTimeoutAsync(
         Guid processId,
         CancellationToken cancellationToken = default)
     {
@@ -694,7 +710,7 @@ public class ProcessService : IProcessService
 
         if (!process.IsTimedOut)
         {
-            return;
+            return process;
         }
 
         _logger.LogWarning(
@@ -702,7 +718,7 @@ public class ProcessService : IProcessService
             processId,
             process.TimeoutAt);
 
-        await FailProcessAsync(
+        return await FailProcessAsync(
             processId,
             "PROCESS_TIMEOUT",
             $"Process exceeded timeout of {(process.TimeoutAt!.Value - process.CreatedAt).TotalSeconds} seconds",
