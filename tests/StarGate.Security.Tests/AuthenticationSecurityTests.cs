@@ -30,13 +30,22 @@ public class AuthenticationSecurityTests : SecurityTestBase
     [Fact]
     public async Task Endpoint_Should_Return401_WhenTokenIsExpired()
     {
-        // Arrange
-        var processId = Guid.NewGuid();
+        // Arrange - Use POST endpoint which requires auth before any validation
         var expiredToken = GenerateExpiredToken("test-client");
+        var requestBody = new
+        {
+            clientId = "test-client",
+            processType = "test-type",
+            clientProcessId = "test-process-123",
+            idempotencyKey = Guid.NewGuid().ToString(),
+            metadata = new Dictionary<string, string>()
+        };
+        
         var request = CreateAuthenticatedRequest(
-            HttpMethod.Get,
-            $"/api/processes/{processId}",
+            HttpMethod.Post,
+            "/api/processes",
             expiredToken);
+        request.Content = JsonContent.Create(requestBody);
 
         // Act
         var response = await Client.SendAsync(request);
@@ -49,6 +58,8 @@ public class AuthenticationSecurityTests : SecurityTestBase
         
         response.StatusCode.Should().NotBe(HttpStatusCode.OK,
             "expired token should never return success");
+        response.StatusCode.Should().NotBe(HttpStatusCode.NotFound,
+            "expired token should fail at authentication, not routing");
     }
 
     [Fact]

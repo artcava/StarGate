@@ -30,13 +30,16 @@ public interface IProcessRepository
     public Task<Process?> GetByIdAsync(Guid processId, CancellationToken ct = default);
 
     /// <summary>
-    /// Retrieves a process by idempotency key.
+    /// Retrieves a process by client ID and idempotency key.
     /// Used for idempotency checks to prevent duplicate process submissions.
+    /// Idempotency keys are scoped per client (same key from different clients = different processes).
     /// </summary>
+    /// <param name="clientId">Client identifier.</param>
     /// <param name="idempotencyKey">Idempotency key.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Process if found, null otherwise.</returns>
     public Task<Process?> GetByIdempotencyKeyAsync(
+        string clientId,
         string idempotencyKey,
         CancellationToken ct = default);
 
