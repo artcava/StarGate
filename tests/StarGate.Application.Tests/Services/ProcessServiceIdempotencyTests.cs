@@ -82,7 +82,12 @@ public class ProcessServiceIdempotencyTests
         {
             ProcessId = Guid.NewGuid(),
             ClientId = clientId,
-            IdempotencyKey = idempotencyKey
+            ClientProcessId = clientProcessId,
+            ProcessType = processType,
+            IdempotencyKey = idempotencyKey,
+            Status = ProcessStatus.Accepted,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
         };
 
         _idempotencyMock
@@ -137,7 +142,12 @@ public class ProcessServiceIdempotencyTests
         {
             ProcessId = Guid.NewGuid(),
             ClientId = clientId,
-            IdempotencyKey = idempotencyKey
+            ClientProcessId = clientProcessId,
+            ProcessType = processType,
+            IdempotencyKey = idempotencyKey,
+            Status = ProcessStatus.Accepted,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
         };
 
         _idempotencyMock
@@ -223,7 +233,7 @@ public class ProcessServiceIdempotencyTests
                 It.IsAny<Process>(),
                 It.IsAny<CancellationToken>()))
             .Callback(() => callOrder.Add("create-process"))
-            .Returns(Task.CompletedTask);
+            .ReturnsAsync((Process p, CancellationToken ct) => p);
 
         // Act
         await _service.CreateProcessAsync(
@@ -340,7 +350,7 @@ public class ProcessServiceIdempotencyTests
                 It.IsAny<Process>(),
                 It.IsAny<CancellationToken>()))
             .Callback<Process, CancellationToken>((p, ct) => createdProcess = p)
-            .Returns(Task.CompletedTask);
+            .ReturnsAsync((Process p, CancellationToken ct) => p);
 
         // Act
         var result = await _service.CreateProcessAsync(
@@ -385,7 +395,7 @@ public class ProcessServiceIdempotencyTests
                 It.IsAny<Process>(),
                 It.IsAny<CancellationToken>()))
             .Callback<Process, CancellationToken>((p, ct) => processIds.Add(p.ProcessId))
-            .Returns(Task.CompletedTask);
+            .ReturnsAsync((Process p, CancellationToken ct) => p);
 
         // Act
         await _service.CreateProcessAsync(clientId, processType, "order-1", "key-1");
@@ -427,6 +437,6 @@ public class ProcessServiceIdempotencyTests
             .Setup(r => r.CreateAsync(
                 It.IsAny<Process>(),
                 It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
+            .ReturnsAsync((Process p, CancellationToken ct) => p);
     }
 }
