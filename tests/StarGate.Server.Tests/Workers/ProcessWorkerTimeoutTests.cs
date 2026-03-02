@@ -256,7 +256,7 @@ public class ProcessWorkerTimeoutTests
     }
 
     [Fact]
-    public async Task ExecuteProcessAsync_Should_FailProcess_WhenNoHandlerFound()
+    public Task ExecuteProcessAsync_Should_FailProcess_WhenNoHandlerFound()
     {
         // Arrange
         var processId = Guid.NewGuid();
@@ -286,6 +286,7 @@ public class ProcessWorkerTimeoutTests
 
         // Act - Verify failure scenario
         _handlerFactoryMock.Object.IsRegistered("unknown-type").Should().BeFalse();
+        return Task.CompletedTask;
 
         // Assert - Would fail with NO_HANDLER_FOUND
     }
