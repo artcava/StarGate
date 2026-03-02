@@ -39,8 +39,9 @@ public class RetryConfiguration
         if (UseJitter)
         {
             var random = new Random();
-            var jitter = random.NextDouble() * 0.3 * delaySeconds; // +/- 30%
-            delaySeconds = delaySeconds * (1 + jitter - 0.15);
+            // Generate jitter between -0.3 and +0.3 (±30%)
+            var jitter = (random.NextDouble() * 0.6) - 0.3;
+            delaySeconds = delaySeconds * (1 + jitter);
         }
 
         return TimeSpan.FromSeconds(delaySeconds);
