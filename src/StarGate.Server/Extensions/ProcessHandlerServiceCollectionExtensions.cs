@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using StarGate.Core.Abstractions;
 using StarGate.Server.Factories;
+using StarGate.Server.Handlers;
 
 namespace StarGate.Server.Extensions;
 
@@ -18,6 +19,21 @@ public static class ProcessHandlerServiceCollectionExtensions
     {
         // Register factory as singleton
         services.AddSingleton<IProcessHandlerFactory, ProcessHandlerFactory>();
+
+        // Register individual handlers
+        services.AddTransient<OrderProcessHandler>();
+
+        // Auto-register handlers with factory
+        services.AddSingleton(provider =>
+        {
+            var factory = provider.GetRequiredService<IProcessHandlerFactory>();
+
+            // Register OrderProcessHandler
+            var orderHandler = provider.GetRequiredService<OrderProcessHandler>();
+            factory.RegisterHandler(orderHandler.ProcessType, orderHandler);
+
+            return factory;
+        });
 
         return services;
     }
