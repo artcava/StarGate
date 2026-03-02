@@ -44,7 +44,7 @@ public class ProcessMessage
             ClientProcessId = process.ClientProcessId,
             Priority = 5, // Default priority, can be made configurable based on process type
             Timestamp = DateTime.UtcNow,
-            Metadata = process.Metadata
+            Metadata = null // Metadata is not persisted in Process entity
         };
     }
 }
