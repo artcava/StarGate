@@ -1,9 +1,9 @@
-namespace StarGate.Server.Extensions;
-
 using Microsoft.Extensions.DependencyInjection;
 using StarGate.Core.Abstractions;
 using StarGate.Server.Factories;
 using StarGate.Server.Handlers;
+
+namespace StarGate.Server.Extensions;
 
 /// <summary>
 /// Extension methods for registering process handlers.
