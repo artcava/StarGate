@@ -123,7 +123,7 @@ public class TimeoutScannerWorkerTests
             .Setup(s => s.CheckTimeoutAsync(
                 It.IsAny<Guid>(),
                 It.IsAny<CancellationToken>()))
-            .Returns(Task.FromResult(0));
+            .ReturnsAsync(It.IsAny<Process>());
 
         using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
 
@@ -161,8 +161,8 @@ public class TimeoutScannerWorkerTests
                 It.IsAny<Guid>(),
                 It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("Process not found"))
-            .Returns(Task.FromResult(0))
-            .Returns(Task.FromResult(0));
+            .ReturnsAsync(It.IsAny<Process>())
+            .ReturnsAsync(It.IsAny<Process>());
 
         using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
 
