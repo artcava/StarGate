@@ -48,8 +48,8 @@ public class ProcessWorkerShutdownTests
     {
         // Assert
         _worker.Should().NotBeNull();
-        _worker.IsShuttingDown.Should().BeDefined();
-        _worker.ActiveMessageCount.Should().BeDefined();
+        _worker.IsShuttingDown.Should().BeFalse();
+        _worker.ActiveMessageCount.Should().BeGreaterThanOrEqualTo(0);
     }
 
     [Fact]
