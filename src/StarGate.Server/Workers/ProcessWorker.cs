@@ -416,7 +416,7 @@ public class ProcessWorker : BackgroundService
                 ClientId = process.ClientId,
                 ProcessType = process.ProcessType,
                 ClientProcessId = process.ClientProcessId,
-                Metadata = process.Metadata ?? new Dictionary<string, string>(),
+                Metadata = new Dictionary<string, string>(),
                 CancellationToken = timeoutCts.Token
             };
 
