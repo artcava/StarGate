@@ -1,8 +1,8 @@
-namespace StarGate.Server.Handlers;
-
 using Microsoft.Extensions.Logging;
 using StarGate.Core.Abstractions;
 using StarGate.Core.Domain;
+
+namespace StarGate.Server.Handlers;
 
 /// <summary>
 /// Process handler for order processing operations.

@@ -1,10 +1,10 @@
-namespace StarGate.Server.Tests.Handlers;
-
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using StarGate.Core.Domain;
 using StarGate.Server.Handlers;
 using Xunit;
+
+namespace StarGate.Server.Tests.Handlers;
 
 public class OrderProcessHandlerTests
 {
