@@ -1,12 +1,10 @@
-namespace StarGate.Server.Tests.Factories;
-
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using StarGate.Core.Abstractions;
-using StarGate.Core.Domain;
 using StarGate.Server.Factories;
-using Xunit;
+
+namespace StarGate.Server.Tests.Factories;
 
 public class ProcessHandlerFactoryTests
 {
