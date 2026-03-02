@@ -1,8 +1,7 @@
-namespace StarGate.Server.Tests.Workers;
-
 using FluentAssertions;
 using StarGate.Core.Configuration;
-using Xunit;
+
+namespace StarGate.Server.Tests.Workers;
 
 public class RetryLogicTests
 {
