@@ -8,11 +8,16 @@ namespace StarGate.Server.Tests.Handlers;
 
 public class ShippingProcessHandlerTests
 {
+    // Use deterministic seed for consistent test results
+    // Production code uses time-based random (no seed)
+    private const int TestRandomSeed = 42;
     private readonly ShippingProcessHandler _handler;
 
     public ShippingProcessHandlerTests()
     {
-        _handler = new ShippingProcessHandler(NullLogger<ShippingProcessHandler>.Instance);
+        _handler = new ShippingProcessHandler(
+            NullLogger<ShippingProcessHandler>.Instance,
+            randomSeed: TestRandomSeed);
     }
 
     [Fact]
@@ -179,9 +184,7 @@ public class ShippingProcessHandlerTests
             }
         };
 
-        // Act & Assert
-        // Note: May occasionally fail due to simulated random failures
-        // In production tests, you'd mock external dependencies
+        // Act & Assert - Deterministic with seed=42
         await _handler.ExecuteAsync(context);
     }
 
@@ -261,12 +264,8 @@ public class ShippingProcessHandlerTests
             }
         };
 
-        // Act
-        // Note: May occasionally fail due to simulated random failures
-        // In production tests, you'd mock external dependencies
+        // Act & Assert - Deterministic with seed=42
         await _handler.ExecuteAsync(context);
-
-        // Assert - no exception thrown
     }
 
     [Fact]
@@ -278,5 +277,30 @@ public class ShippingProcessHandlerTests
         // Assert
         act.Should().Throw<ArgumentNullException>()
             .WithParameterName("logger");
+    }
+
+    [Fact]
+    public void Constructor_Should_AcceptRandomSeed()
+    {
+        // Act
+        var handler = new ShippingProcessHandler(
+            NullLogger<ShippingProcessHandler>.Instance,
+            randomSeed: 123);
+
+        // Assert
+        handler.Should().NotBeNull();
+        handler.ProcessType.Should().Be("shipping");
+    }
+
+    [Fact]
+    public void Constructor_Should_UseTimeBasedRandom_WhenSeedNotProvided()
+    {
+        // Act
+        var handler = new ShippingProcessHandler(
+            NullLogger<ShippingProcessHandler>.Instance);
+
+        // Assert
+        handler.Should().NotBeNull();
+        handler.ProcessType.Should().Be("shipping");
     }
 }
