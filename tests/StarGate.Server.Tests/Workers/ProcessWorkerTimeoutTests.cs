@@ -217,7 +217,7 @@ public class ProcessWorkerTimeoutTests
             .Returns(async (Process p, CancellationToken ct) =>
             {
                 await Task.Delay(TimeSpan.FromSeconds(5), ct);
-                return (object?)null;
+                return null!; // Suppress CS8603: test doesn't need real result
             });
 
         _processServiceMock
@@ -232,10 +232,8 @@ public class ProcessWorkerTimeoutTests
         // Act & Assert - Timeout should occur
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
 
-        await Assert.ThrowsAsync<OperationCanceledException>(async () =>
-        {
-            await _handlerMock.Object.ExecuteAsync(process, cts.Token);
-        });
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            _handlerMock.Object.ExecuteAsync(process, cts.Token));
     }
 
     [Fact]
