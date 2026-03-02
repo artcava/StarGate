@@ -2,6 +2,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using StarGate.Core.Abstractions;
 using StarGate.Core.Messages;
+using System.Collections.Concurrent;
 using System.Text.Json;
 
 namespace StarGate.Server.Workers;
@@ -16,6 +17,8 @@ public class ProcessWorker : BackgroundService
     private readonly IProcessService _processService;
     private readonly IProcessHandlerFactory _handlerFactory;
     private readonly ILogger<ProcessWorker> _logger;
+    private readonly ConcurrentDictionary<string, Task> _activeMessages;
+    private readonly TimeSpan _shutdownTimeout = TimeSpan.FromSeconds(30);
 
     public ProcessWorker(
         IMessageConsumer messageConsumer,
@@ -27,30 +30,86 @@ public class ProcessWorker : BackgroundService
         _processService = processService ?? throw new ArgumentNullException(nameof(processService));
         _handlerFactory = handlerFactory ?? throw new ArgumentNullException(nameof(handlerFactory));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _activeMessages = new ConcurrentDictionary<string, Task>();
     }
+
+    /// <summary>
+    /// Gets the number of messages currently being processed.
+    /// </summary>
+    public int ActiveMessageCount => _activeMessages.Count;
+
+    /// <summary>
+    /// Indicates if the worker is shutting down.
+    /// </summary>
+    public bool IsShuttingDown { get; private set; }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("ProcessWorker starting");
 
+        // Register shutdown callback
+        stoppingToken.Register(() =>
+        {
+            IsShuttingDown = true;
+            _logger.LogInformation(
+                "Shutdown requested. Active messages: {ActiveMessageCount}",
+                ActiveMessageCount);
+        });
+
         try
         {
             await _messageConsumer.StartConsumingAsync<ProcessMessage>(
-                messageHandler: async (message, context) => await HandleMessageAsync(message, context, stoppingToken),
+                messageHandler: async (message, context) =>
+                {
+                    // Don't accept new messages during shutdown
+                    if (stoppingToken.IsCancellationRequested)
+                    {
+                        _logger.LogWarning(
+                            "Rejecting message during shutdown: ProcessId={ProcessId}",
+                            message.ProcessId);
+
+                        // NACK to requeue
+                        await context.RejectAsync(true);
+                        return;
+                    }
+
+                    // Track message processing with unique key
+                    var messageKey = $"{message.ProcessId}_{Guid.NewGuid()}";
+                    var processingTask = HandleMessageWithTrackingAsync(
+                        message,
+                        context,
+                        stoppingToken);
+
+                    // Store task for graceful shutdown tracking
+                    _activeMessages.TryAdd(messageKey, processingTask);
+
+                    try
+                    {
+                        await processingTask;
+                    }
+                    finally
+                    {
+                        _activeMessages.TryRemove(messageKey, out _);
+                    }
+                },
                 ct: stoppingToken);
         }
         catch (OperationCanceledException)
         {
-            _logger.LogInformation("ProcessWorker stopped gracefully");
+            _logger.LogInformation("ProcessWorker cancellation requested");
         }
         catch (Exception ex)
         {
             _logger.LogCritical(ex, "ProcessWorker encountered fatal error");
             throw;
         }
+        finally
+        {
+            await WaitForActiveMessagesToCompleteAsync();
+        }
     }
 
-    private async Task HandleMessageAsync(
+    private async Task HandleMessageWithTrackingAsync(
         ProcessMessage processMessage,
         MessageContext context,
         CancellationToken cancellationToken)
@@ -74,6 +133,18 @@ public class ProcessWorker : BackgroundService
 
             // ACK message
             await context.AcknowledgeAsync();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogWarning(
+                "Process execution cancelled during shutdown: ProcessId={ProcessId}",
+                processId);
+
+            // Record cancellation for audit trail
+            await RecordCancellationAsync(processId);
+
+            // NACK to requeue - will be processed after restart
+            await context.RejectAsync(true);
         }
         catch (JsonException ex)
         {
@@ -100,6 +171,76 @@ public class ProcessWorker : BackgroundService
 
             // NACK and requeue for retry
             await context.RejectAsync(true);
+        }
+    }
+
+    private async Task WaitForActiveMessagesToCompleteAsync()
+    {
+        if (_activeMessages.IsEmpty)
+        {
+            _logger.LogInformation("No active messages to wait for");
+            return;
+        }
+
+        _logger.LogInformation(
+            "Waiting for {ActiveMessageCount} active message(s) to complete. Timeout: {Timeout}s",
+            ActiveMessageCount,
+            _shutdownTimeout.TotalSeconds);
+
+        var allTasks = _activeMessages.Values.ToArray();
+
+        try
+        {
+            using var cts = new CancellationTokenSource(_shutdownTimeout);
+            await Task.WhenAll(allTasks).WaitAsync(cts.Token);
+
+            _logger.LogInformation(
+                "All active messages completed successfully");
+        }
+        catch (TimeoutException)
+        {
+            _logger.LogWarning(
+                "Shutdown timeout exceeded. {RemainingCount} message(s) still processing",
+                _activeMessages.Count);
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogWarning(
+                "Graceful shutdown cancelled. {RemainingCount} message(s) still processing",
+                _activeMessages.Count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Error while waiting for active messages to complete");
+        }
+    }
+
+    private async Task RecordCancellationAsync(Guid processId)
+    {
+        try
+        {
+            // Use a fresh cancellation token to allow this operation to complete
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+
+            await _processService.RecordProcessErrorAsync(
+                processId,
+                "PROCESS_CANCELLED",
+                "Process execution was cancelled during graceful shutdown",
+                retryable: true,
+                cts.Token);
+
+            _logger.LogInformation(
+                "Cancellation recorded for process: ProcessId={ProcessId}",
+                processId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to record cancellation: ProcessId={ProcessId}",
+                processId);
         }
     }
 
@@ -162,6 +303,9 @@ public class ProcessWorker : BackgroundService
     {
         try
         {
+            // Use fresh token for error recording to ensure it completes
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+
             var errorCode = exception switch
             {
                 TimeoutException => "PROCESS_TIMEOUT",
@@ -177,7 +321,7 @@ public class ProcessWorker : BackgroundService
                 errorCode,
                 exception.Message,
                 canRetry,
-                cancellationToken);
+                cts.Token);
 
             _logger.LogWarning(
                 "Process failure recorded: ProcessId={ProcessId}, ErrorCode={ErrorCode}, CanRetry={CanRetry}",
@@ -196,11 +340,13 @@ public class ProcessWorker : BackgroundService
 
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
-        _logger.LogInformation("ProcessWorker stopping...");
-        
+        _logger.LogInformation(
+            "ProcessWorker stopping. Active messages: {ActiveMessageCount}",
+            ActiveMessageCount);
+
         await _messageConsumer.StopConsumingAsync();
         await base.StopAsync(cancellationToken);
-        
+
         _logger.LogInformation("ProcessWorker stopped");
     }
 }
