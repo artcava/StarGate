@@ -89,7 +89,7 @@ public class TimeoutScannerWorkerTests
         // Arrange
         _repositoryMock
             .Setup(r => r.GetTimedOutProcessesAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Process>());
+            .ReturnsAsync(new List<Process>() as IReadOnlyList<Process>);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
 
@@ -117,7 +117,7 @@ public class TimeoutScannerWorkerTests
 
         _repositoryMock
             .Setup(r => r.GetTimedOutProcessesAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(timedOutProcesses);
+            .ReturnsAsync(timedOutProcesses as IReadOnlyList<Process>);
 
         _serviceMock
             .Setup(s => s.CheckTimeoutAsync(
@@ -153,7 +153,7 @@ public class TimeoutScannerWorkerTests
 
         _repositoryMock
             .Setup(r => r.GetTimedOutProcessesAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(timedOutProcesses);
+            .ReturnsAsync(timedOutProcesses as IReadOnlyList<Process>);
 
         // First call fails, others succeed
         _serviceMock
@@ -185,7 +185,7 @@ public class TimeoutScannerWorkerTests
         // Arrange
         _repositoryMock
             .Setup(r => r.GetTimedOutProcessesAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Process>());
+            .ReturnsAsync(new List<Process>() as IReadOnlyList<Process>);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
 
@@ -236,7 +236,7 @@ public class TimeoutScannerWorkerTests
         // Arrange
         _repositoryMock
             .Setup(r => r.GetTimedOutProcessesAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Process>());
+            .ReturnsAsync(new List<Process>() as IReadOnlyList<Process>);
 
         using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
 
