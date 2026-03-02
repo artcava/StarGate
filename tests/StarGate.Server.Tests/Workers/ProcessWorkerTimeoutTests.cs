@@ -210,8 +210,9 @@ public class ProcessWorkerTimeoutTests
             .Setup(s => s.TransitionToProcessingAsync(processId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(It.IsAny<Process>());
 
+        // Use IsRegistered instead of HasHandler
         _handlerFactoryMock
-            .Setup(f => f.HasHandler("test-order"))
+            .Setup(f => f.IsRegistered("test-order"))
             .Returns(true);
 
         _handlerFactoryMock
@@ -219,13 +220,12 @@ public class ProcessWorkerTimeoutTests
             .Returns(_handlerMock.Object);
 
         // Handler takes 5 seconds (exceeds 1 second timeout)
-        // ExecuteAsync returns Task<object>
+        // ExecuteAsync now takes only ProcessContext
         _handlerMock
-            .Setup(h => h.ExecuteAsync(It.IsAny<Process>(), It.IsAny<CancellationToken>()))
-            .Returns(async (Process p, CancellationToken ct) =>
+            .Setup(h => h.ExecuteAsync(It.IsAny<ProcessContext>()))
+            .Returns(async (ProcessContext context) =>
             {
-                await Task.Delay(TimeSpan.FromSeconds(5), ct);
-                return null!; // Suppress CS8603: test doesn't need real result
+                await Task.Delay(TimeSpan.FromSeconds(5), context.CancellationToken);
             });
 
         _processServiceMock
@@ -241,8 +241,18 @@ public class ProcessWorkerTimeoutTests
         // TaskCanceledException is thrown by Task.Delay when cancelled
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
 
+        var processContext = new ProcessContext
+        {
+            ProcessId = process.ProcessId,
+            ClientId = process.ClientId,
+            ProcessType = process.ProcessType,
+            ClientProcessId = process.ClientProcessId,
+            Metadata = new Dictionary<string, string>(),
+            CancellationToken = cts.Token
+        };
+
         await Assert.ThrowsAsync<TaskCanceledException>(() =>
-            _handlerMock.Object.ExecuteAsync(process, cts.Token));
+            _handlerMock.Object.ExecuteAsync(processContext));
     }
 
     [Fact]
@@ -260,8 +270,9 @@ public class ProcessWorkerTimeoutTests
             .Setup(s => s.TransitionToProcessingAsync(processId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(It.IsAny<Process>());
 
+        // Use IsRegistered instead of HasHandler
         _handlerFactoryMock
-            .Setup(f => f.HasHandler("unknown-type"))
+            .Setup(f => f.IsRegistered("unknown-type"))
             .Returns(false);
 
         _processServiceMock
@@ -274,7 +285,7 @@ public class ProcessWorkerTimeoutTests
             .ReturnsAsync(It.IsAny<Process>());
 
         // Act - Verify failure scenario
-        _handlerFactoryMock.Object.HasHandler("unknown-type").Should().BeFalse();
+        _handlerFactoryMock.Object.IsRegistered("unknown-type").Should().BeFalse();
 
         // Assert - Would fail with NO_HANDLER_FOUND
     }
