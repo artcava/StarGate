@@ -1,9 +1,8 @@
+namespace StarGate.Server.Extensions;
+
 using Microsoft.Extensions.DependencyInjection;
 using StarGate.Core.Abstractions;
 using StarGate.Server.Factories;
-using StarGate.Server.Handlers;
-
-namespace StarGate.Server.Extensions;
 
 /// <summary>
 /// Extension methods for registering process handlers.
@@ -20,26 +19,6 @@ public static class ProcessHandlerServiceCollectionExtensions
         // Register factory as singleton
         services.AddSingleton<IProcessHandlerFactory, ProcessHandlerFactory>();
 
-        // Register individual handlers
-        services.AddTransient<OrderProcessHandler>();
-        services.AddTransient<ShippingProcessHandler>();
-
-        // Auto-register handlers with factory
-        services.AddSingleton<IProcessHandlerFactory>(provider =>
-        {
-            var factory = provider.GetRequiredService<IProcessHandlerFactory>();
-
-            // Register OrderProcessHandler
-            var orderHandler = provider.GetRequiredService<OrderProcessHandler>();
-            factory.RegisterHandler(orderHandler.ProcessType, orderHandler);
-
-            // Register ShippingProcessHandler
-            var shippingHandler = provider.GetRequiredService<ShippingProcessHandler>();
-            factory.RegisterHandler(shippingHandler.ProcessType, shippingHandler);
-
-            return factory;
-        });
-
         return services;
     }
 
@@ -55,7 +34,7 @@ public static class ProcessHandlerServiceCollectionExtensions
     {
         services.AddTransient<THandler>();
 
-        services.AddSingleton<THandler>(provider =>
+        services.AddSingleton(provider =>
         {
             var handler = provider.GetRequiredService<THandler>();
             var factory = provider.GetRequiredService<IProcessHandlerFactory>();
