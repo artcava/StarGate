@@ -26,6 +26,9 @@ public class ProcessMessage
     [JsonPropertyName("timestamp")]
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;
 
+    [JsonPropertyName("metadata")]
+    public Dictionary<string, string>? Metadata { get; set; }
+
     /// <summary>
     /// Creates a ProcessMessage from a Process entity.
     /// </summary>
@@ -40,7 +43,8 @@ public class ProcessMessage
             ProcessType = process.ProcessType,
             ClientProcessId = process.ClientProcessId,
             Priority = 5, // Default priority, can be made configurable based on process type
-            Timestamp = DateTime.UtcNow
+            Timestamp = DateTime.UtcNow,
+            Metadata = null // Metadata is not persisted in Process entity
         };
     }
 }
