@@ -371,11 +371,11 @@ StarGate/
 - [x] Write unit tests
 
 #### Sprint 7.2: Process Handlers
-- [ ] Implement ProcessHandlerFactory
-- [ ] Create OrderProcessHandler (example)
-- [ ] Create ShippingProcessHandler (example)
-- [ ] Add handler registration mechanism
-- [ ] Write unit tests for each handler
+- [x] Implement ProcessHandlerFactory
+- [x] Create OrderProcessHandler (example)
+- [x] Create ShippingProcessHandler (example)
+- [x] Add handler registration mechanism
+- [x] Write unit tests for each handler
 
 ### Phase 8: Resilience (Week 11)
 
