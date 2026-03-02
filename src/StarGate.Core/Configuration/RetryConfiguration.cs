@@ -32,9 +32,8 @@ public class RetryConfiguration
     /// <returns>Time span representing the delay before next retry.</returns>
     public TimeSpan CalculateDelay(int retryCount)
     {
-        var delaySeconds = Math.Min(
-            BaseDelaySeconds * Math.Pow(BackoffMultiplier, retryCount),
-            MaxDelaySeconds);
+        // Calculate exponential backoff
+        var delaySeconds = BaseDelaySeconds * Math.Pow(BackoffMultiplier, retryCount);
 
         if (UseJitter)
         {
@@ -43,6 +42,9 @@ public class RetryConfiguration
             var jitter = (random.NextDouble() * 0.6) - 0.3;
             delaySeconds = delaySeconds * (1 + jitter);
         }
+
+        // Apply max delay cap after jitter
+        delaySeconds = Math.Min(delaySeconds, MaxDelaySeconds);
 
         return TimeSpan.FromSeconds(delaySeconds);
     }
