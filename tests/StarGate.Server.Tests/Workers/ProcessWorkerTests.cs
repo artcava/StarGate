@@ -1,7 +1,9 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 using StarGate.Core.Abstractions;
+using StarGate.Core.Configuration;
 using StarGate.Core.Messages;
 using StarGate.Server.Workers;
 using Xunit;
@@ -13,6 +15,8 @@ public class ProcessWorkerTests
     private readonly Mock<IMessageConsumer> _consumerMock;
     private readonly Mock<IProcessService> _processServiceMock;
     private readonly Mock<IProcessHandlerFactory> _handlerFactoryMock;
+    private readonly Mock<IMessageBroker> _messageBrokerMock;
+    private readonly IOptions<RetryConfiguration> _retryConfig;
     private readonly ProcessWorker _worker;
 
     public ProcessWorkerTests()
@@ -20,11 +24,15 @@ public class ProcessWorkerTests
         _consumerMock = new Mock<IMessageConsumer>();
         _processServiceMock = new Mock<IProcessService>();
         _handlerFactoryMock = new Mock<IProcessHandlerFactory>();
+        _messageBrokerMock = new Mock<IMessageBroker>();
+        _retryConfig = Options.Create(new RetryConfiguration());
 
         _worker = new ProcessWorker(
             _consumerMock.Object,
             _processServiceMock.Object,
             _handlerFactoryMock.Object,
+            _messageBrokerMock.Object,
+            _retryConfig,
             NullLogger<ProcessWorker>.Instance);
     }
 
@@ -36,6 +44,8 @@ public class ProcessWorkerTests
             null!,
             _processServiceMock.Object,
             _handlerFactoryMock.Object,
+            _messageBrokerMock.Object,
+            _retryConfig,
             NullLogger<ProcessWorker>.Instance);
 
         // Assert
@@ -51,6 +61,8 @@ public class ProcessWorkerTests
             _consumerMock.Object,
             null!,
             _handlerFactoryMock.Object,
+            _messageBrokerMock.Object,
+            _retryConfig,
             NullLogger<ProcessWorker>.Instance);
 
         // Assert
@@ -66,11 +78,47 @@ public class ProcessWorkerTests
             _consumerMock.Object,
             _processServiceMock.Object,
             null!,
+            _messageBrokerMock.Object,
+            _retryConfig,
             NullLogger<ProcessWorker>.Instance);
 
         // Assert
         act.Should().Throw<ArgumentNullException>()
             .WithParameterName("handlerFactory");
+    }
+
+    [Fact]
+    public void Constructor_Should_ThrowArgumentNullException_WhenMessageBrokerIsNull()
+    {
+        // Act
+        Action act = () => new ProcessWorker(
+            _consumerMock.Object,
+            _processServiceMock.Object,
+            _handlerFactoryMock.Object,
+            null!,
+            _retryConfig,
+            NullLogger<ProcessWorker>.Instance);
+
+        // Assert
+        act.Should().Throw<ArgumentNullException>()
+            .WithParameterName("messageBroker");
+    }
+
+    [Fact]
+    public void Constructor_Should_ThrowArgumentNullException_WhenRetryConfigIsNull()
+    {
+        // Act
+        Action act = () => new ProcessWorker(
+            _consumerMock.Object,
+            _processServiceMock.Object,
+            _handlerFactoryMock.Object,
+            _messageBrokerMock.Object,
+            null!,
+            NullLogger<ProcessWorker>.Instance);
+
+        // Assert
+        act.Should().Throw<ArgumentNullException>()
+            .WithParameterName("retryConfig");
     }
 
     [Fact]
@@ -81,6 +129,8 @@ public class ProcessWorkerTests
             _consumerMock.Object,
             _processServiceMock.Object,
             _handlerFactoryMock.Object,
+            _messageBrokerMock.Object,
+            _retryConfig,
             null!);
 
         // Assert
@@ -96,6 +146,8 @@ public class ProcessWorkerTests
             _consumerMock.Object,
             _processServiceMock.Object,
             _handlerFactoryMock.Object,
+            _messageBrokerMock.Object,
+            _retryConfig,
             NullLogger<ProcessWorker>.Instance);
 
         // Assert
