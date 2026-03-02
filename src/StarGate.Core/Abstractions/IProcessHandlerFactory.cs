@@ -1,35 +1,34 @@
 namespace StarGate.Core.Abstractions;
 
 /// <summary>
-/// Factory for retrieving process handlers by type.
-/// Enables dynamic handler registration and resolution.
-/// Typically implemented using dependency injection container.
+/// Factory for creating and retrieving process handlers.
 /// </summary>
 public interface IProcessHandlerFactory
 {
     /// <summary>
-    /// Gets handler for specified process type.
-    /// Throws exception if handler not found to fail fast.
+    /// Gets a handler for the specified process type.
     /// </summary>
-    /// <param name="processType">Process type identifier.</param>
-    /// <returns>Handler instance.</returns>
-    /// <exception cref="InvalidOperationException">If process type is not supported.</exception>
-    /// <exception cref="ArgumentNullException">If processType is null.</exception>
-    public IProcessHandler GetHandler(string processType);
+    /// <param name="processType">The process type.</param>
+    /// <returns>The handler, or null if no handler is registered.</returns>
+    public IProcessHandler? GetHandler(string processType);
 
     /// <summary>
-    /// Checks if a handler exists for the specified process type.
-    /// Use this before GetHandler to avoid exceptions.
+    /// Registers a handler for a process type.
     /// </summary>
-    /// <param name="processType">Process type identifier.</param>
-    /// <returns>True if handler exists, false otherwise.</returns>
-    /// <exception cref="ArgumentNullException">If processType is null.</exception>
-    public bool HasHandler(string processType);
+    /// <param name="processType">The process type.</param>
+    /// <param name="handler">The handler instance.</param>
+    public void RegisterHandler(string processType, IProcessHandler handler);
 
     /// <summary>
-    /// Gets all supported process types.
-    /// Useful for validation and API documentation.
+    /// Gets all registered process types.
     /// </summary>
-    /// <returns>List of supported process type identifiers.</returns>
-    public IReadOnlyList<string> GetSupportedProcessTypes();
+    /// <returns>Collection of registered process types.</returns>
+    public IEnumerable<string> GetRegisteredProcessTypes();
+
+    /// <summary>
+    /// Checks if a handler is registered for the specified process type.
+    /// </summary>
+    /// <param name="processType">The process type to check.</param>
+    /// <returns>True if a handler is registered; otherwise, false.</returns>
+    public bool IsRegistered(string processType);
 }
