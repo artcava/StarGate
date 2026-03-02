@@ -219,11 +219,12 @@ public class TimeoutScannerWorkerTests
                 return new List<Process>() as IReadOnlyList<Process>;
             });
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        // Scanner has 60-second delay between scans, need to wait longer
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(65));
 
         // Act
         await _scanner.StartAsync(cts.Token);
-        await Task.Delay(1500); // Wait for multiple scan cycles
+        await Task.Delay(TimeSpan.FromSeconds(62)); // Wait for first scan + delay + second scan
         await _scanner.StopAsync(CancellationToken.None);
 
         // Assert
