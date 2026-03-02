@@ -10,10 +10,19 @@ namespace StarGate.Server.Handlers;
 public class ShippingProcessHandler : IProcessHandler
 {
     private readonly ILogger<ShippingProcessHandler> _logger;
+    private readonly Random _random;
 
-    public ShippingProcessHandler(ILogger<ShippingProcessHandler> logger)
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ShippingProcessHandler"/> class.
+    /// </summary>
+    /// <param name="logger">Logger instance.</param>
+    /// <param name="randomSeed">Optional seed for Random. Use for deterministic testing. Default: null (time-based).</param>
+    public ShippingProcessHandler(
+        ILogger<ShippingProcessHandler> logger,
+        int? randomSeed = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _random = randomSeed.HasValue ? new Random(randomSeed.Value) : new Random();
     }
 
     public string ProcessType => "shipping";
@@ -166,8 +175,7 @@ public class ShippingProcessHandler : IProcessHandler
         };
 
         // Add random variation
-        var random = new Random();
-        var variation = (decimal)(random.NextDouble() * 5.0);
+        var variation = (decimal)(_random.NextDouble() * 5.0);
 
         return baseCost + variation;
     }
@@ -186,8 +194,7 @@ public class ShippingProcessHandler : IProcessHandler
             shipmentId);
 
         // Simulate capacity check (could fail with probability)
-        var random = new Random();
-        if (random.Next(100) < 2) // 2% failure rate
+        if (_random.Next(100) < 2) // 2% failure rate
         {
             throw new HttpRequestException($"Carrier {carrier} has no available capacity");
         }
