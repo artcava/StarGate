@@ -69,10 +69,10 @@ public class ProcessWorkerTimeoutTests
 
         // We can't directly test ExecuteProcessAsync (it's private),
         // but we verify the service was called correctly
-        await _processServiceMock.Object.GetProcessAsync(processId, CancellationToken.None);
+        var result = await _processServiceMock.Object.GetProcessAsync(processId, CancellationToken.None);
 
         // Assert - Verify timeout was detected and process failed
-        timedOutProcess.IsTimedOut.Should().BeTrue(
+        result.IsTimedOut.Should().BeTrue(
             "process should be marked as timed out when TimeoutAt < UtcNow");
     }
 
@@ -88,10 +88,10 @@ public class ProcessWorkerTimeoutTests
             .ReturnsAsync(process);
 
         // Act
-        await _processServiceMock.Object.GetProcessAsync(processId, CancellationToken.None);
+        var result = await _processServiceMock.Object.GetProcessAsync(processId, CancellationToken.None);
 
         // Assert
-        var remainingTime = process.TimeoutAt!.Value - DateTime.UtcNow;
+        var remainingTime = result.TimeoutAt!.Value - DateTime.UtcNow;
         remainingTime.Should().BeGreaterThan(TimeSpan.FromMinutes(4),
             "remaining time should be approximately 5 minutes");
         remainingTime.Should().BeLessThan(TimeSpan.FromMinutes(6));
@@ -132,10 +132,10 @@ public class ProcessWorkerTimeoutTests
             .ReturnsAsync(process);
 
         // Act
-        await _processServiceMock.Object.GetProcessAsync(processId, CancellationToken.None);
+        var result = await _processServiceMock.Object.GetProcessAsync(processId, CancellationToken.None);
 
         // Assert
-        process.TimeoutAt.Should().BeNull(
+        result.TimeoutAt.Should().BeNull(
             "process should have null timeout when not configured");
 
         // In ProcessWorker, this would default to 1 hour
