@@ -1,13 +1,16 @@
 name: ci
 
-# Trigger events as per Git Flow documentation
+# Trigger events optimized to avoid duplicate runs
+# - pull_request: Run checks on all PRs (primary validation)
+# - push to main: Run checks after merge (final validation)
+# - push tags: Trigger release workflow
+# Note: Removed push trigger for develop to avoid duplicate runs with pull_request
 on:
   push:
     branches:
-      - main
-      - develop
+      - main  # Only run on main after PR merge
     tags:
-      - 'v*'
+      - 'v*'  # Trigger release on version tags
   pull_request:
     branches:
       - main

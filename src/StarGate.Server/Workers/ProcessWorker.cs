@@ -1,420 +1,555 @@
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using StarGate.Core.Abstractions;
+using StarGate.Core.Configuration;
 using StarGate.Core.Domain;
-using System.Threading.Channels;
+using StarGate.Core.Errors;
+using StarGate.Core.Messages;
+using System.Collections.Concurrent;
+using System.Text.Json;
 
 namespace StarGate.Server.Workers;
 
 /// <summary>
-/// Background worker that consumes messages from RabbitMQ and executes processes.
-/// Integrates policy enforcement for timeout, retry, and concurrency control.
+/// Background worker that consumes process messages from the broker and executes them.
+/// Implements graceful shutdown and comprehensive error handling.
+/// Enforces timeout limits to prevent processes from exceeding configured timeout duration.
+/// Supports retry logic with exponential backoff for transient failures.
+/// Integrates ErrorClassifier for sophisticated error handling and ACK/NACK decisions.
 /// </summary>
 public class ProcessWorker : BackgroundService
 {
-    private readonly IMessageConsumer _consumer;
+    private readonly IMessageConsumer _messageConsumer;
+    private readonly IProcessService _processService;
     private readonly IProcessHandlerFactory _handlerFactory;
-    private readonly IProcessRepository _repository;
-    private readonly IPolicyProvider _policyProvider;
+    private readonly IMessageBroker _messageBroker;
+    private readonly RetryConfiguration _retryConfig;
     private readonly ILogger<ProcessWorker> _logger;
-    private readonly Channel<ProcessExecutionContext> _executionChannel;
-    private readonly SemaphoreSlim _globalSemaphore;
-    private readonly Dictionary<string, SemaphoreSlim> _processTypeSemaphores;
+    private readonly ConcurrentDictionary<string, Task> _activeMessages;
+    private readonly TimeSpan _shutdownTimeout = TimeSpan.FromSeconds(30);
 
     public ProcessWorker(
-        IMessageConsumer consumer,
+        IMessageConsumer messageConsumer,
+        IProcessService processService,
         IProcessHandlerFactory handlerFactory,
-        IProcessRepository repository,
-        IPolicyProvider policyProvider,
+        IMessageBroker messageBroker,
+        IOptions<RetryConfiguration> retryConfig,
         ILogger<ProcessWorker> logger)
     {
-        _consumer = consumer ?? throw new ArgumentNullException(nameof(consumer));
+        _messageConsumer = messageConsumer ?? throw new ArgumentNullException(nameof(messageConsumer));
+        _processService = processService ?? throw new ArgumentNullException(nameof(processService));
         _handlerFactory = handlerFactory ?? throw new ArgumentNullException(nameof(handlerFactory));
-        _repository = repository ?? throw new ArgumentNullException(nameof(repository));
-        _policyProvider = policyProvider ?? throw new ArgumentNullException(nameof(policyProvider));
+        _messageBroker = messageBroker ?? throw new ArgumentNullException(nameof(messageBroker));
+        _retryConfig = retryConfig?.Value ?? throw new ArgumentNullException(nameof(retryConfig));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-
-        // Create bounded channel for execution queue
-        _executionChannel = Channel.CreateBounded<ProcessExecutionContext>(new BoundedChannelOptions(100)
-        {
-            FullMode = BoundedChannelFullMode.Wait
-        });
-
-        _globalSemaphore = new SemaphoreSlim(Environment.ProcessorCount * 2);
-        _processTypeSemaphores = new Dictionary<string, SemaphoreSlim>();
+        _activeMessages = new ConcurrentDictionary<string, Task>();
     }
+
+    /// <summary>
+    /// Gets the number of messages currently being processed.
+    /// </summary>
+    public int ActiveMessageCount => _activeMessages.Count;
+
+    /// <summary>
+    /// Indicates if the worker is shutting down.
+    /// </summary>
+    public bool IsShuttingDown { get; private set; }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("ProcessWorker starting...");
+        _logger.LogInformation("ProcessWorker starting with ErrorClassifier integration");
 
-        // Start consumer
-        var consumerTask = StartConsumerAsync(stoppingToken);
-
-        // Start execution workers
-        var workerTasks = Enumerable.Range(0, Environment.ProcessorCount)
-            .Select(i => ExecuteProcessesAsync(i, stoppingToken))
-            .ToArray();
+        stoppingToken.Register(() =>
+        {
+            IsShuttingDown = true;
+            _logger.LogInformation(
+                "Shutdown requested. Active messages: {ActiveMessageCount}",
+                ActiveMessageCount);
+        });
 
         try
         {
-            await Task.WhenAll(workerTasks.Append(consumerTask));
+            await _messageConsumer.StartConsumingAsync<ProcessMessage>(
+                messageHandler: async (message, context) =>
+                {
+                    if (stoppingToken.IsCancellationRequested)
+                    {
+                        _logger.LogWarning(
+                            "Rejecting message during shutdown: ProcessId={ProcessId}",
+                            message.ProcessId);
+
+                        await context.RejectAsync(true);
+                        return;
+                    }
+
+                    var messageKey = $"{message.ProcessId}_{Guid.NewGuid()}";
+                    var processingTask = HandleMessageWithTrackingAsync(
+                        message,
+                        context,
+                        stoppingToken);
+
+                    _activeMessages.TryAdd(messageKey, processingTask);
+
+                    try
+                    {
+                        await processingTask;
+                    }
+                    finally
+                    {
+                        _activeMessages.TryRemove(messageKey, out _);
+                    }
+                },
+                ct: stoppingToken);
         }
         catch (OperationCanceledException)
         {
-            _logger.LogInformation("ProcessWorker stopping...");
+            _logger.LogInformation("ProcessWorker cancellation requested");
         }
         catch (Exception ex)
         {
-            _logger.LogCritical(ex, "ProcessWorker failed with unhandled exception");
+            _logger.LogCritical(ex, "ProcessWorker encountered fatal error");
             throw;
         }
         finally
         {
-            await _consumer.StopConsumingAsync();
-            _logger.LogInformation("ProcessWorker stopped");
+            await WaitForActiveMessagesToCompleteAsync();
         }
     }
 
-    private async Task StartConsumerAsync(CancellationToken cancellationToken)
-    {
-        await _consumer.StartConsumingAsync<Process>(
-            async (process, context) => await HandleMessageAsync(process, context, cancellationToken),
-            cancellationToken);
-    }
-
-    private async Task HandleMessageAsync(
-        Process process,
+    private async Task HandleMessageWithTrackingAsync(
+        ProcessMessage processMessage,
         MessageContext context,
         CancellationToken cancellationToken)
     {
+        var processId = processMessage.ProcessId;
+
         try
         {
             _logger.LogInformation(
-                "Received message for process {ProcessId}, Type: {ProcessType}, ClientId: {ClientId}",
-                process.ProcessId,
-                process.ProcessType,
-                process.ClientId);
+                "Handling process: ProcessId={ProcessId}, ProcessType={ProcessType}, ClientId={ClientId}",
+                processId,
+                processMessage.ProcessType,
+                processMessage.ClientId);
 
-            // Load policy for this process
-            var policy = await _policyProvider.GetPolicyAsync(
-                process.ClientId,
-                process.ProcessType,
-                cancellationToken);
+            await ExecuteProcessAsync(processMessage, cancellationToken);
 
-            if (policy == null)
-            {
-                _logger.LogError(
-                    "No policy found for process type {ProcessType}, client {ClientId}",
-                    process.ProcessType,
-                    process.ClientId);
-                await context.RejectAsync(false); // Don't requeue - send to DLQ
-                return;
-            }
-
-            // Validate policy constraints
-            if (!ValidatePolicy(policy))
-            {
-                _logger.LogError(
-                    "Policy validation failed for process {ProcessId}",
-                    process.ProcessId);
-                await context.RejectAsync(false); // Don't requeue - send to DLQ
-                return;
-            }
-
-            // Queue for execution with policy context
-            var executionContext = new ProcessExecutionContext
-            {
-                Process = process,
-                Policy = policy,
-                MessageId = context.MessageId,
-                CorrelationId = context.CorrelationId ?? process.ProcessId.ToString()
-            };
-
-            await _executionChannel.Writer.WriteAsync(executionContext, cancellationToken);
-
-            _logger.LogDebug(
-                "Process {ProcessId} queued for execution",
-                process.ProcessId);
+            _logger.LogInformation(
+                "Process completed successfully: ProcessId={ProcessId}",
+                processId);
 
             await context.AcknowledgeAsync();
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            _logger.LogInformation(
-                "Message handling cancelled for process {ProcessId}",
-                process.ProcessId);
-            await context.RejectAsync(true); // Requeue for retry
+            _logger.LogWarning(
+                "Process execution cancelled during shutdown: ProcessId={ProcessId}",
+                processId);
+
+            await RecordCancellationAsync(processId);
+            await context.RejectAsync(true);
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(
+                ex,
+                "Malformed message (JSON error): ProcessId={ProcessId}",
+                processId);
+
+            // Classify error
+            var classification = ErrorClassifier.Classify(ex);
+
+            _logger.LogWarning(
+                "Error classification: ErrorCode={ErrorCode}, IsRetryable={IsRetryable}, ShouldRequeue={ShouldRequeue}, Severity={Severity}",
+                classification.ErrorCode,
+                classification.IsRetryable,
+                classification.ShouldRequeue,
+                classification.Severity);
+
+            // Record failure
+            await RecordProcessFailureAsync(
+                processId,
+                classification,
+                ex.Message,
+                cancellationToken);
+
+            // NACK without requeue (malformed message goes to DLQ)
+            await context.RejectAsync(false);
         }
         catch (Exception ex)
         {
             _logger.LogError(
                 ex,
-                "Error handling message for process {ProcessId}",
-                process.ProcessId);
-            await context.RejectAsync(true); // Requeue for retry
+                "Failed to process message: ProcessId={ProcessId}",
+                processId);
+
+            // Classify error
+            var classification = ErrorClassifier.Classify(ex);
+
+            _logger.LogWarning(
+                "Error classification: ErrorCode={ErrorCode}, IsRetryable={IsRetryable}, ShouldRequeue={ShouldRequeue}, Severity={Severity}",
+                classification.ErrorCode,
+                classification.IsRetryable,
+                classification.ShouldRequeue,
+                classification.Severity);
+
+            // Record process failure with classification
+            await RecordProcessFailureAsync(
+                processId,
+                classification,
+                ex.Message,
+                cancellationToken);
+
+            // Handle process failure with retry logic
+            await HandleProcessFailureAsync(
+                processId,
+                classification,
+                ex,
+                cancellationToken);
+
+            // Apply ACK/NACK strategy based on classification
+            // If ShouldRequeue = false, message goes to DLQ
+            // If ShouldRequeue = true, message is requeued for retry
+            await context.RejectAsync(classification.ShouldRequeue);
         }
     }
 
-    private async Task ExecuteProcessesAsync(int workerId, CancellationToken cancellationToken)
-    {
-        _logger.LogInformation("Execution worker {WorkerId} started", workerId);
-
-        await foreach (var context in _executionChannel.Reader.ReadAllAsync(cancellationToken))
-        {
-            await ExecuteWithPolicyAsync(context, cancellationToken);
-        }
-
-        _logger.LogInformation("Execution worker {WorkerId} stopped", workerId);
-    }
-
-    private async Task ExecuteWithPolicyAsync(
-        ProcessExecutionContext context,
+    private async Task RecordProcessFailureAsync(
+        Guid processId,
+        ErrorClassification classification,
+        string errorMessage,
         CancellationToken cancellationToken)
     {
-        var process = context.Process;
-        var policy = context.Policy;
-
-        // Get or create semaphore for process type concurrency control
-        var maxConcurrency = policy.MaxConcurrentProcesses ?? Environment.ProcessorCount * 2;
-        var typeSemaphore = GetOrCreateTypeSemaphore(process.ProcessType, maxConcurrency);
-
-        await _globalSemaphore.WaitAsync(cancellationToken);
         try
         {
-            await typeSemaphore.WaitAsync(cancellationToken);
-            try
-            {
-                _logger.LogInformation(
-                    "Executing process {ProcessId} with policy: Timeout={Timeout}s, MaxRetries={MaxRetries}, MaxConcurrency={MaxConcurrency}",
-                    process.ProcessId,
-                    policy.Timeout.TotalSeconds,
-                    policy.RetryPolicy.MaxAttempts,
-                    maxConcurrency);
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
-                await ExecuteProcessWithRetryAsync(context, cancellationToken);
-            }
-            finally
-            {
-                typeSemaphore.Release();
-            }
+            await _processService.RecordProcessErrorAsync(
+                processId,
+                classification.ErrorCode,
+                errorMessage,
+                classification.IsRetryable,
+                cts.Token);
+
+            _logger.LogInformation(
+                "Process failure recorded: ProcessId={ProcessId}, ErrorCode={ErrorCode}, Severity={Severity}",
+                processId,
+                classification.ErrorCode,
+                classification.Severity);
         }
-        finally
+        catch (Exception ex)
         {
-            _globalSemaphore.Release();
+            _logger.LogError(
+                ex,
+                "Failed to record process failure: ProcessId={ProcessId}",
+                processId);
         }
     }
 
-    private async Task ExecuteProcessWithRetryAsync(
-        ProcessExecutionContext context,
-        CancellationToken cancellationToken)
+    private async Task WaitForActiveMessagesToCompleteAsync()
     {
-        var process = context.Process;
-        var policy = context.Policy;
-        var attemptCount = process.RetryCount;
-
-        for (var attempt = attemptCount; attempt <= policy.RetryPolicy.MaxAttempts; attempt++)
+        if (_activeMessages.IsEmpty)
         {
-            try
-            {
-                // Create timeout token
-                using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                timeoutCts.CancelAfter(policy.Timeout);
-
-                // Update process status
-                var updatedProcess = process with
-                {
-                    Status = ProcessStatus.Processing,
-                    RetryCount = attempt,
-                    UpdatedAt = DateTime.UtcNow
-                };
-                await _repository.UpdateAsync(updatedProcess);
-
-                // Get handler
-                var handler = _handlerFactory.GetHandler(process.ProcessType);
-
-                // Execute with timeout
-                await handler.ExecuteAsync(updatedProcess, timeoutCts.Token);
-
-                // Success - update status
-                updatedProcess = updatedProcess with
-                {
-                    Status = ProcessStatus.Completed,
-                    Progress = 100,
-                    CompletedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
-                };
-                await _repository.UpdateAsync(updatedProcess);
-
-                _logger.LogInformation(
-                    "Process {ProcessId} completed successfully after {Attempts} attempt(s)",
-                    process.ProcessId,
-                    attempt + 1);
-
-                return; // Success
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                // Worker shutdown - requeue
-                _logger.LogWarning(
-                    "Process {ProcessId} execution cancelled due to worker shutdown",
-                    process.ProcessId);
-
-                var requeuedProcess = process with
-                {
-                    Status = ProcessStatus.Accepted,
-                    UpdatedAt = DateTime.UtcNow
-                };
-                await _repository.UpdateAsync(requeuedProcess);
-                throw;
-            }
-            catch (OperationCanceledException)
-            {
-                // Timeout
-                _logger.LogWarning(
-                    "Process {ProcessId} execution timed out after {Timeout}s (attempt {Attempt}/{MaxAttempts})",
-                    process.ProcessId,
-                    policy.Timeout.TotalSeconds,
-                    attempt + 1,
-                    policy.RetryPolicy.MaxAttempts + 1);
-
-                if (attempt >= policy.RetryPolicy.MaxAttempts)
-                {
-                    await HandleMaxRetriesExceededAsync(process, "Execution timeout");
-                    return;
-                }
-
-                // Retry with exponential backoff
-                await DelayForRetryAsync(attempt, cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(
-                    ex,
-                    "Process {ProcessId} execution failed (attempt {Attempt}/{MaxAttempts}): {Error}",
-                    process.ProcessId,
-                    attempt + 1,
-                    policy.RetryPolicy.MaxAttempts + 1,
-                    ex.Message);
-
-                if (attempt >= policy.RetryPolicy.MaxAttempts || !process.Retryable)
-                {
-                    await HandleMaxRetriesExceededAsync(process, ex.Message);
-                    return;
-                }
-
-                // Retry with exponential backoff
-                await DelayForRetryAsync(attempt, cancellationToken);
-            }
+            _logger.LogInformation("No active messages to wait for");
+            return;
         }
-    }
-
-    private async Task DelayForRetryAsync(
-        int attemptNumber,
-        CancellationToken cancellationToken)
-    {
-        // Exponential backoff: 2^attempt seconds (1s, 2s, 4s, 8s, ...)
-        var delaySeconds = Math.Min(Math.Pow(2, attemptNumber), 60); // Max 60 seconds
-        var delay = TimeSpan.FromSeconds(delaySeconds);
 
         _logger.LogInformation(
-            "Waiting {Delay}s before retry attempt {Attempt}",
-            delaySeconds,
-            attemptNumber + 1);
+            "Waiting for {ActiveMessageCount} active message(s) to complete. Timeout: {Timeout}s",
+            ActiveMessageCount,
+            _shutdownTimeout.TotalSeconds);
 
-        await Task.Delay(delay, cancellationToken);
-    }
+        var allTasks = _activeMessages.Values.ToArray();
 
-    private async Task HandleMaxRetriesExceededAsync(Process process, string errorMessage)
-    {
-        _logger.LogError(
-            "Process {ProcessId} failed after {MaxAttempts} attempts: {Error}",
-            process.ProcessId,
-            process.RetryCount + 1,
-            errorMessage);
-
-        var failedProcess = process with
+        try
         {
-            Status = ProcessStatus.Failed,
-            Error = new ProcessError("MAX_RETRIES_EXCEEDED", errorMessage, null),
-            CompletedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
-        };
+            using var cts = new CancellationTokenSource(_shutdownTimeout);
+            await Task.WhenAll(allTasks).WaitAsync(cts.Token);
 
-        await _repository.UpdateAsync(failedProcess);
-    }
-
-    private bool ValidatePolicy(EffectivePolicy policy)
-    {
-        // Validate timeout
-        if (policy.Timeout <= TimeSpan.Zero)
+            _logger.LogInformation(
+                "All active messages completed successfully");
+        }
+        catch (TimeoutException)
+        {
+            _logger.LogWarning(
+                "Shutdown timeout exceeded. {RemainingCount} message(s) still processing",
+                _activeMessages.Count);
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogWarning(
+                "Graceful shutdown cancelled. {RemainingCount} message(s) still processing",
+                _activeMessages.Count);
+        }
+        catch (Exception ex)
         {
             _logger.LogError(
-                "Invalid timeout in policy: {Timeout}s",
-                policy.Timeout.TotalSeconds);
-            return false;
+                ex,
+                "Error while waiting for active messages to complete");
         }
-
-        // Validate max retries
-        if (policy.RetryPolicy.MaxAttempts < 0)
-        {
-            _logger.LogError(
-                "Invalid max retry attempts in policy: {MaxRetries}",
-                policy.RetryPolicy.MaxAttempts);
-            return false;
-        }
-
-        // Validate concurrency
-        if (policy.MaxConcurrentProcesses.HasValue && policy.MaxConcurrentProcesses.Value <= 0)
-        {
-            _logger.LogError(
-                "Invalid max concurrent executions in policy: {MaxConcurrency}",
-                policy.MaxConcurrentProcesses.Value);
-            return false;
-        }
-
-        return true;
     }
 
-    private SemaphoreSlim GetOrCreateTypeSemaphore(string processType, int maxConcurrency)
+    private async Task RecordCancellationAsync(Guid processId)
     {
-        lock (_processTypeSemaphores)
+        try
         {
-            if (!_processTypeSemaphores.TryGetValue(processType, out var semaphore))
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+
+            await _processService.RecordProcessErrorAsync(
+                processId,
+                "PROCESS_CANCELLED",
+                "Process execution was cancelled during graceful shutdown",
+                retryable: true,
+                cts.Token);
+
+            _logger.LogInformation(
+                "Cancellation recorded for process: ProcessId={ProcessId}",
+                processId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to record cancellation: ProcessId={ProcessId}",
+                processId);
+        }
+    }
+
+    private async Task ExecuteProcessAsync(
+        ProcessMessage processMessage,
+        CancellationToken cancellationToken)
+    {
+        var processId = processMessage.ProcessId;
+
+        var process = await _processService.GetProcessAsync(processId, cancellationToken);
+
+        if (process.IsTimedOut)
+        {
+            _logger.LogWarning(
+                "Process timed out before execution: ProcessId={ProcessId}, TimeoutAt={TimeoutAt}",
+                processId,
+                process.TimeoutAt);
+
+            await _processService.FailProcessAsync(
+                processId,
+                "PROCESS_TIMEOUT",
+                $"Process timed out before handler execution (timeout: {process.TimeoutAt})",
+                canRetry: true,
+                cancellationToken);
+
+            return;
+        }
+
+        var remainingTime = process.TimeoutAt.HasValue
+            ? process.TimeoutAt.Value - DateTime.UtcNow
+            : TimeSpan.FromHours(1);
+
+        if (remainingTime <= TimeSpan.Zero)
+        {
+            remainingTime = TimeSpan.FromSeconds(5);
+        }
+
+        _logger.LogDebug(
+            "Process execution timeout: ProcessId={ProcessId}, RemainingTime={RemainingTime}s",
+            processId,
+            remainingTime.TotalSeconds);
+
+        await _processService.TransitionToProcessingAsync(processId, cancellationToken);
+
+        _logger.LogInformation(
+            "Process transitioned to Processing: ProcessId={ProcessId}",
+            processId);
+
+        // Use IsRegistered instead of HasHandler
+        if (!_handlerFactory.IsRegistered(processMessage.ProcessType))
+        {
+            _logger.LogError(
+                "No handler found for process type: ProcessType={ProcessType}, ProcessId={ProcessId}",
+                processMessage.ProcessType,
+                processId);
+
+            await _processService.FailProcessAsync(
+                processId,
+                "NO_HANDLER_FOUND",
+                $"No handler registered for process type '{processMessage.ProcessType}'",
+                canRetry: false,
+                cancellationToken);
+
+            return;
+        }
+
+        var handler = _handlerFactory.GetHandler(processMessage.ProcessType);
+
+        // Add null check to prevent dereference
+        if (handler == null)
+        {
+            _logger.LogError(
+                "Handler retrieval returned null: ProcessType={ProcessType}, ProcessId={ProcessId}",
+                processMessage.ProcessType,
+                processId);
+
+            await _processService.FailProcessAsync(
+                processId,
+                "HANDLER_RETRIEVAL_FAILED",
+                $"Handler retrieval returned null for process type '{processMessage.ProcessType}'",
+                canRetry: false,
+                cancellationToken);
+
+            return;
+        }
+
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCts.CancelAfter(remainingTime);
+
+        try
+        {
+            _logger.LogDebug(
+                "Executing handler with timeout: ProcessType={ProcessType}, HandlerType={HandlerType}, Timeout={Timeout}s",
+                processMessage.ProcessType,
+                handler.GetType().Name,
+                remainingTime.TotalSeconds);
+
+            // Create ProcessContext from Process
+            var processContext = new ProcessContext
             {
-                semaphore = new SemaphoreSlim(maxConcurrency, maxConcurrency);
-                _processTypeSemaphores[processType] = semaphore;
+                ProcessId = process.ProcessId,
+                ClientId = process.ClientId,
+                ProcessType = process.ProcessType,
+                ClientProcessId = process.ClientProcessId,
+                Metadata = new Dictionary<string, string>(),
+                CancellationToken = timeoutCts.Token
+            };
+
+            // ExecuteAsync takes only ProcessContext (includes CancellationToken)
+            await handler.ExecuteAsync(processContext);
+
+            await _processService.CompleteProcessAsync(processId, cancellationToken);
+
+            _logger.LogInformation(
+                "Handler execution completed: ProcessId={ProcessId}",
+                processId);
+        }
+        catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogWarning(
+                "Process execution timed out: ProcessId={ProcessId}, Timeout={Timeout}s",
+                processId,
+                remainingTime.TotalSeconds);
+
+            await _processService.FailProcessAsync(
+                processId,
+                "PROCESS_TIMEOUT",
+                $"Handler execution exceeded timeout of {remainingTime.TotalSeconds} seconds",
+                canRetry: true,
+                cancellationToken);
+
+            throw;
+        }
+    }
+
+    private async Task HandleProcessFailureAsync(
+        Guid processId,
+        ErrorClassification classification,
+        Exception exception,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            _logger.LogWarning(
+                "Handling process failure: ProcessId={ProcessId}, ErrorCode={ErrorCode}, IsRetryable={IsRetryable}, Severity={Severity}",
+                processId,
+                classification.ErrorCode,
+                classification.IsRetryable,
+                classification.Severity);
+
+            var process = await _processService.GetProcessAsync(processId, cancellationToken);
+
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+
+            await _processService.FailProcessAsync(
+                processId,
+                classification.ErrorCode,
+                exception.Message,
+                classification.IsRetryable,
+                cts.Token);
+
+            process = await _processService.GetProcessAsync(processId, cts.Token);
+
+            if (process.Status == ProcessStatus.Retrying)
+            {
+                var retryDelay = _retryConfig.CalculateDelay(process.RetryCount);
 
                 _logger.LogInformation(
-                    "Created concurrency semaphore for process type {ProcessType} with limit {MaxConcurrency}",
-                    processType,
-                    maxConcurrency);
+                    "Process will retry: ProcessId={ProcessId}, RetryCount={RetryCount}/{MaxRetries}, Delay={Delay}s, ErrorCode={ErrorCode}",
+                    processId,
+                    process.RetryCount,
+                    process.MaxRetries,
+                    retryDelay.TotalSeconds,
+                    classification.ErrorCode);
+
+                await PublishRetryMessageAsync(process, retryDelay, cts.Token);
             }
-
-            return semaphore;
+            else
+            {
+                _logger.LogWarning(
+                    "Process failed permanently: ProcessId={ProcessId}, Status={Status}, RetryCount={RetryCount}, ErrorCode={ErrorCode}",
+                    processId,
+                    process.Status,
+                    process.RetryCount,
+                    classification.ErrorCode);
+            }
         }
-    }
-
-    public override void Dispose()
-    {
-        _globalSemaphore?.Dispose();
-
-        foreach (var semaphore in _processTypeSemaphores.Values)
+        catch (Exception ex)
         {
-            semaphore?.Dispose();
+            _logger.LogError(
+                ex,
+                "Failed to handle process failure: ProcessId={ProcessId}",
+                processId);
         }
-
-        base.Dispose();
     }
-}
 
-/// <summary>
-/// Context for process execution including policy.
-/// </summary>
-internal record ProcessExecutionContext
-{
-    public required Process Process { get; init; }
-    public required EffectivePolicy Policy { get; init; }
-    public required string MessageId { get; init; }
-    public required string CorrelationId { get; init; }
+    private async Task PublishRetryMessageAsync(
+        Process process,
+        TimeSpan delay,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var message = ProcessMessage.FromProcess(process);
+            var routingKey = $"process.{process.ProcessType}";
+
+            _logger.LogDebug(
+                "Publishing retry message: ProcessId={ProcessId}, Delay={Delay}s",
+                process.ProcessId,
+                delay.TotalSeconds);
+
+            await _messageBroker.PublishWithDelayAsync(
+                message,
+                routingKey,
+                delay,
+                cancellationToken);
+
+            _logger.LogInformation(
+                "Retry message published: ProcessId={ProcessId}, ScheduledFor={ScheduledTime}",
+                process.ProcessId,
+                DateTime.UtcNow.Add(delay));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to publish retry message: ProcessId={ProcessId}",
+                process.ProcessId);
+        }
+    }
+
+    public override async Task StopAsync(CancellationToken cancellationToken)
+    {
+        _logger.LogInformation(
+            "ProcessWorker stopping. Active messages: {ActiveMessageCount}",
+            ActiveMessageCount);
+
+        await _messageConsumer.StopConsumingAsync();
+        await base.StopAsync(cancellationToken);
+
+        _logger.LogInformation("ProcessWorker stopped");
+    }
 }

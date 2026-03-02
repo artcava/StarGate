@@ -153,6 +153,28 @@ public class InMemoryProcessRepository : IProcessRepository
         return Task.FromResult<IReadOnlyList<Process>>(processes);
     }
 
+    public Task<IReadOnlyList<Process>> GetTimedOutProcessesAsync(
+        CancellationToken ct = default)
+    {
+        var now = DateTime.UtcNow;
+        var activeStatuses = new[] 
+        { 
+            ProcessStatus.Accepted, 
+            ProcessStatus.Processing,
+            ProcessStatus.Retrying
+        };
+
+        var processes = _processesById.Values
+            .Where(p => 
+                activeStatuses.Contains(p.Status) &&
+                p.TimeoutAt.HasValue &&
+                p.TimeoutAt.Value < now)
+            .Take(100)
+            .ToList();
+
+        return Task.FromResult<IReadOnlyList<Process>>(processes);
+    }
+
     private static string GetClientKey(string clientId, string clientProcessId) 
         => $"{clientId}:{clientProcessId}";
 
