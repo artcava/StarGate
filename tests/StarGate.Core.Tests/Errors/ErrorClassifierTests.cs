@@ -1,9 +1,9 @@
-namespace StarGate.Core.Tests.Errors;
-
 using FluentAssertions;
 using StarGate.Core.Errors;
 using System.Text.Json;
 using Xunit;
+
+namespace StarGate.Core.Tests.Errors;
 
 public class ErrorClassifierTests
 {
