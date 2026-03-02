@@ -1,10 +1,10 @@
-namespace StarGate.Server.Workers;
-
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using StarGate.Core.Abstractions;
 using StarGate.Core.Messages;
 using System.Text.Json;
+
+namespace StarGate.Server.Workers;
 
 /// <summary>
 /// Background worker that consumes process messages from the broker and executes them.
