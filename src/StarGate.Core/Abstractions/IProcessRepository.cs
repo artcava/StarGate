@@ -138,4 +138,15 @@ public interface IProcessRepository
     public Task<IReadOnlyList<Process>> GetExpiredProcessesAsync(
         DateTime expirationDate,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Gets all active processes that have exceeded their timeout.
+    /// Active processes include Accepted, Processing, and Retrying states.
+    /// Used by TimeoutScannerWorker to identify processes that need timeout enforcement.
+    /// Results are limited to 100 per call for batch processing efficiency.
+    /// </summary>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>List of timed-out processes (max 100 per call).</returns>
+    public Task<IReadOnlyList<Process>> GetTimedOutProcessesAsync(
+        CancellationToken ct = default);
 }
