@@ -1,7 +1,9 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 using StarGate.Core.Abstractions;
+using StarGate.Core.Configuration;
 using StarGate.Core.Domain;
 using StarGate.Core.Messages;
 using StarGate.Server.Workers;
@@ -21,7 +23,9 @@ public class ProcessWorkerTimeoutTests
     private readonly Mock<IMessageConsumer> _consumerMock;
     private readonly Mock<IProcessService> _processServiceMock;
     private readonly Mock<IProcessHandlerFactory> _handlerFactoryMock;
+    private readonly Mock<IMessageBroker> _messageBrokerMock;
     private readonly Mock<IProcessHandler> _handlerMock;
+    private readonly IOptions<RetryConfiguration> _retryConfig;
     private readonly ProcessWorker _worker;
 
     public ProcessWorkerTimeoutTests()
@@ -29,12 +33,16 @@ public class ProcessWorkerTimeoutTests
         _consumerMock = new Mock<IMessageConsumer>();
         _processServiceMock = new Mock<IProcessService>();
         _handlerFactoryMock = new Mock<IProcessHandlerFactory>();
+        _messageBrokerMock = new Mock<IMessageBroker>();
         _handlerMock = new Mock<IProcessHandler>();
+        _retryConfig = Options.Create(new RetryConfiguration());
 
         _worker = new ProcessWorker(
             _consumerMock.Object,
             _processServiceMock.Object,
             _handlerFactoryMock.Object,
+            _messageBrokerMock.Object,
+            _retryConfig,
             NullLogger<ProcessWorker>.Instance);
     }
 

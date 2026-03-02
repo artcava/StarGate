@@ -1,8 +1,10 @@
 using FluentAssertions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 using StarGate.Core.Abstractions;
+using StarGate.Core.Configuration;
 using StarGate.Server.HealthChecks;
 using StarGate.Server.Workers;
 using Xunit;
@@ -17,12 +19,16 @@ public class ProcessWorkerHealthCheckTests
     private readonly Mock<IMessageConsumer> _consumerMock;
     private readonly Mock<IProcessService> _serviceMock;
     private readonly Mock<IProcessHandlerFactory> _factoryMock;
+    private readonly Mock<IMessageBroker> _messageBrokerMock;
+    private readonly IOptions<RetryConfiguration> _retryConfig;
 
     public ProcessWorkerHealthCheckTests()
     {
         _consumerMock = new Mock<IMessageConsumer>();
         _serviceMock = new Mock<IProcessService>();
         _factoryMock = new Mock<IProcessHandlerFactory>();
+        _messageBrokerMock = new Mock<IMessageBroker>();
+        _retryConfig = Options.Create(new RetryConfiguration());
     }
 
     [Fact]
@@ -44,6 +50,8 @@ public class ProcessWorkerHealthCheckTests
             _consumerMock.Object,
             _serviceMock.Object,
             _factoryMock.Object,
+            _messageBrokerMock.Object,
+            _retryConfig,
             NullLogger<ProcessWorker>.Instance);
 
         var healthCheck = new ProcessWorkerHealthCheck(worker);
@@ -67,6 +75,8 @@ public class ProcessWorkerHealthCheckTests
             _consumerMock.Object,
             _serviceMock.Object,
             _factoryMock.Object,
+            _messageBrokerMock.Object,
+            _retryConfig,
             NullLogger<ProcessWorker>.Instance);
 
         var healthCheck = new ProcessWorkerHealthCheck(worker);
@@ -88,6 +98,8 @@ public class ProcessWorkerHealthCheckTests
             _consumerMock.Object,
             _serviceMock.Object,
             _factoryMock.Object,
+            _messageBrokerMock.Object,
+            _retryConfig,
             NullLogger<ProcessWorker>.Instance);
 
         var healthCheck = new ProcessWorkerHealthCheck(worker);
