@@ -230,9 +230,10 @@ public class ProcessWorkerTimeoutTests
             .ReturnsAsync(It.IsAny<Process>());
 
         // Act & Assert - Timeout should occur
+        // TaskCanceledException is thrown by Task.Delay when cancelled
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
 
-        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+        await Assert.ThrowsAsync<TaskCanceledException>(() =>
             _handlerMock.Object.ExecuteAsync(process, cts.Token));
     }
 
