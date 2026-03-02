@@ -10,6 +10,7 @@ namespace StarGate.Server.Workers;
 /// <summary>
 /// Background worker that consumes process messages from the broker and executes them.
 /// Implements graceful shutdown and comprehensive error handling.
+/// Enforces timeout limits to prevent processes from exceeding configured timeout duration.
 /// </summary>
 public class ProcessWorker : BackgroundService
 {
@@ -250,6 +251,42 @@ public class ProcessWorker : BackgroundService
     {
         var processId = processMessage.ProcessId;
 
+        // Get process to check timeout
+        var process = await _processService.GetProcessAsync(processId, cancellationToken);
+
+        // Check if process has already timed out while waiting in queue
+        if (process.IsTimedOut)
+        {
+            _logger.LogWarning(
+                "Process timed out before execution: ProcessId={ProcessId}, TimeoutAt={TimeoutAt}",
+                processId,
+                process.TimeoutAt);
+
+            await _processService.FailProcessAsync(
+                processId,
+                "PROCESS_TIMEOUT",
+                $"Process timed out before handler execution (timeout: {process.TimeoutAt})",
+                canRetry: true,
+                cancellationToken);
+
+            return;
+        }
+
+        // Calculate remaining time for execution
+        var remainingTime = process.TimeoutAt.HasValue
+            ? process.TimeoutAt.Value - DateTime.UtcNow
+            : TimeSpan.FromHours(1); // Default if no timeout set
+
+        if (remainingTime <= TimeSpan.Zero)
+        {
+            remainingTime = TimeSpan.FromSeconds(5); // Minimum grace period
+        }
+
+        _logger.LogDebug(
+            "Process execution timeout: ProcessId={ProcessId}, RemainingTime={RemainingTime}s",
+            processId,
+            remainingTime.TotalSeconds);
+
         // Transition to Processing
         await _processService.TransitionToProcessingAsync(processId, cancellationToken);
 
@@ -277,23 +314,45 @@ public class ProcessWorker : BackgroundService
 
         var handler = _handlerFactory.GetHandler(processMessage.ProcessType);
 
-        _logger.LogDebug(
-            "Executing handler: ProcessType={ProcessType}, HandlerType={HandlerType}",
-            processMessage.ProcessType,
-            handler.GetType().Name);
+        // Create timeout cancellation token
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCts.CancelAfter(remainingTime);
 
-        // Get process entity
-        var process = await _processService.GetProcessAsync(processId, cancellationToken);
+        try
+        {
+            _logger.LogDebug(
+                "Executing handler with timeout: ProcessType={ProcessType}, HandlerType={HandlerType}, Timeout={Timeout}s",
+                processMessage.ProcessType,
+                handler.GetType().Name,
+                remainingTime.TotalSeconds);
 
-        // Execute handler
-        await handler.ExecuteAsync(process, cancellationToken);
+            // Execute handler with timeout
+            await handler.ExecuteAsync(process, timeoutCts.Token);
 
-        // Complete process
-        await _processService.CompleteProcessAsync(processId, cancellationToken);
+            // Complete process
+            await _processService.CompleteProcessAsync(processId, cancellationToken);
 
-        _logger.LogInformation(
-            "Handler execution completed: ProcessId={ProcessId}",
-            processId);
+            _logger.LogInformation(
+                "Handler execution completed: ProcessId={ProcessId}",
+                processId);
+        }
+        catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            // Timeout occurred (not graceful shutdown)
+            _logger.LogWarning(
+                "Process execution timed out: ProcessId={ProcessId}, Timeout={Timeout}s",
+                processId,
+                remainingTime.TotalSeconds);
+
+            await _processService.FailProcessAsync(
+                processId,
+                "PROCESS_TIMEOUT",
+                $"Handler execution exceeded timeout of {remainingTime.TotalSeconds} seconds",
+                canRetry: true,
+                cancellationToken);
+
+            throw; // Re-throw to trigger NACK
+        }
     }
 
     private async Task HandleProcessFailureAsync(
