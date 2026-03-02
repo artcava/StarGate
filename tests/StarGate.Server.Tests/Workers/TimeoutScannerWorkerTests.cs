@@ -209,14 +209,14 @@ public class TimeoutScannerWorkerTests
         var callCount = 0;
         _repositoryMock
             .Setup(r => r.GetTimedOutProcessesAsync(It.IsAny<CancellationToken>()))
-            .Returns(() =>
+            .ReturnsAsync(() =>
             {
                 callCount++;
                 if (callCount == 1)
                 {
                     throw new InvalidOperationException("Database error");
                 }
-                return Task.FromResult<IReadOnlyList<Process>>(new List<Process>());
+                return new List<Process>() as IReadOnlyList<Process>;
             });
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
