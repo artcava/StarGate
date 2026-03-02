@@ -2,7 +2,7 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using StarGate.Core.Abstractions;
-using StarGate.Core.Domain;
+using StarGate.Core.Messages;
 using StarGate.Server.Workers;
 using Xunit;
 
@@ -11,23 +11,20 @@ namespace StarGate.Server.Tests.Workers;
 public class ProcessWorkerTests
 {
     private readonly Mock<IMessageConsumer> _consumerMock;
+    private readonly Mock<IProcessService> _processServiceMock;
     private readonly Mock<IProcessHandlerFactory> _handlerFactoryMock;
-    private readonly Mock<IProcessRepository> _repositoryMock;
-    private readonly Mock<IPolicyProvider> _policyProviderMock;
     private readonly ProcessWorker _worker;
 
     public ProcessWorkerTests()
     {
         _consumerMock = new Mock<IMessageConsumer>();
+        _processServiceMock = new Mock<IProcessService>();
         _handlerFactoryMock = new Mock<IProcessHandlerFactory>();
-        _repositoryMock = new Mock<IProcessRepository>();
-        _policyProviderMock = new Mock<IPolicyProvider>();
 
         _worker = new ProcessWorker(
             _consumerMock.Object,
+            _processServiceMock.Object,
             _handlerFactoryMock.Object,
-            _repositoryMock.Object,
-            _policyProviderMock.Object,
             NullLogger<ProcessWorker>.Instance);
     }
 
@@ -37,14 +34,28 @@ public class ProcessWorkerTests
         // Act
         Action act = () => new ProcessWorker(
             null!,
+            _processServiceMock.Object,
             _handlerFactoryMock.Object,
-            _repositoryMock.Object,
-            _policyProviderMock.Object,
             NullLogger<ProcessWorker>.Instance);
 
         // Assert
         act.Should().Throw<ArgumentNullException>()
-            .WithParameterName("consumer");
+            .WithParameterName("messageConsumer");
+    }
+
+    [Fact]
+    public void Constructor_Should_ThrowArgumentNullException_WhenProcessServiceIsNull()
+    {
+        // Act
+        Action act = () => new ProcessWorker(
+            _consumerMock.Object,
+            null!,
+            _handlerFactoryMock.Object,
+            NullLogger<ProcessWorker>.Instance);
+
+        // Assert
+        act.Should().Throw<ArgumentNullException>()
+            .WithParameterName("processService");
     }
 
     [Fact]
@@ -53,9 +64,8 @@ public class ProcessWorkerTests
         // Act
         Action act = () => new ProcessWorker(
             _consumerMock.Object,
+            _processServiceMock.Object,
             null!,
-            _repositoryMock.Object,
-            _policyProviderMock.Object,
             NullLogger<ProcessWorker>.Instance);
 
         // Assert
@@ -64,46 +74,13 @@ public class ProcessWorkerTests
     }
 
     [Fact]
-    public void Constructor_Should_ThrowArgumentNullException_WhenRepositoryIsNull()
-    {
-        // Act
-        Action act = () => new ProcessWorker(
-            _consumerMock.Object,
-            _handlerFactoryMock.Object,
-            null!,
-            _policyProviderMock.Object,
-            NullLogger<ProcessWorker>.Instance);
-
-        // Assert
-        act.Should().Throw<ArgumentNullException>()
-            .WithParameterName("repository");
-    }
-
-    [Fact]
-    public void Constructor_Should_ThrowArgumentNullException_WhenPolicyProviderIsNull()
-    {
-        // Act
-        Action act = () => new ProcessWorker(
-            _consumerMock.Object,
-            _handlerFactoryMock.Object,
-            _repositoryMock.Object,
-            null!,
-            NullLogger<ProcessWorker>.Instance);
-
-        // Assert
-        act.Should().Throw<ArgumentNullException>()
-            .WithParameterName("policyProvider");
-    }
-
-    [Fact]
     public void Constructor_Should_ThrowArgumentNullException_WhenLoggerIsNull()
     {
         // Act
         Action act = () => new ProcessWorker(
             _consumerMock.Object,
+            _processServiceMock.Object,
             _handlerFactoryMock.Object,
-            _repositoryMock.Object,
-            _policyProviderMock.Object,
             null!);
 
         // Assert
@@ -117,9 +94,8 @@ public class ProcessWorkerTests
         // Act
         var worker = new ProcessWorker(
             _consumerMock.Object,
+            _processServiceMock.Object,
             _handlerFactoryMock.Object,
-            _repositoryMock.Object,
-            _policyProviderMock.Object,
             NullLogger<ProcessWorker>.Instance);
 
         // Assert
@@ -134,8 +110,8 @@ public class ProcessWorkerTests
         cts.CancelAfter(TimeSpan.FromMilliseconds(100));
 
         _consumerMock
-            .Setup(x => x.StartConsumingAsync<Process>(
-                It.IsAny<Func<Process, MessageContext, Task>>(),
+            .Setup(x => x.StartConsumingAsync<ProcessMessage>(
+                It.IsAny<Func<ProcessMessage, MessageContext, Task>>(),
                 It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
@@ -157,8 +133,8 @@ public class ProcessWorkerTests
 
         // Assert
         _consumerMock.Verify(
-            x => x.StartConsumingAsync<Process>(
-                It.IsAny<Func<Process, MessageContext, Task>>(),
+            x => x.StartConsumingAsync<ProcessMessage>(
+                It.IsAny<Func<ProcessMessage, MessageContext, Task>>(),
                 It.IsAny<CancellationToken>()),
             Times.Once);
     }
@@ -171,8 +147,8 @@ public class ProcessWorkerTests
         cts.CancelAfter(TimeSpan.FromMilliseconds(100));
 
         _consumerMock
-            .Setup(x => x.StartConsumingAsync<Process>(
-                It.IsAny<Func<Process, MessageContext, Task>>(),
+            .Setup(x => x.StartConsumingAsync<ProcessMessage>(
+                It.IsAny<Func<ProcessMessage, MessageContext, Task>>(),
                 It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
