@@ -22,6 +22,7 @@ public static class ProcessHandlerServiceCollectionExtensions
 
         // Register individual handlers
         services.AddTransient<OrderProcessHandler>();
+        services.AddTransient<ShippingProcessHandler>();
 
         // Auto-register handlers with factory
         services.AddSingleton(provider =>
@@ -31,6 +32,10 @@ public static class ProcessHandlerServiceCollectionExtensions
             // Register OrderProcessHandler
             var orderHandler = provider.GetRequiredService<OrderProcessHandler>();
             factory.RegisterHandler(orderHandler.ProcessType, orderHandler);
+
+            // Register ShippingProcessHandler
+            var shippingHandler = provider.GetRequiredService<ShippingProcessHandler>();
+            factory.RegisterHandler(shippingHandler.ProcessType, shippingHandler);
 
             return factory;
         });
