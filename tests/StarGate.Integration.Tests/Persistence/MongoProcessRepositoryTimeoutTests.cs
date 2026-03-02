@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using StarGate.Core.Domain;
 using StarGate.Infrastructure.Persistence;
 using StarGate.Integration.Tests.Fixtures;
+using StarGate.Integration.Tests.Infrastructure;
 using Xunit;
 
 namespace StarGate.Integration.Tests.Persistence;
@@ -12,43 +13,34 @@ namespace StarGate.Integration.Tests.Persistence;
 /// Tests GetTimedOutProcessesAsync with real MongoDB instance.
 /// </summary>
 [Trait("Category", "Integration")]
-public class MongoProcessRepositoryTimeoutTests : IClassFixture<MongoDbFixture>, IAsyncLifetime
+public class MongoProcessRepositoryTimeoutTests : MongoRepositoryTestBase
 {
-    private readonly MongoDbFixture _fixture;
-    private readonly MongoProcessRepository _repository;
-
     public MongoProcessRepositoryTimeoutTests(MongoDbFixture fixture)
+        : base(
+            fixture,
+            new MongoProcessRepository(
+                fixture.Database,
+                NullLogger<MongoProcessRepository>.Instance))
     {
-        _fixture = fixture;
-        _repository = new MongoProcessRepository(
-            _fixture.Database,
-            NullLogger<MongoProcessRepository>.Instance);
-    }
-
-    public Task InitializeAsync() => Task.CompletedTask;
-
-    public async Task DisposeAsync()
-    {
-        await _fixture.ResetDatabaseAsync();
     }
 
     [Fact]
     public async Task GetTimedOutProcessesAsync_Should_ReturnProcesses_WhenTimeoutExceeded()
     {
         // Arrange
-        var timedOutProcess = CreateValidProcess();
-        timedOutProcess.TimeoutAt = DateTime.UtcNow.AddMinutes(-5); // Timed out 5 minutes ago
-        timedOutProcess.Status = ProcessStatus.Processing;
+        var timedOutProcess = CreateTestProcess(
+            status: ProcessStatus.Processing,
+            timeoutAt: DateTime.UtcNow.AddMinutes(-5)); // Timed out 5 minutes ago
 
-        var activeProcess = CreateValidProcess();
-        activeProcess.TimeoutAt = DateTime.UtcNow.AddHours(1); // Still has time
-        activeProcess.Status = ProcessStatus.Processing;
+        var activeProcess = CreateTestProcess(
+            status: ProcessStatus.Processing,
+            timeoutAt: DateTime.UtcNow.AddHours(1)); // Still has time
 
-        await _repository.CreateAsync(timedOutProcess);
-        await _repository.CreateAsync(activeProcess);
+        await Repository.CreateAsync(timedOutProcess);
+        await Repository.CreateAsync(activeProcess);
 
         // Act
-        var result = await _repository.GetTimedOutProcessesAsync();
+        var result = await Repository.GetTimedOutProcessesAsync();
 
         // Assert
         result.Should().ContainSingle()
@@ -59,14 +51,14 @@ public class MongoProcessRepositoryTimeoutTests : IClassFixture<MongoDbFixture>,
     public async Task GetTimedOutProcessesAsync_Should_NotReturnCompletedProcesses()
     {
         // Arrange
-        var completedProcess = CreateValidProcess();
-        completedProcess.TimeoutAt = DateTime.UtcNow.AddMinutes(-5);
-        completedProcess.Status = ProcessStatus.Completed;
+        var completedProcess = CreateTestProcess(
+            status: ProcessStatus.Completed,
+            timeoutAt: DateTime.UtcNow.AddMinutes(-5));
 
-        await _repository.CreateAsync(completedProcess);
+        await Repository.CreateAsync(completedProcess);
 
         // Act
-        var result = await _repository.GetTimedOutProcessesAsync();
+        var result = await Repository.GetTimedOutProcessesAsync();
 
         // Assert
         result.Should().BeEmpty();
@@ -76,14 +68,14 @@ public class MongoProcessRepositoryTimeoutTests : IClassFixture<MongoDbFixture>,
     public async Task GetTimedOutProcessesAsync_Should_NotReturnFailedProcesses()
     {
         // Arrange
-        var failedProcess = CreateValidProcess();
-        failedProcess.TimeoutAt = DateTime.UtcNow.AddMinutes(-5);
-        failedProcess.Status = ProcessStatus.Failed;
+        var failedProcess = CreateTestProcess(
+            status: ProcessStatus.Failed,
+            timeoutAt: DateTime.UtcNow.AddMinutes(-5));
 
-        await _repository.CreateAsync(failedProcess);
+        await Repository.CreateAsync(failedProcess);
 
         // Act
-        var result = await _repository.GetTimedOutProcessesAsync();
+        var result = await Repository.GetTimedOutProcessesAsync();
 
         // Assert
         result.Should().BeEmpty();
@@ -93,14 +85,14 @@ public class MongoProcessRepositoryTimeoutTests : IClassFixture<MongoDbFixture>,
     public async Task GetTimedOutProcessesAsync_Should_ReturnAcceptedTimedOutProcesses()
     {
         // Arrange
-        var acceptedProcess = CreateValidProcess();
-        acceptedProcess.TimeoutAt = DateTime.UtcNow.AddMinutes(-1);
-        acceptedProcess.Status = ProcessStatus.Accepted;
+        var acceptedProcess = CreateTestProcess(
+            status: ProcessStatus.Accepted,
+            timeoutAt: DateTime.UtcNow.AddMinutes(-1));
 
-        await _repository.CreateAsync(acceptedProcess);
+        await Repository.CreateAsync(acceptedProcess);
 
         // Act
-        var result = await _repository.GetTimedOutProcessesAsync();
+        var result = await Repository.GetTimedOutProcessesAsync();
 
         // Assert
         result.Should().ContainSingle()
@@ -111,14 +103,14 @@ public class MongoProcessRepositoryTimeoutTests : IClassFixture<MongoDbFixture>,
     public async Task GetTimedOutProcessesAsync_Should_ReturnRetryingTimedOutProcesses()
     {
         // Arrange
-        var retryingProcess = CreateValidProcess();
-        retryingProcess.TimeoutAt = DateTime.UtcNow.AddMinutes(-2);
-        retryingProcess.Status = ProcessStatus.Retrying;
+        var retryingProcess = CreateTestProcess(
+            status: ProcessStatus.Retrying,
+            timeoutAt: DateTime.UtcNow.AddMinutes(-2));
 
-        await _repository.CreateAsync(retryingProcess);
+        await Repository.CreateAsync(retryingProcess);
 
         // Act
-        var result = await _repository.GetTimedOutProcessesAsync();
+        var result = await Repository.GetTimedOutProcessesAsync();
 
         // Assert
         result.Should().ContainSingle()
@@ -129,14 +121,14 @@ public class MongoProcessRepositoryTimeoutTests : IClassFixture<MongoDbFixture>,
     public async Task GetTimedOutProcessesAsync_Should_NotReturnProcesses_WhenTimeoutNotSet()
     {
         // Arrange
-        var processWithoutTimeout = CreateValidProcess();
-        processWithoutTimeout.TimeoutAt = null;
-        processWithoutTimeout.Status = ProcessStatus.Processing;
+        var processWithoutTimeout = CreateTestProcess(
+            status: ProcessStatus.Processing,
+            timeoutAt: null);
 
-        await _repository.CreateAsync(processWithoutTimeout);
+        await Repository.CreateAsync(processWithoutTimeout);
 
         // Act
-        var result = await _repository.GetTimedOutProcessesAsync();
+        var result = await Repository.GetTimedOutProcessesAsync();
 
         // Assert
         result.Should().BeEmpty();
@@ -146,14 +138,14 @@ public class MongoProcessRepositoryTimeoutTests : IClassFixture<MongoDbFixture>,
     public async Task GetTimedOutProcessesAsync_Should_NotReturnProcesses_WhenTimeoutNotExceeded()
     {
         // Arrange
-        var futureTimeout = CreateValidProcess();
-        futureTimeout.TimeoutAt = DateTime.UtcNow.AddMinutes(10);
-        futureTimeout.Status = ProcessStatus.Processing;
+        var futureTimeout = CreateTestProcess(
+            status: ProcessStatus.Processing,
+            timeoutAt: DateTime.UtcNow.AddMinutes(10));
 
-        await _repository.CreateAsync(futureTimeout);
+        await Repository.CreateAsync(futureTimeout);
 
         // Act
-        var result = await _repository.GetTimedOutProcessesAsync();
+        var result = await Repository.GetTimedOutProcessesAsync();
 
         // Assert
         result.Should().BeEmpty();
@@ -165,15 +157,15 @@ public class MongoProcessRepositoryTimeoutTests : IClassFixture<MongoDbFixture>,
         // Arrange - Create 150 timed-out processes
         for (int i = 0; i < 150; i++)
         {
-            var process = CreateValidProcess();
-            process.TimeoutAt = DateTime.UtcNow.AddMinutes(-5);
-            process.Status = ProcessStatus.Processing;
+            var process = CreateTestProcess(
+                status: ProcessStatus.Processing,
+                timeoutAt: DateTime.UtcNow.AddMinutes(-5));
 
-            await _repository.CreateAsync(process);
+            await Repository.CreateAsync(process);
         }
 
         // Act
-        var result = await _repository.GetTimedOutProcessesAsync();
+        var result = await Repository.GetTimedOutProcessesAsync();
 
         // Assert
         result.Should().HaveCount(100);
@@ -183,19 +175,19 @@ public class MongoProcessRepositoryTimeoutTests : IClassFixture<MongoDbFixture>,
     public async Task GetTimedOutProcessesAsync_Should_ReturnEmpty_WhenNoTimedOutProcesses()
     {
         // Arrange - Create only active processes with future timeouts
-        var activeProcess1 = CreateValidProcess();
-        activeProcess1.TimeoutAt = DateTime.UtcNow.AddHours(1);
-        activeProcess1.Status = ProcessStatus.Processing;
+        var activeProcess1 = CreateTestProcess(
+            status: ProcessStatus.Processing,
+            timeoutAt: DateTime.UtcNow.AddHours(1));
 
-        var activeProcess2 = CreateValidProcess();
-        activeProcess2.TimeoutAt = DateTime.UtcNow.AddMinutes(30);
-        activeProcess2.Status = ProcessStatus.Accepted;
+        var activeProcess2 = CreateTestProcess(
+            status: ProcessStatus.Accepted,
+            timeoutAt: DateTime.UtcNow.AddMinutes(30));
 
-        await _repository.CreateAsync(activeProcess1);
-        await _repository.CreateAsync(activeProcess2);
+        await Repository.CreateAsync(activeProcess1);
+        await Repository.CreateAsync(activeProcess2);
 
         // Act
-        var result = await _repository.GetTimedOutProcessesAsync();
+        var result = await Repository.GetTimedOutProcessesAsync();
 
         // Assert
         result.Should().BeEmpty();
@@ -205,24 +197,24 @@ public class MongoProcessRepositoryTimeoutTests : IClassFixture<MongoDbFixture>,
     public async Task GetTimedOutProcessesAsync_Should_ReturnMultipleStatuses()
     {
         // Arrange
-        var acceptedTimedOut = CreateValidProcess();
-        acceptedTimedOut.TimeoutAt = DateTime.UtcNow.AddMinutes(-1);
-        acceptedTimedOut.Status = ProcessStatus.Accepted;
+        var acceptedTimedOut = CreateTestProcess(
+            status: ProcessStatus.Accepted,
+            timeoutAt: DateTime.UtcNow.AddMinutes(-1));
 
-        var processingTimedOut = CreateValidProcess();
-        processingTimedOut.TimeoutAt = DateTime.UtcNow.AddMinutes(-2);
-        processingTimedOut.Status = ProcessStatus.Processing;
+        var processingTimedOut = CreateTestProcess(
+            status: ProcessStatus.Processing,
+            timeoutAt: DateTime.UtcNow.AddMinutes(-2));
 
-        var retryingTimedOut = CreateValidProcess();
-        retryingTimedOut.TimeoutAt = DateTime.UtcNow.AddMinutes(-3);
-        retryingTimedOut.Status = ProcessStatus.Retrying;
+        var retryingTimedOut = CreateTestProcess(
+            status: ProcessStatus.Retrying,
+            timeoutAt: DateTime.UtcNow.AddMinutes(-3));
 
-        await _repository.CreateAsync(acceptedTimedOut);
-        await _repository.CreateAsync(processingTimedOut);
-        await _repository.CreateAsync(retryingTimedOut);
+        await Repository.CreateAsync(acceptedTimedOut);
+        await Repository.CreateAsync(processingTimedOut);
+        await Repository.CreateAsync(retryingTimedOut);
 
         // Act
-        var result = await _repository.GetTimedOutProcessesAsync();
+        var result = await Repository.GetTimedOutProcessesAsync();
 
         // Assert
         result.Should().HaveCount(3);
@@ -230,18 +222,4 @@ public class MongoProcessRepositoryTimeoutTests : IClassFixture<MongoDbFixture>,
         result.Should().Contain(p => p.ProcessId == processingTimedOut.ProcessId);
         result.Should().Contain(p => p.ProcessId == retryingTimedOut.ProcessId);
     }
-
-    private static Process CreateValidProcess() => new()
-    {
-        ProcessId = Guid.NewGuid(),
-        ClientProcessId = $"client-{Guid.NewGuid()}",
-        ProcessType = "test-order",
-        ClientId = "test-client",
-        Status = ProcessStatus.Accepted,
-        Progress = 0,
-        CreatedAt = DateTime.UtcNow,
-        UpdatedAt = DateTime.UtcNow,
-        IdempotencyKey = Guid.NewGuid().ToString(),
-        Retryable = true
-    };
 }
