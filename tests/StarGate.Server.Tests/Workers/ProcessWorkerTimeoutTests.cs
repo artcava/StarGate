@@ -211,10 +211,14 @@ public class ProcessWorkerTimeoutTests
             .Returns(_handlerMock.Object);
 
         // Handler takes 5 seconds (exceeds 1 second timeout)
-        // ExecuteAsync returns Task, use callback that returns Task
+        // ExecuteAsync returns Task<object>
         _handlerMock
             .Setup(h => h.ExecuteAsync(It.IsAny<Process>(), It.IsAny<CancellationToken>()))
-            .Returns<Process, CancellationToken>((p, ct) => Task.Delay(TimeSpan.FromSeconds(5), ct));
+            .Returns(async (Process p, CancellationToken ct) =>
+            {
+                await Task.Delay(TimeSpan.FromSeconds(5), ct);
+                return (object?)null;
+            });
 
         _processServiceMock
             .Setup(s => s.FailProcessAsync(
