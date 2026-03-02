@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
+using StarGate.Core.Configuration;
 using StarGate.Server.HealthChecks;
 using StarGate.Server.Workers;
 
@@ -11,6 +12,10 @@ builder.Services.Configure<HostOptions>(options =>
 {
     options.ShutdownTimeout = TimeSpan.FromSeconds(45);
 });
+
+// Configure retry settings
+builder.Services.Configure<RetryConfiguration>(
+    builder.Configuration.GetSection("Retry"));
 
 // Register ProcessWorker as singleton to allow health check injection
 builder.Services.AddSingleton<ProcessWorker>();
