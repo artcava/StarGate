@@ -1,8 +1,7 @@
-namespace StarGate.Server.Factories;
-
-using Microsoft.Extensions.Logging;
 using StarGate.Core.Abstractions;
 using System.Collections.Concurrent;
+
+namespace StarGate.Server.Factories;
 
 /// <summary>
 /// Factory for managing process handler registration and retrieval.
