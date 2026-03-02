@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using StarGate.Core.Abstractions;
 using StarGate.Core.Configuration;
 using StarGate.Core.Domain;
+using StarGate.Core.Errors;
 using StarGate.Core.Messages;
 using System.Collections.Concurrent;
 using System.Text.Json;
@@ -15,6 +16,7 @@ namespace StarGate.Server.Workers;
 /// Implements graceful shutdown and comprehensive error handling.
 /// Enforces timeout limits to prevent processes from exceeding configured timeout duration.
 /// Supports retry logic with exponential backoff for transient failures.
+/// Integrates ErrorClassifier for sophisticated error handling and ACK/NACK decisions.
 /// </summary>
 public class ProcessWorker : BackgroundService
 {
@@ -56,9 +58,8 @@ public class ProcessWorker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("ProcessWorker starting");
+        _logger.LogInformation("ProcessWorker starting with ErrorClassifier integration");
 
-        // Register shutdown callback
         stoppingToken.Register(() =>
         {
             IsShuttingDown = true;
@@ -72,26 +73,22 @@ public class ProcessWorker : BackgroundService
             await _messageConsumer.StartConsumingAsync<ProcessMessage>(
                 messageHandler: async (message, context) =>
                 {
-                    // Don't accept new messages during shutdown
                     if (stoppingToken.IsCancellationRequested)
                     {
                         _logger.LogWarning(
                             "Rejecting message during shutdown: ProcessId={ProcessId}",
                             message.ProcessId);
 
-                        // NACK to requeue
                         await context.RejectAsync(true);
                         return;
                     }
 
-                    // Track message processing with unique key
                     var messageKey = $"{message.ProcessId}_{Guid.NewGuid()}";
                     var processingTask = HandleMessageWithTrackingAsync(
                         message,
                         context,
                         stoppingToken);
 
-                    // Store task for graceful shutdown tracking
                     _activeMessages.TryAdd(messageKey, processingTask);
 
                     try
@@ -135,14 +132,12 @@ public class ProcessWorker : BackgroundService
                 processMessage.ProcessType,
                 processMessage.ClientId);
 
-            // Execute process
             await ExecuteProcessAsync(processMessage, cancellationToken);
 
             _logger.LogInformation(
                 "Process completed successfully: ProcessId={ProcessId}",
                 processId);
 
-            // ACK message
             await context.AcknowledgeAsync();
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -151,20 +146,34 @@ public class ProcessWorker : BackgroundService
                 "Process execution cancelled during shutdown: ProcessId={ProcessId}",
                 processId);
 
-            // Record cancellation for audit trail
             await RecordCancellationAsync(processId);
-
-            // NACK to requeue - will be processed after restart
             await context.RejectAsync(true);
         }
         catch (JsonException ex)
         {
             _logger.LogError(
                 ex,
-                "Failed to process malformed message: ProcessId={ProcessId}",
+                "Malformed message (JSON error): ProcessId={ProcessId}",
                 processId);
 
-            // NACK message without requeue (malformed message)
+            // Classify error
+            var classification = ErrorClassifier.Classify(ex);
+
+            _logger.LogWarning(
+                "Error classification: ErrorCode={ErrorCode}, IsRetryable={IsRetryable}, ShouldRequeue={ShouldRequeue}, Severity={Severity}",
+                classification.ErrorCode,
+                classification.IsRetryable,
+                classification.ShouldRequeue,
+                classification.Severity);
+
+            // Record failure
+            await RecordProcessFailureAsync(
+                processId,
+                classification,
+                ex.Message,
+                cancellationToken);
+
+            // NACK without requeue (malformed message goes to DLQ)
             await context.RejectAsync(false);
         }
         catch (Exception ex)
@@ -174,14 +183,66 @@ public class ProcessWorker : BackgroundService
                 "Failed to process message: ProcessId={ProcessId}",
                 processId);
 
+            // Classify error
+            var classification = ErrorClassifier.Classify(ex);
+
+            _logger.LogWarning(
+                "Error classification: ErrorCode={ErrorCode}, IsRetryable={IsRetryable}, ShouldRequeue={ShouldRequeue}, Severity={Severity}",
+                classification.ErrorCode,
+                classification.IsRetryable,
+                classification.ShouldRequeue,
+                classification.Severity);
+
+            // Record process failure with classification
+            await RecordProcessFailureAsync(
+                processId,
+                classification,
+                ex.Message,
+                cancellationToken);
+
             // Handle process failure with retry logic
             await HandleProcessFailureAsync(
                 processId,
+                classification,
                 ex,
                 cancellationToken);
 
-            // NACK - message will be requeued if retry is scheduled
-            await context.RejectAsync(false);
+            // Apply ACK/NACK strategy based on classification
+            // If ShouldRequeue = false, message goes to DLQ
+            // If ShouldRequeue = true, message is requeued for retry
+            await context.RejectAsync(classification.ShouldRequeue);
+        }
+    }
+
+    private async Task RecordProcessFailureAsync(
+        Guid processId,
+        ErrorClassification classification,
+        string errorMessage,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+
+            await _processService.RecordProcessErrorAsync(
+                processId,
+                classification.ErrorCode,
+                errorMessage,
+                classification.IsRetryable,
+                cts.Token);
+
+            _logger.LogInformation(
+                "Process failure recorded: ProcessId={ProcessId}, ErrorCode={ErrorCode}, Severity={Severity}",
+                processId,
+                classification.ErrorCode,
+                classification.Severity);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to record process failure: ProcessId={ProcessId}",
+                processId);
         }
     }
 
@@ -232,7 +293,6 @@ public class ProcessWorker : BackgroundService
     {
         try
         {
-            // Use a fresh cancellation token to allow this operation to complete
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
             await _processService.RecordProcessErrorAsync(
@@ -261,10 +321,8 @@ public class ProcessWorker : BackgroundService
     {
         var processId = processMessage.ProcessId;
 
-        // Get process to check timeout
         var process = await _processService.GetProcessAsync(processId, cancellationToken);
 
-        // Check if process has already timed out while waiting in queue
         if (process.IsTimedOut)
         {
             _logger.LogWarning(
@@ -282,14 +340,13 @@ public class ProcessWorker : BackgroundService
             return;
         }
 
-        // Calculate remaining time for execution
         var remainingTime = process.TimeoutAt.HasValue
             ? process.TimeoutAt.Value - DateTime.UtcNow
-            : TimeSpan.FromHours(1); // Default if no timeout set
+            : TimeSpan.FromHours(1);
 
         if (remainingTime <= TimeSpan.Zero)
         {
-            remainingTime = TimeSpan.FromSeconds(5); // Minimum grace period
+            remainingTime = TimeSpan.FromSeconds(5);
         }
 
         _logger.LogDebug(
@@ -297,14 +354,12 @@ public class ProcessWorker : BackgroundService
             processId,
             remainingTime.TotalSeconds);
 
-        // Transition to Processing
         await _processService.TransitionToProcessingAsync(processId, cancellationToken);
 
         _logger.LogInformation(
             "Process transitioned to Processing: ProcessId={ProcessId}",
             processId);
 
-        // Get appropriate handler for process type
         if (!_handlerFactory.HasHandler(processMessage.ProcessType))
         {
             _logger.LogError(
@@ -324,7 +379,6 @@ public class ProcessWorker : BackgroundService
 
         var handler = _handlerFactory.GetHandler(processMessage.ProcessType);
 
-        // Create timeout cancellation token
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeoutCts.CancelAfter(remainingTime);
 
@@ -336,10 +390,8 @@ public class ProcessWorker : BackgroundService
                 handler.GetType().Name,
                 remainingTime.TotalSeconds);
 
-            // Execute handler with timeout
             await handler.ExecuteAsync(process, timeoutCts.Token);
 
-            // Complete process
             await _processService.CompleteProcessAsync(processId, cancellationToken);
 
             _logger.LogInformation(
@@ -348,7 +400,6 @@ public class ProcessWorker : BackgroundService
         }
         catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
         {
-            // Timeout occurred (not graceful shutdown)
             _logger.LogWarning(
                 "Process execution timed out: ProcessId={ProcessId}, Timeout={Timeout}s",
                 processId,
@@ -361,76 +412,60 @@ public class ProcessWorker : BackgroundService
                 canRetry: true,
                 cancellationToken);
 
-            throw; // Re-throw to trigger NACK
+            throw;
         }
     }
 
     private async Task HandleProcessFailureAsync(
         Guid processId,
+        ErrorClassification classification,
         Exception exception,
         CancellationToken cancellationToken)
     {
         try
         {
-            // Determine error classification
-            var errorCode = exception switch
-            {
-                TimeoutException => "PROCESS_TIMEOUT",
-                OperationCanceledException => "PROCESS_CANCELLED",
-                InvalidOperationException => "INVALID_OPERATION",
-                HttpRequestException => "HTTP_ERROR",
-                _ => "UNKNOWN_ERROR"
-            };
-
-            // Determine if error is retryable
-            var canRetry = exception is not InvalidOperationException;
-
             _logger.LogWarning(
-                "Handling process failure: ProcessId={ProcessId}, ErrorCode={ErrorCode}, CanRetry={CanRetry}, Exception={Exception}",
+                "Handling process failure: ProcessId={ProcessId}, ErrorCode={ErrorCode}, IsRetryable={IsRetryable}, Severity={Severity}",
                 processId,
-                errorCode,
-                canRetry,
-                exception.GetType().Name);
+                classification.ErrorCode,
+                classification.IsRetryable,
+                classification.Severity);
 
-            // Get current process state
             var process = await _processService.GetProcessAsync(processId, cancellationToken);
 
-            // Use fresh token for error recording to ensure it completes
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
-            // Fail process (service determines retry vs final failure)
             await _processService.FailProcessAsync(
                 processId,
-                errorCode,
+                classification.ErrorCode,
                 exception.Message,
-                canRetry,
+                classification.IsRetryable,
                 cts.Token);
 
-            // Reload process to check new status
             process = await _processService.GetProcessAsync(processId, cts.Token);
 
             if (process.Status == ProcessStatus.Retrying)
             {
-                // Calculate retry delay
                 var retryDelay = _retryConfig.CalculateDelay(process.RetryCount);
 
                 _logger.LogInformation(
-                    "Process will retry: ProcessId={ProcessId}, RetryCount={RetryCount}/{MaxRetries}, Delay={Delay}s",
+                    "Process will retry: ProcessId={ProcessId}, RetryCount={RetryCount}/{MaxRetries}, Delay={Delay}s, ErrorCode={ErrorCode}",
                     processId,
                     process.RetryCount,
                     process.MaxRetries,
-                    retryDelay.TotalSeconds);
+                    retryDelay.TotalSeconds,
+                    classification.ErrorCode);
 
-                // Publish delayed retry message
                 await PublishRetryMessageAsync(process, retryDelay, cts.Token);
             }
             else
             {
                 _logger.LogWarning(
-                    "Process failed permanently: ProcessId={ProcessId}, Status={Status}, RetryCount={RetryCount}",
+                    "Process failed permanently: ProcessId={ProcessId}, Status={Status}, RetryCount={RetryCount}, ErrorCode={ErrorCode}",
                     processId,
                     process.Status,
-                    process.RetryCount);
+                    process.RetryCount,
+                    classification.ErrorCode);
             }
         }
         catch (Exception ex)
