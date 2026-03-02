@@ -444,4 +444,37 @@ public class MongoProcessRepository : IProcessRepository
 
         return processes;
     }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<Process>> GetTimedOutProcessesAsync(
+        CancellationToken ct = default)
+    {
+        _logger.LogDebug("Querying timed-out processes");
+
+        var now = DateTime.UtcNow;
+        var activeStatuses = new[]
+        {
+            nameof(ProcessStatus.Accepted),
+            nameof(ProcessStatus.Processing),
+            nameof(ProcessStatus.Retrying)
+        };
+
+        var filter = Builders<ProcessDocument>.Filter.And(
+            Builders<ProcessDocument>.Filter.In(d => d.Status, activeStatuses),
+            Builders<ProcessDocument>.Filter.Ne(d => d.TimeoutAt, null),
+            Builders<ProcessDocument>.Filter.Lt(d => d.TimeoutAt, now));
+
+        var documents = await _collection
+            .Find(filter)
+            .Limit(100) // Process in batches
+            .ToListAsync(ct);
+
+        var processes = documents.Select(ProcessMapper.MapToDomain).ToList();
+
+        _logger.LogDebug(
+            "Found {Count} timed-out processes",
+            processes.Count);
+
+        return processes;
+    }
 }

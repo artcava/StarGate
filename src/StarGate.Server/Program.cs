@@ -16,6 +16,9 @@ builder.Services.Configure<HostOptions>(options =>
 builder.Services.AddSingleton<ProcessWorker>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<ProcessWorker>());
 
+// Register TimeoutScannerWorker for timeout enforcement
+builder.Services.AddHostedService<TimeoutScannerWorker>();
+
 // Add health checks
 builder.Services.AddHealthChecks()
     .AddCheck<ProcessWorkerHealthCheck>(
