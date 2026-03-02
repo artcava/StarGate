@@ -73,7 +73,7 @@ public class ProcessWorker : BackgroundService
                 processId);
 
             // ACK message
-            await context.AckAsync();
+            await context.AcknowledgeAsync();
         }
         catch (JsonException ex)
         {
@@ -83,7 +83,7 @@ public class ProcessWorker : BackgroundService
                 processId);
 
             // NACK message without requeue (malformed message)
-            await context.NackAsync(requeue: false);
+            await context.RejectAsync(false);
         }
         catch (Exception ex)
         {
@@ -99,7 +99,7 @@ public class ProcessWorker : BackgroundService
                 cancellationToken);
 
             // NACK and requeue for retry
-            await context.NackAsync(requeue: true);
+            await context.RejectAsync(true);
         }
     }
 
