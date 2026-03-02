@@ -56,7 +56,7 @@ public class ProcessWorkerTimeoutTests
                 It.IsAny<string>(),
                 true,
                 It.IsAny<CancellationToken>()))
-            .Returns(Task.FromResult(0));
+            .ReturnsAsync(It.IsAny<Process>());
 
         // Act - Simulate message processing
         var processMessage = new ProcessMessage
@@ -200,7 +200,7 @@ public class ProcessWorkerTimeoutTests
 
         _processServiceMock
             .Setup(s => s.TransitionToProcessingAsync(processId, It.IsAny<CancellationToken>()))
-            .Returns(Task.FromResult(0));
+            .ReturnsAsync(It.IsAny<Process>());
 
         _handlerFactoryMock
             .Setup(f => f.HasHandler("test-order"))
@@ -222,7 +222,7 @@ public class ProcessWorkerTimeoutTests
                 It.IsAny<string>(),
                 true,
                 It.IsAny<CancellationToken>()))
-            .Returns(Task.FromResult(0));
+            .ReturnsAsync(It.IsAny<Process>());
 
         // Act & Assert - Timeout should occur
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
@@ -246,7 +246,7 @@ public class ProcessWorkerTimeoutTests
 
         _processServiceMock
             .Setup(s => s.TransitionToProcessingAsync(processId, It.IsAny<CancellationToken>()))
-            .Returns(Task.FromResult(0));
+            .ReturnsAsync(It.IsAny<Process>());
 
         _handlerFactoryMock
             .Setup(f => f.HasHandler("unknown-type"))
@@ -259,7 +259,7 @@ public class ProcessWorkerTimeoutTests
                 It.IsAny<string>(),
                 false, // Not retryable
                 It.IsAny<CancellationToken>()))
-            .Returns(Task.FromResult(0));
+            .ReturnsAsync(It.IsAny<Process>());
 
         // Act - Verify failure scenario
         _handlerFactoryMock.Object.HasHandler("unknown-type").Should().BeFalse();
