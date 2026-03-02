@@ -360,7 +360,8 @@ public class ProcessWorker : BackgroundService
             "Process transitioned to Processing: ProcessId={ProcessId}",
             processId);
 
-        if (!_handlerFactory.HasHandler(processMessage.ProcessType))
+        // Use IsRegistered instead of HasHandler
+        if (!_handlerFactory.IsRegistered(processMessage.ProcessType))
         {
             _logger.LogError(
                 "No handler found for process type: ProcessType={ProcessType}, ProcessId={ProcessId}",
@@ -379,6 +380,24 @@ public class ProcessWorker : BackgroundService
 
         var handler = _handlerFactory.GetHandler(processMessage.ProcessType);
 
+        // Add null check to prevent dereference
+        if (handler == null)
+        {
+            _logger.LogError(
+                "Handler retrieval returned null: ProcessType={ProcessType}, ProcessId={ProcessId}",
+                processMessage.ProcessType,
+                processId);
+
+            await _processService.FailProcessAsync(
+                processId,
+                "HANDLER_RETRIEVAL_FAILED",
+                $"Handler retrieval returned null for process type '{processMessage.ProcessType}'",
+                canRetry: false,
+                cancellationToken);
+
+            return;
+        }
+
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeoutCts.CancelAfter(remainingTime);
 
@@ -390,7 +409,19 @@ public class ProcessWorker : BackgroundService
                 handler.GetType().Name,
                 remainingTime.TotalSeconds);
 
-            await handler.ExecuteAsync(process, timeoutCts.Token);
+            // Create ProcessContext from Process
+            var processContext = new ProcessContext
+            {
+                ProcessId = process.ProcessId,
+                ClientId = process.ClientId,
+                ProcessType = process.ProcessType,
+                ClientProcessId = process.ClientProcessId,
+                Metadata = process.Metadata ?? new Dictionary<string, string>(),
+                CancellationToken = timeoutCts.Token
+            };
+
+            // ExecuteAsync takes only ProcessContext (includes CancellationToken)
+            await handler.ExecuteAsync(processContext);
 
             await _processService.CompleteProcessAsync(processId, cancellationToken);
 
