@@ -1,6 +1,9 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using StarGate.Core.Abstractions;
+using StarGate.Core.Configuration;
+using StarGate.Core.Domain;
 using StarGate.Core.Messages;
 using System.Collections.Concurrent;
 using System.Text.Json;
@@ -11,12 +14,15 @@ namespace StarGate.Server.Workers;
 /// Background worker that consumes process messages from the broker and executes them.
 /// Implements graceful shutdown and comprehensive error handling.
 /// Enforces timeout limits to prevent processes from exceeding configured timeout duration.
+/// Supports retry logic with exponential backoff for transient failures.
 /// </summary>
 public class ProcessWorker : BackgroundService
 {
     private readonly IMessageConsumer _messageConsumer;
     private readonly IProcessService _processService;
     private readonly IProcessHandlerFactory _handlerFactory;
+    private readonly IMessageBroker _messageBroker;
+    private readonly RetryConfiguration _retryConfig;
     private readonly ILogger<ProcessWorker> _logger;
     private readonly ConcurrentDictionary<string, Task> _activeMessages;
     private readonly TimeSpan _shutdownTimeout = TimeSpan.FromSeconds(30);
@@ -25,11 +31,15 @@ public class ProcessWorker : BackgroundService
         IMessageConsumer messageConsumer,
         IProcessService processService,
         IProcessHandlerFactory handlerFactory,
+        IMessageBroker messageBroker,
+        IOptions<RetryConfiguration> retryConfig,
         ILogger<ProcessWorker> logger)
     {
         _messageConsumer = messageConsumer ?? throw new ArgumentNullException(nameof(messageConsumer));
         _processService = processService ?? throw new ArgumentNullException(nameof(processService));
         _handlerFactory = handlerFactory ?? throw new ArgumentNullException(nameof(handlerFactory));
+        _messageBroker = messageBroker ?? throw new ArgumentNullException(nameof(messageBroker));
+        _retryConfig = retryConfig?.Value ?? throw new ArgumentNullException(nameof(retryConfig));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _activeMessages = new ConcurrentDictionary<string, Task>();
     }
@@ -164,14 +174,14 @@ public class ProcessWorker : BackgroundService
                 "Failed to process message: ProcessId={ProcessId}",
                 processId);
 
-            // Handle process failure
+            // Handle process failure with retry logic
             await HandleProcessFailureAsync(
                 processId,
                 ex,
                 cancellationToken);
 
-            // NACK and requeue for retry
-            await context.RejectAsync(true);
+            // NACK - message will be requeued if retry is scheduled
+            await context.RejectAsync(false);
         }
     }
 
@@ -362,19 +372,33 @@ public class ProcessWorker : BackgroundService
     {
         try
         {
-            // Use fresh token for error recording to ensure it completes
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-
+            // Determine error classification
             var errorCode = exception switch
             {
                 TimeoutException => "PROCESS_TIMEOUT",
                 OperationCanceledException => "PROCESS_CANCELLED",
                 InvalidOperationException => "INVALID_OPERATION",
+                HttpRequestException => "HTTP_ERROR",
                 _ => "UNKNOWN_ERROR"
             };
 
+            // Determine if error is retryable
             var canRetry = exception is not InvalidOperationException;
 
+            _logger.LogWarning(
+                "Handling process failure: ProcessId={ProcessId}, ErrorCode={ErrorCode}, CanRetry={CanRetry}, Exception={Exception}",
+                processId,
+                errorCode,
+                canRetry,
+                exception.GetType().Name);
+
+            // Get current process state
+            var process = await _processService.GetProcessAsync(processId, cancellationToken);
+
+            // Use fresh token for error recording to ensure it completes
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+
+            // Fail process (service determines retry vs final failure)
             await _processService.FailProcessAsync(
                 processId,
                 errorCode,
@@ -382,11 +406,32 @@ public class ProcessWorker : BackgroundService
                 canRetry,
                 cts.Token);
 
-            _logger.LogWarning(
-                "Process failure recorded: ProcessId={ProcessId}, ErrorCode={ErrorCode}, CanRetry={CanRetry}",
-                processId,
-                errorCode,
-                canRetry);
+            // Reload process to check new status
+            process = await _processService.GetProcessAsync(processId, cts.Token);
+
+            if (process.Status == ProcessStatus.Retrying)
+            {
+                // Calculate retry delay
+                var retryDelay = _retryConfig.CalculateDelay(process.RetryCount);
+
+                _logger.LogInformation(
+                    "Process will retry: ProcessId={ProcessId}, RetryCount={RetryCount}/{MaxRetries}, Delay={Delay}s",
+                    processId,
+                    process.RetryCount,
+                    process.MaxRetries,
+                    retryDelay.TotalSeconds);
+
+                // Publish delayed retry message
+                await PublishRetryMessageAsync(process, retryDelay, cts.Token);
+            }
+            else
+            {
+                _logger.LogWarning(
+                    "Process failed permanently: ProcessId={ProcessId}, Status={Status}, RetryCount={RetryCount}",
+                    processId,
+                    process.Status,
+                    process.RetryCount);
+            }
         }
         catch (Exception ex)
         {
@@ -394,6 +439,41 @@ public class ProcessWorker : BackgroundService
                 ex,
                 "Failed to handle process failure: ProcessId={ProcessId}",
                 processId);
+        }
+    }
+
+    private async Task PublishRetryMessageAsync(
+        Process process,
+        TimeSpan delay,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var message = ProcessMessage.FromProcess(process);
+            var routingKey = $"process.{process.ProcessType}";
+
+            _logger.LogDebug(
+                "Publishing retry message: ProcessId={ProcessId}, Delay={Delay}s",
+                process.ProcessId,
+                delay.TotalSeconds);
+
+            await _messageBroker.PublishWithDelayAsync(
+                message,
+                routingKey,
+                delay,
+                cancellationToken);
+
+            _logger.LogInformation(
+                "Retry message published: ProcessId={ProcessId}, ScheduledFor={ScheduledTime}",
+                process.ProcessId,
+                DateTime.UtcNow.Add(delay));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to publish retry message: ProcessId={ProcessId}",
+                process.ProcessId);
         }
     }
 
