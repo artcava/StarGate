@@ -365,7 +365,7 @@ StarGate/
 - [x] Implement ProcessWorker with message consumption
 - [x] Add graceful shutdown handling
 - [x] Integrate timeout enforcement
-- [ ] Integrate retry logic
+- [x] Integrate retry logic
 - [ ] Implement error handling and acknowledgment
 - [ ] Add telemetry and logging
 - [ ] Write unit tests
