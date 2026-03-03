@@ -27,7 +27,7 @@ public static class ProcessEndpoints
             .WithName("CreateProcess")
             .RequireRateLimiting("CreateProcess") // Apply rate limiting policy
             .AddValidation<CreateProcessRequest>()
-            .Produces<ProcessResponse>(StatusCodes.Status201Created)
+            .Produces<ProcessResponse>(StatusCodes.Status202Accepted)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden)
@@ -127,7 +127,7 @@ public static class ProcessEndpoints
                 "Process created successfully: ProcessId={ProcessId}",
                 process.ProcessId);
 
-            return Results.Created($"/api/processes/{process.ProcessId}", response);
+            return Results.Accepted($"/api/processes/{process.ProcessId}", response);
         }
         catch (PolicyViolationException ex)
         {
