@@ -4,6 +4,7 @@ using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Polly;
+using Polly.Extensions.Http;
 using StarGate.Infrastructure.Resilience;
 
 namespace StarGate.Infrastructure.Extensions;
