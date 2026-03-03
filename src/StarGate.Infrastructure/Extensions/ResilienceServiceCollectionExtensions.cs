@@ -23,6 +23,10 @@ public static class ResilienceServiceCollectionExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        // Register timeout configuration
+        services.Configure<TimeoutConfiguration>(
+            configuration.GetSection("Resilience:Timeout"));
+
         // Register retry policy configuration
         services.Configure<RetryPolicyConfiguration>(
             configuration.GetSection("Resilience:Retry"));
@@ -31,33 +35,39 @@ public static class ResilienceServiceCollectionExtensions
         services.Configure<CircuitBreakerConfiguration>(
             configuration.GetSection("Resilience:CircuitBreaker"));
 
-        // Register wrapped resilience policies (circuit breaker + retry)
+        // Register complete wrapped resilience policies (timeout + circuit breaker + retry)
         services.AddSingleton(provider =>
         {
+            var timeoutConfig = provider.GetRequiredService<IOptions<TimeoutConfiguration>>().Value;
             var retryConfig = provider.GetRequiredService<IOptions<RetryPolicyConfiguration>>().Value;
             var circuitConfig = provider.GetRequiredService<IOptions<CircuitBreakerConfiguration>>().Value;
             var logger = provider.GetRequiredService<ILogger<RetryPolicyConfiguration>>();
-            return ResiliencePolicyWrapper.CreateDatabaseResiliencePolicy(retryConfig, circuitConfig, logger);
+            return ResiliencePolicyWrapper.CreateCompleteDatabaseResiliencePolicy(
+                timeoutConfig, retryConfig, circuitConfig, logger);
         });
 
         services.AddSingleton(provider =>
         {
+            var timeoutConfig = provider.GetRequiredService<IOptions<TimeoutConfiguration>>().Value;
             var retryConfig = provider.GetRequiredService<IOptions<RetryPolicyConfiguration>>().Value;
             var circuitConfig = provider.GetRequiredService<IOptions<CircuitBreakerConfiguration>>().Value;
             var logger = provider.GetRequiredService<ILogger<RetryPolicyConfiguration>>();
-            return ResiliencePolicyWrapper.CreateBrokerResiliencePolicy(retryConfig, circuitConfig, logger);
+            return ResiliencePolicyWrapper.CreateCompleteBrokerResiliencePolicy(
+                timeoutConfig, retryConfig, circuitConfig, logger);
         });
 
-        // Register HTTP resilience policy factory as singleton
+        // Register HTTP complete resilience policy factory as singleton
         services.AddSingleton(provider =>
         {
+            var timeoutConfig = provider.GetRequiredService<IOptions<TimeoutConfiguration>>().Value;
             var retryConfig = provider.GetRequiredService<IOptions<RetryPolicyConfiguration>>().Value;
             var circuitConfig = provider.GetRequiredService<IOptions<CircuitBreakerConfiguration>>().Value;
             var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
             
-            // Return a factory function that creates HTTP resilience policies with appropriate logger
+            // Return a factory function that creates HTTP complete resilience policies with appropriate logger
             return new Func<ILogger, AsyncPolicyWrap<HttpResponseMessage>>(
-                logger => ResiliencePolicyWrapper.CreateHttpResiliencePolicy(retryConfig, circuitConfig, logger));
+                logger => ResiliencePolicyWrapper.CreateCompleteHttpResiliencePolicy(
+                    timeoutConfig, retryConfig, circuitConfig, logger));
         });
 
         return services;
