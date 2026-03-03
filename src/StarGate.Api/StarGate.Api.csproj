@@ -20,7 +20,7 @@
     <ProjectReference Include="..\StarGate.Application\StarGate.Application.csproj" />
     <ProjectReference Include="..\StarGate.Core\StarGate.Core.csproj" />
     <ProjectReference Include="..\StarGate.Infrastructure\StarGate.Infrastructure.csproj" />
-    <PackageReference Include="..\StarGate.Contracts\StarGate.Contracts.csproj" />
+    <ProjectReference Include="..\StarGate.Contracts\StarGate.Contracts.csproj" />
   </ItemGroup>
 
 </Project>
