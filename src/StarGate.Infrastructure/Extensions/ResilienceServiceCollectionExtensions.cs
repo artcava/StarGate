@@ -65,7 +65,7 @@ public static class ResilienceServiceCollectionExtensions
             var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
             
             // Return a factory function that creates HTTP complete resilience policies with appropriate logger
-            return new Func<ILogger, AsyncPolicyWrap<HttpResponseMessage>>(
+            return new Func<ILogger, CompleteHttpResiliencePolicy>(
                 logger => ResiliencePolicyWrapper.CreateCompleteHttpResiliencePolicy(
                     timeoutConfig, retryConfig, circuitConfig, logger));
         });
@@ -75,7 +75,7 @@ public static class ResilienceServiceCollectionExtensions
 
     /// <summary>
     /// Adds HTTP client without automatic resilience policy.
-    /// Consumers should inject AsyncPolicyWrap&lt;HttpResponseMessage&gt; and wrap calls manually.
+    /// Consumers should inject CompleteHttpResiliencePolicy and wrap calls manually.
     /// </summary>
     /// <typeparam name="TClient">HTTP client interface type.</typeparam>
     /// <param name="services">The service collection.</param>
@@ -83,7 +83,7 @@ public static class ResilienceServiceCollectionExtensions
     /// <returns>HTTP client builder for further configuration.</returns>
     /// <remarks>
     /// To use resilience policies:
-    /// 1. Inject AsyncPolicyWrap&lt;HttpResponseMessage&gt; via factory
+    /// 1. Inject CompleteHttpResiliencePolicy via factory
     /// 2. Wrap HTTP calls: await policy.ExecuteAsync(() => httpClient.SendAsync(request))
     /// </remarks>
     public static IHttpClientBuilder AddHttpClientWithResilience<TClient>(
