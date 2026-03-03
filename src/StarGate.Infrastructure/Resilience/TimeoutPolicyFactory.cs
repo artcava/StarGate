@@ -1,8 +1,8 @@
-namespace StarGate.Infrastructure.Resilience;
-
 using Microsoft.Extensions.Logging;
 using Polly;
 using Polly.Timeout;
+
+namespace StarGate.Infrastructure.Resilience;
 
 /// <summary>
 /// Factory for creating Polly timeout policies.
