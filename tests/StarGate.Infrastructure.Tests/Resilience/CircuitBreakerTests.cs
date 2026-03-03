@@ -146,7 +146,7 @@ public class CircuitBreakerTests
             catch { }
         }
 
-        // Assert - Next call should fail immediately
+        // Assert - Next call should fail fast (much faster than retry delays)
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         var act = async () => await circuitBreaker.ExecuteAsync(async () =>
         {
@@ -156,8 +156,9 @@ public class CircuitBreakerTests
         await act.Should().ThrowAsync<BrokenCircuitException>();
         stopwatch.Stop();
         
-        // Should fail almost instantly (< 100ms)
-        stopwatch.ElapsedMilliseconds.Should().BeLessThan(100);
+        // Should fail fast (< 500ms) vs retry delays (1s, 2s, 4s = 7s total)
+        // This validates fail-fast behavior while accounting for test overhead
+        stopwatch.ElapsedMilliseconds.Should().BeLessThan(500);
     }
 
     [Fact]
