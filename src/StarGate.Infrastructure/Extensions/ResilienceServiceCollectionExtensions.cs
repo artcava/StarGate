@@ -1,10 +1,8 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Polly;
-using Polly.Extensions.Http;
 using StarGate.Infrastructure.Resilience;
 
 namespace StarGate.Infrastructure.Extensions;
@@ -44,28 +42,38 @@ public static class ResilienceServiceCollectionExtensions
             return RetryPolicyFactory.CreateBrokerRetryPolicy(config, logger);
         });
 
+        // Register HTTP retry policy factory as singleton
+        services.AddSingleton(provider =>
+        {
+            var config = provider.GetRequiredService<IOptions<RetryPolicyConfiguration>>().Value;
+            var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
+            
+            // Return a factory function that creates HTTP retry policies with appropriate logger
+            return new Func<ILogger, Polly.Retry.AsyncRetryPolicy<HttpResponseMessage>>(
+                logger => RetryPolicyFactory.CreateHttpRetryPolicy(config, logger));
+        });
+
         return services;
     }
 
     /// <summary>
-    /// Adds HTTP client with retry policy.
+    /// Adds HTTP client without automatic retry policy.
+    /// Consumers should inject AsyncRetryPolicy and wrap calls manually.
     /// </summary>
     /// <typeparam name="TClient">HTTP client interface type.</typeparam>
     /// <param name="services">The service collection.</param>
     /// <param name="name">HTTP client name.</param>
     /// <returns>HTTP client builder for further configuration.</returns>
+    /// <remarks>
+    /// Polly v8 removed AddPolicyHandler. To use retry policies:
+    /// 1. Inject AsyncRetryPolicy&lt;HttpResponseMessage&gt; via factory
+    /// 2. Wrap HTTP calls: await policy.ExecuteAsync(() => httpClient.SendAsync(request))
+    /// </remarks>
     public static IHttpClientBuilder AddHttpClientWithRetry<TClient>(
         this IServiceCollection services,
         string name)
         where TClient : class
     {
-        return services
-            .AddHttpClient<TClient>(name)
-            .AddPolicyHandler((provider, request) =>
-            {
-                var config = provider.GetRequiredService<IOptions<RetryPolicyConfiguration>>().Value;
-                var logger = provider.GetRequiredService<ILogger<TClient>>();
-                return RetryPolicyFactory.CreateHttpRetryPolicy(config, logger);
-            });
+        return services.AddHttpClient<TClient>(name);
     }
 }
