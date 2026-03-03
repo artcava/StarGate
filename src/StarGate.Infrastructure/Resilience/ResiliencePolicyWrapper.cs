@@ -63,4 +63,68 @@ public static class ResiliencePolicyWrapper
 
         return Policy.WrapAsync(circuitBreaker, retryPolicy);
     }
+
+    /// <summary>
+    /// Creates a complete resilience policy with timeout, circuit breaker, and retry.
+    /// </summary>
+    /// <param name="timeoutConfig">Timeout configuration.</param>
+    /// <param name="retryConfig">Retry policy configuration.</param>
+    /// <param name="circuitConfig">Circuit breaker configuration.</param>
+    /// <param name="logger">Logger instance.</param>
+    /// <returns>Complete wrapped policy with timeout (outer), circuit breaker, and retry (inner).</returns>
+    public static AsyncPolicyWrap<HttpResponseMessage> CreateCompleteHttpResiliencePolicy(
+        TimeoutConfiguration timeoutConfig,
+        RetryPolicyConfiguration retryConfig,
+        CircuitBreakerConfiguration circuitConfig,
+        ILogger logger)
+    {
+        var timeoutPolicy = TimeoutPolicyFactory.CreateHttpTimeoutPolicy(timeoutConfig, logger);
+        var retryPolicy = RetryPolicyFactory.CreateHttpRetryPolicy(retryConfig, logger);
+        var circuitBreaker = CircuitBreakerFactory.CreateHttpCircuitBreaker(circuitConfig, logger);
+
+        // Wrap: Timeout (outer) -> Circuit Breaker -> Retry (inner)
+        return Policy.WrapAsync(timeoutPolicy, circuitBreaker, retryPolicy);
+    }
+
+    /// <summary>
+    /// Creates a complete resilience policy for database operations.
+    /// </summary>
+    /// <param name="timeoutConfig">Timeout configuration.</param>
+    /// <param name="retryConfig">Retry policy configuration.</param>
+    /// <param name="circuitConfig">Circuit breaker configuration.</param>
+    /// <param name="logger">Logger instance.</param>
+    /// <returns>Complete wrapped policy with timeout (outer), circuit breaker, and retry (inner).</returns>
+    public static AsyncPolicyWrap CreateCompleteDatabaseResiliencePolicy(
+        TimeoutConfiguration timeoutConfig,
+        RetryPolicyConfiguration retryConfig,
+        CircuitBreakerConfiguration circuitConfig,
+        ILogger logger)
+    {
+        var timeoutPolicy = TimeoutPolicyFactory.CreateDatabaseTimeoutPolicy(timeoutConfig, logger);
+        var retryPolicy = RetryPolicyFactory.CreateDatabaseRetryPolicy(retryConfig, logger);
+        var circuitBreaker = CircuitBreakerFactory.CreateDatabaseCircuitBreaker(circuitConfig, logger);
+
+        return Policy.WrapAsync(timeoutPolicy, circuitBreaker, retryPolicy);
+    }
+
+    /// <summary>
+    /// Creates a complete resilience policy for broker operations.
+    /// </summary>
+    /// <param name="timeoutConfig">Timeout configuration.</param>
+    /// <param name="retryConfig">Retry policy configuration.</param>
+    /// <param name="circuitConfig">Circuit breaker configuration.</param>
+    /// <param name="logger">Logger instance.</param>
+    /// <returns>Complete wrapped policy with timeout (outer), circuit breaker, and retry (inner).</returns>
+    public static AsyncPolicyWrap CreateCompleteBrokerResiliencePolicy(
+        TimeoutConfiguration timeoutConfig,
+        RetryPolicyConfiguration retryConfig,
+        CircuitBreakerConfiguration circuitConfig,
+        ILogger logger)
+    {
+        var timeoutPolicy = TimeoutPolicyFactory.CreateBrokerTimeoutPolicy(timeoutConfig, logger);
+        var retryPolicy = RetryPolicyFactory.CreateBrokerRetryPolicy(retryConfig, logger);
+        var circuitBreaker = CircuitBreakerFactory.CreateBrokerCircuitBreaker(circuitConfig, logger);
+
+        return Policy.WrapAsync(timeoutPolicy, circuitBreaker, retryPolicy);
+    }
 }
