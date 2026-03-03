@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Polly;
+using Polly.Wrap;
 using StarGate.Infrastructure.Resilience;
 
 namespace StarGate.Infrastructure.Extensions;
@@ -26,50 +27,56 @@ public static class ResilienceServiceCollectionExtensions
         services.Configure<RetryPolicyConfiguration>(
             configuration.GetSection("Resilience:Retry"));
 
-        // Register database retry policy as singleton
+        // Register circuit breaker configuration
+        services.Configure<CircuitBreakerConfiguration>(
+            configuration.GetSection("Resilience:CircuitBreaker"));
+
+        // Register wrapped resilience policies (circuit breaker + retry)
         services.AddSingleton(provider =>
         {
-            var config = provider.GetRequiredService<IOptions<RetryPolicyConfiguration>>().Value;
+            var retryConfig = provider.GetRequiredService<IOptions<RetryPolicyConfiguration>>().Value;
+            var circuitConfig = provider.GetRequiredService<IOptions<CircuitBreakerConfiguration>>().Value;
             var logger = provider.GetRequiredService<ILogger<RetryPolicyConfiguration>>();
-            return RetryPolicyFactory.CreateDatabaseRetryPolicy(config, logger);
+            return ResiliencePolicyWrapper.CreateDatabaseResiliencePolicy(retryConfig, circuitConfig, logger);
         });
 
-        // Register broker retry policy as singleton
         services.AddSingleton(provider =>
         {
-            var config = provider.GetRequiredService<IOptions<RetryPolicyConfiguration>>().Value;
+            var retryConfig = provider.GetRequiredService<IOptions<RetryPolicyConfiguration>>().Value;
+            var circuitConfig = provider.GetRequiredService<IOptions<CircuitBreakerConfiguration>>().Value;
             var logger = provider.GetRequiredService<ILogger<RetryPolicyConfiguration>>();
-            return RetryPolicyFactory.CreateBrokerRetryPolicy(config, logger);
+            return ResiliencePolicyWrapper.CreateBrokerResiliencePolicy(retryConfig, circuitConfig, logger);
         });
 
-        // Register HTTP retry policy factory as singleton
+        // Register HTTP resilience policy factory as singleton
         services.AddSingleton(provider =>
         {
-            var config = provider.GetRequiredService<IOptions<RetryPolicyConfiguration>>().Value;
+            var retryConfig = provider.GetRequiredService<IOptions<RetryPolicyConfiguration>>().Value;
+            var circuitConfig = provider.GetRequiredService<IOptions<CircuitBreakerConfiguration>>().Value;
             var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
             
-            // Return a factory function that creates HTTP retry policies with appropriate logger
-            return new Func<ILogger, Polly.Retry.AsyncRetryPolicy<HttpResponseMessage>>(
-                logger => RetryPolicyFactory.CreateHttpRetryPolicy(config, logger));
+            // Return a factory function that creates HTTP resilience policies with appropriate logger
+            return new Func<ILogger, AsyncPolicyWrap<HttpResponseMessage>>(
+                logger => ResiliencePolicyWrapper.CreateHttpResiliencePolicy(retryConfig, circuitConfig, logger));
         });
 
         return services;
     }
 
     /// <summary>
-    /// Adds HTTP client without automatic retry policy.
-    /// Consumers should inject AsyncRetryPolicy and wrap calls manually.
+    /// Adds HTTP client without automatic resilience policy.
+    /// Consumers should inject AsyncPolicyWrap&lt;HttpResponseMessage&gt; and wrap calls manually.
     /// </summary>
     /// <typeparam name="TClient">HTTP client interface type.</typeparam>
     /// <param name="services">The service collection.</param>
     /// <param name="name">HTTP client name.</param>
     /// <returns>HTTP client builder for further configuration.</returns>
     /// <remarks>
-    /// Polly v8 removed AddPolicyHandler. To use retry policies:
-    /// 1. Inject AsyncRetryPolicy&lt;HttpResponseMessage&gt; via factory
+    /// To use resilience policies:
+    /// 1. Inject AsyncPolicyWrap&lt;HttpResponseMessage&gt; via factory
     /// 2. Wrap HTTP calls: await policy.ExecuteAsync(() => httpClient.SendAsync(request))
     /// </remarks>
-    public static IHttpClientBuilder AddHttpClientWithRetry<TClient>(
+    public static IHttpClientBuilder AddHttpClientWithResilience<TClient>(
         this IServiceCollection services,
         string name)
         where TClient : class
