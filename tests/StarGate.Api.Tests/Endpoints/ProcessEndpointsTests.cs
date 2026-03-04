@@ -79,7 +79,7 @@ public class ProcessEndpointsTests : EndpointTestBase
 
         // Assert
         var statusCode = GetStatusCode(result);
-        statusCode.Should().Be(StatusCodes.Status201Created);
+        statusCode.Should().Be(StatusCodes.Status202Accepted);
 
         var response = GetResultValue<ProcessResponse>(result);
         response.Should().NotBeNull();
@@ -390,7 +390,7 @@ public class ProcessEndpointsTests : EndpointTestBase
 
         // Assert
         var statusCode = GetStatusCode(result);
-        statusCode.Should().Be(StatusCodes.Status201Created);
+        statusCode.Should().Be(StatusCodes.Status202Accepted);
 
         _processServiceMock.Verify(
             s => s.SubmitProcessAsync(

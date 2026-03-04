@@ -62,6 +62,11 @@ public abstract class EndpointTestBase
             return createdResult.Value!;
         }
 
+        if(result is Accepted<T> acceptedResult)
+        {
+            return acceptedResult.Value!;
+        }
+
         throw new InvalidOperationException($"Result is not Ok<{typeof(T).Name}> or Created<{typeof(T).Name}>");
     }
 

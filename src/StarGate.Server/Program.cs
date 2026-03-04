@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
 using StarGate.Core.Configuration;
+using StarGate.Infrastructure.Extensions;
+using StarGate.Infrastructure.Resilience;
 using StarGate.Server.HealthChecks;
 using StarGate.Server.Workers;
 
@@ -17,6 +19,12 @@ builder.Services.Configure<HostOptions>(options =>
 builder.Services.Configure<RetryConfiguration>(
     builder.Configuration.GetSection("Retry"));
 
+// Add resilience policies
+builder.Services.AddResiliencePolicies(builder.Configuration);
+
+// Register circuit breaker state service
+builder.Services.AddSingleton<CircuitBreakerStateService>();
+
 // Register ProcessWorker as singleton to allow health check injection
 builder.Services.AddSingleton<ProcessWorker>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<ProcessWorker>());
@@ -29,7 +37,11 @@ builder.Services.AddHealthChecks()
     .AddCheck<ProcessWorkerHealthCheck>(
         "process-worker",
         failureStatus: HealthStatus.Degraded,
-        tags: new[] { "worker", "ready" });
+        tags: new[] { "worker", "ready" })
+    .AddCheck<CircuitBreakerHealthCheck>(
+        "circuit-breakers",
+        failureStatus: HealthStatus.Degraded,
+        tags: new[] { "resilience", "ready" });
 
 IHost host = builder.Build();
 host.Run();
